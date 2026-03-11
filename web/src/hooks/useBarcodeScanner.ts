@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { BrowserMultiFormatReader } from '@zxing/browser'
 
 type UseBarcodeScannerOptions = {
   onCode: (code: string) => void
@@ -11,6 +12,7 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
   const [torchOn, setTorchOn] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
   const lastCodeRef = useRef<string | null>(null)
+  const zxingControlsRef = useRef<{ stop: () => void } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -75,9 +77,28 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
 
           requestAnimationFrame(scanFrame)
         } else {
-          setError(
-            'Este navegador no soporta BarcodeDetector. Más adelante se puede integrar una librería de fallback como ZXing.',
-          )
+          // Fallback con ZXing para Safari, Chrome en escritorio y otros navegadores
+          try {
+            const codeReader = new BrowserMultiFormatReader()
+            const controls = await codeReader.decodeFromStream(stream, video ?? undefined, (result, err) => {
+              if (cancelled) return
+              if (err && !(err.name === 'NotFoundException')) {
+                console.error('Error al decodificar con ZXing', err)
+                return
+              }
+              if (result) {
+                const raw = result.getText()
+                if (raw && raw !== lastCodeRef.current) {
+                  lastCodeRef.current = raw
+                  onCode(raw)
+                }
+              }
+            })
+            zxingControlsRef.current = controls
+          } catch (e) {
+            console.error('Error al iniciar ZXing', e)
+            setError('No se pudo iniciar el escáner de códigos de barras.')
+          }
         }
       } catch (e) {
         console.error(e)
@@ -89,6 +110,8 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
 
     return () => {
       cancelled = true
+      zxingControlsRef.current?.stop()
+      zxingControlsRef.current = null
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop())
       }
@@ -117,4 +140,3 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
     toggleTorch,
   }
 }
-
