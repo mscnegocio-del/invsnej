@@ -38,7 +38,7 @@ export function BarcodeScanner({ onDetected }: Props) {
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            transform: 'scaleX(-1) scaleY(-1)',
+            transform: 'rotate(-90deg)',
           }}
         />
         {/* Marco de área de escaneo */}
