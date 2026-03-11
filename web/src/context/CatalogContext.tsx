@@ -1,0 +1,122 @@
+import { createContext, useContext, useEffect, useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
+import type { Trabajador, Ubicacion } from '../types'
+
+type CatalogContextValue = {
+  trabajadores: Trabajador[]
+  ubicaciones: Ubicacion[]
+  loading: boolean
+  error: string | null
+  reload: () => void
+}
+
+const CatalogContext = createContext<CatalogContextValue | undefined>(undefined)
+
+const CACHE_KEY = 'invweb_catalogs_v1'
+const CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutos
+
+type CachePayload = {
+  trabajadores: Trabajador[]
+  ubicaciones: Ubicacion[]
+  timestamp: number
+}
+
+function loadFromCache(): CachePayload | null {
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as CachePayload
+    if (!parsed.timestamp || Date.now() - parsed.timestamp > CACHE_TTL_MS) {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function saveToCache(payload: CachePayload) {
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload))
+  } catch {
+    // Si falla el cache, no bloquea la app
+  }
+}
+
+export function CatalogProvider({ children }: { children: React.ReactNode }) {
+  const [trabajadores, setTrabajadores] = useState<Trabajador[]>([])
+  const [ubicaciones, setUbicaciones] = useState<Ubicacion[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchData() {
+      setLoading(true)
+      setError(null)
+
+      // Intentar usar cache primero
+      const cached = loadFromCache()
+      if (cached && !cancelled) {
+        setTrabajadores(cached.trabajadores)
+        setUbicaciones(cached.ubicaciones)
+        setLoading(false)
+        return
+      }
+
+      const [trabajadoresRes, ubicacionesRes] = await Promise.all([
+        supabase.from('trabajadores').select('id, nombre').order('nombre', { ascending: true }),
+        supabase.from('ubicaciones').select('id, nombre').order('nombre', { ascending: true }),
+      ])
+
+      if (cancelled) return
+
+      if (trabajadoresRes.error || ubicacionesRes.error) {
+        setError(
+          trabajadoresRes.error?.message ??
+            ubicacionesRes.error?.message ??
+            'Error cargando catálogos',
+        )
+        setLoading(false)
+        return
+      }
+
+      const trabajadoresData = (trabajadoresRes.data ?? []) as Trabajador[]
+      const ubicacionesData = (ubicacionesRes.data ?? []) as Ubicacion[]
+
+      setTrabajadores(trabajadoresData)
+      setUbicaciones(ubicacionesData)
+      saveToCache({
+        trabajadores: trabajadoresData,
+        ubicaciones: ubicacionesData,
+        timestamp: Date.now(),
+      })
+      setLoading(false)
+    }
+
+    fetchData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [reloadToken])
+
+  const reload = () => setReloadToken((t) => t + 1)
+
+  return (
+    <CatalogContext.Provider value={{ trabajadores, ubicaciones, loading, error, reload }}>
+      {children}
+    </CatalogContext.Provider>
+  )
+}
+
+export function useCatalogs() {
+  const ctx = useContext(CatalogContext)
+  if (!ctx) {
+    throw new Error('useCatalogs debe usarse dentro de CatalogProvider')
+  }
+  return ctx
+}
+
