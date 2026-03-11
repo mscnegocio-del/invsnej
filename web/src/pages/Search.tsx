@@ -72,127 +72,115 @@ export function Search() {
 
   const handleNextPage = () => {
     setPage((prev) => prev + 1)
-    // Disparar búsqueda con la nueva página
-    setTimeout(() => {
-      void handleSearch()
-    }, 0)
+    setTimeout(() => void handleSearch(), 0)
   }
 
   const handlePrevPage = () => {
     setPage((prev) => Math.max(0, prev - 1))
-    setTimeout(() => {
-      void handleSearch()
-    }, 0)
+    setTimeout(() => void handleSearch(), 0)
   }
 
   const totalPages = total !== null ? Math.ceil(total / PAGE_SIZE) : null
 
   return (
-    <main style={{ padding: '1.5rem' }}>
-      <h1>Buscar bienes</h1>
-      <p>Filtra por código, responsable o ubicación y navega al detalle del bien.</p>
+    <div>
+      <h1 className="page-title">Buscar bienes</h1>
+      <p className="page-subtitle">Filtra por código, responsable o ubicación y navega al detalle del bien.</p>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.75rem',
-          marginTop: '1rem',
-          maxWidth: 480,
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <label>
-            Código patrimonial
-            <input
-              type="text"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              placeholder="Ej. código exacto"
-            />
-          </label>
+      <form onSubmit={handleSubmit} className="mt-6 card p-6 space-y-4 max-w-xl">
+        <div>
+          <label className="label" htmlFor="search-codigo">Código patrimonial</label>
+          <input
+            id="search-codigo"
+            type="text"
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value)}
+            placeholder="Ej. código exacto"
+            className="input"
+          />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <label>
-            Responsable
-            <select
-              value={idTrabajador}
-              onChange={(e) => {
-                const v = e.target.value
-                setIdTrabajador(v ? Number(v) : '')
-              }}
-            >
-              <option value="">Todos</option>
-              {trabajadores.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div>
+          <label className="label" htmlFor="search-responsable">Responsable</label>
+          <select
+            id="search-responsable"
+            value={idTrabajador}
+            onChange={(e) => setIdTrabajador(e.target.value ? Number(e.target.value) : '')}
+            className="input"
+          >
+            <option value="">Todos</option>
+            {trabajadores.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nombre}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <label>
-            Ubicación (contiene)
-            <input
-              type="text"
-              value={textoUbicacion}
-              onChange={(e) => setTextoUbicacion(e.target.value)}
-              placeholder="Texto parcial de ubicación"
-            />
-          </label>
+        <div>
+          <label className="label" htmlFor="search-ubicacion">Ubicación (contiene)</label>
+          <input
+            id="search-ubicacion"
+            type="text"
+            value={textoUbicacion}
+            onChange={(e) => setTextoUbicacion(e.target.value)}
+            placeholder="Texto parcial de ubicación"
+            className="input"
+          />
         </div>
 
-        <button type="submit" disabled={loading} style={{ padding: '0.5rem 1rem' }}>
-          {loading ? 'Buscando...' : 'Buscar'}
+        <button type="submit" disabled={loading} className="btn-primary w-full">
+          {loading ? (
+            <>
+              <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Buscando...
+            </>
+          ) : (
+            'Buscar'
+          )}
         </button>
       </form>
 
       {error && (
-        <p style={{ marginTop: '1rem', color: 'red' }}>
+        <p className="mt-4 rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
           {error}
         </p>
       )}
 
       {!loading && resultados.length > 0 && (
-        <section style={{ marginTop: '1.5rem' }}>
-          <h2>Resultados</h2>
-          <p>
-            Página {page + 1}
-            {totalPages ? ` de ${totalPages}` : ''}{' '}
-            {total !== null ? `(${total} bienes encontrados)` : ''}
-          </p>
+        <section className="mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">Resultados</h2>
+            <p className="text-sm text-slate-600">
+              Página {page + 1}
+              {totalPages ? ` de ${totalPages}` : ''}
+              {total !== null ? ` · ${total} bienes` : ''}
+            </p>
+          </div>
 
-          <ul style={{ listStyle: 'none', padding: 0, marginTop: '0.75rem' }}>
+          <ul className="space-y-0 divide-y divide-slate-200 card overflow-hidden">
             {resultados.map((b) => (
               <li
                 key={b.id}
-                style={{
-                  padding: '0.75rem 0',
-                  borderBottom: '1px solid #e5e7eb',
-                  cursor: 'pointer',
-                }}
                 onClick={() => navigate(`/bienes/${b.id}`)}
+                className="px-4 py-4 hover:bg-slate-50 cursor-pointer transition-colors"
               >
-                <div style={{ fontWeight: 600 }}>{b.codigo_patrimonial}</div>
-                <div>{b.nombre_mueble_equipo || 'Sin nombre'}</div>
-                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  {b.ubicacion || 'Sin ubicación'}{' '}
-                  {b.id_trabajador ? `· Responsable ID ${b.id_trabajador}` : ''}
+                <div className="font-semibold text-slate-900">{b.codigo_patrimonial}</div>
+                <div className="text-slate-600">{b.nombre_mueble_equipo || 'Sin nombre'}</div>
+                <div className="text-sm text-slate-500 mt-0.5">
+                  {b.ubicacion || 'Sin ubicación'}
+                  {b.id_trabajador ? ` · Responsable ID ${b.id_trabajador}` : ''}
                 </div>
               </li>
             ))}
           </ul>
 
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', alignItems: 'center' }}>
+          <div className="flex gap-3 mt-4">
             <button
               type="button"
               onClick={handlePrevPage}
               disabled={loading || page === 0}
-              style={{ padding: '0.5rem 1rem' }}
+              className="btn-secondary flex-1"
             >
               Anterior
             </button>
@@ -200,7 +188,7 @@ export function Search() {
               type="button"
               onClick={handleNextPage}
               disabled={loading || (totalPages !== null && page + 1 >= totalPages)}
-              style={{ padding: '0.5rem 1rem' }}
+              className="btn-primary flex-1"
             >
               Siguiente
             </button>
@@ -209,13 +197,12 @@ export function Search() {
       )}
 
       {!loading && !error && resultados.length === 0 && total === null && (
-        <p style={{ marginTop: '1.5rem' }}>Realiza una búsqueda para ver resultados.</p>
+        <p className="mt-8 text-slate-500 text-center py-8">Realiza una búsqueda para ver resultados.</p>
       )}
 
       {!loading && !error && resultados.length === 0 && total === 0 && (
-        <p style={{ marginTop: '1.5rem' }}>No se encontraron bienes con esos filtros.</p>
+        <p className="mt-8 text-slate-500 text-center py-8">No se encontraron bienes con esos filtros.</p>
       )}
-    </main>
+    </div>
   )
 }
-

@@ -12,63 +12,48 @@ export function DuplicateAlert({ codigo, bien, onRegisterAnother, onCancel }: Pr
   const navigate = useNavigate()
 
   return (
-    <section
-      style={{
-        marginTop: '1.5rem',
-        padding: '1rem',
-        borderRadius: '0.75rem',
-        border: '1px solid #f97316',
-        background: '#fff7ed',
-      }}
-    >
-      <h2 style={{ marginTop: 0 }}>Bien ya registrado</h2>
-      <p>
+    <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+      <h2 className="text-lg font-semibold text-amber-900">Bien ya registrado</h2>
+      <p className="mt-2 text-amber-800">
         El código <strong>{codigo}</strong> ya existe en el inventario.
       </p>
-      <dl style={{ marginTop: '0.75rem' }}>
+      <dl className="mt-4 space-y-2">
         <div>
-          <dt style={{ fontWeight: 600 }}>Nombre / modelo</dt>
-          <dd>{bien.nombre_mueble_equipo || 'Sin nombre registrado'}</dd>
+          <dt className="text-sm font-medium text-amber-700">Nombre / modelo</dt>
+          <dd className="text-amber-900">{bien.nombre_mueble_equipo || 'Sin nombre registrado'}</dd>
         </div>
         <div>
-          <dt style={{ fontWeight: 600 }}>Ubicación actual</dt>
-          <dd>{bien.ubicacion || 'Sin ubicación registrada'}</dd>
+          <dt className="text-sm font-medium text-amber-700">Ubicación actual</dt>
+          <dd className="text-amber-900">{bien.ubicacion || 'Sin ubicación registrada'}</dd>
         </div>
       </dl>
 
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          marginTop: '1rem',
-        }}
-      >
+      <div className="mt-5 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => navigate(`/bienes/${bien.id}`)}
-          style={{ padding: '0.5rem 1rem' }}
+          className="btn-primary"
         >
           Ver detalle
         </button>
         <button
           type="button"
           onClick={() => navigate(`/bienes/${bien.id}/editar`)}
-          style={{ padding: '0.5rem 1rem' }}
+          className="btn-secondary"
         >
           Editar
         </button>
         <button
           type="button"
           onClick={onRegisterAnother}
-          style={{ padding: '0.5rem 1rem' }}
+          className="btn-ghost"
         >
           Registrar otro
         </button>
         <button
           type="button"
           onClick={onCancel}
-          style={{ padding: '0.5rem 1rem', marginLeft: 'auto' }}
+          className="btn-ghost ml-auto"
         >
           Cancelar
         </button>
@@ -76,4 +61,3 @@ export function DuplicateAlert({ codigo, bien, onRegisterAnother, onCancel }: Pr
     </section>
   )
 }
-

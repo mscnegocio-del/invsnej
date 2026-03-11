@@ -42,15 +42,20 @@ export function Scan() {
   }
 
   return (
-    <main style={{ padding: '1.5rem' }}>
-      <h1>Escanear bien</h1>
-      <p>Usa la cámara para leer el código de barras del bien.</p>
+    <div>
+      <h1 className="page-title">Escanear bien</h1>
+      <p className="page-subtitle">Apunta la cámara al código de barras del bien.</p>
 
       <BarcodeScanner onDetected={handleDetected} />
 
-      {checking && <p style={{ marginTop: '1rem' }}>Verificando código en el inventario...</p>}
+      {checking && (
+        <p className="mt-4 flex items-center gap-2 text-slate-600">
+          <span className="size-4 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+          Verificando código en el inventario...
+        </p>
+      )}
       {error && (
-        <p style={{ marginTop: '1rem', color: 'red' }}>
+        <p className="mt-4 rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
           {error}
         </p>
       )}
@@ -66,7 +71,6 @@ export function Scan() {
           onCancel={() => navigate('/')}
         />
       )}
-    </main>
+    </div>
   )
 }
-

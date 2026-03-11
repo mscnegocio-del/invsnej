@@ -10,47 +10,19 @@ export function BarcodeScanner({ onDetected }: Props) {
   })
 
   return (
-    <section
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem',
-        marginTop: '1rem',
-      }}
-    >
-      <div
-        style={{
-          position: 'relative',
-          width: '100%',
-          maxWidth: 480,
-          aspectRatio: '3 / 4',
-          borderRadius: '0.75rem',
-          overflow: 'hidden',
-          background: '#000',
-        }}
-      >
+    <section className="mt-6 flex flex-col gap-4">
+      <div className="relative w-full max-w-md mx-auto aspect-[3/4] rounded-2xl overflow-hidden bg-slate-900 shadow-lg ring-1 ring-slate-200/50">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            transform: 'rotate(-90deg)',
-          }}
+          className="absolute inset-0 w-full h-full object-cover [transform:rotate(90deg)]"
         />
         {/* Marco de área de escaneo */}
         <div
-          style={{
-            position: 'absolute',
-            inset: '20%',
-            borderRadius: '0.75rem',
-            border: '2px solid rgba(0, 255, 0, 0.7)',
-            boxShadow: '0 0 20px rgba(0, 255, 0, 0.5)',
-            pointerEvents: 'none',
-          }}
+          className="absolute inset-[20%] rounded-xl border-2 border-emerald-400/80 shadow-[0_0_24px_rgba(52,211,153,0.3)] pointer-events-none"
+          aria-hidden
         />
       </div>
 
@@ -58,18 +30,20 @@ export function BarcodeScanner({ onDetected }: Props) {
         <button
           type="button"
           onClick={toggleTorch}
-          style={{
-            alignSelf: 'flex-start',
-            padding: '0.5rem 1rem',
-          }}
+          className="btn-secondary self-start"
         >
           {torchOn ? 'Apagar flash' : 'Encender flash'}
         </button>
       )}
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {!error && <p>Apunta la cámara al código de barras del bien.</p>}
+      {error && (
+        <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
+          {error}
+        </p>
+      )}
+      {!error && (
+        <p className="text-slate-600 text-sm">Apunta la cámara al código de barras del bien.</p>
+      )}
     </section>
   )
 }
-

@@ -29,7 +29,6 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Cargar datos iniciales en modo edición
   useEffect(() => {
     if (modo !== 'edit' || !bienId) return
 
@@ -62,7 +61,6 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       setTipo(raw.tipo_mueble_equipo ?? '')
       setEstado(raw.estado)
       setIdTrabajador(raw.id_trabajador)
-      // En la BD ubicacion es texto; aquí asumimos que se migrará a FK en el futuro.
       setIdUbicacion(null)
       setLoading(false)
     }
@@ -126,7 +124,6 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       const { error: supaError } = await supabase
         .from('bienes')
         .update({
-          // Normalmente no se debería cambiar el código; aquí lo permitimos para flexibilidad.
           codigo_patrimonial: codigo.trim(),
           nombre_mueble_equipo: nombre.trim(),
           tipo_mueble_equipo: tipo.trim() || null,
@@ -153,69 +150,78 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <label>
-          Código patrimonial *
-          <input
-            type="text"
-            value={codigo}
-            onChange={(e) => setCodigo(e.target.value)}
-            placeholder="Código leído del código de barras"
-          />
-        </label>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div>
+        <label className="label" htmlFor="form-codigo">Código patrimonial *</label>
+        <input
+          id="form-codigo"
+          type="text"
+          value={codigo}
+          onChange={(e) => setCodigo(e.target.value)}
+          placeholder="Código leído del código de barras"
+          className="input"
+        />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <label>
-          Nombre / modelo del bien *
-          <input
-            type="text"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej. Escritorio de oficina, Laptop Dell..."
-          />
-        </label>
+      <div>
+        <label className="label" htmlFor="form-nombre">Nombre / modelo del bien *</label>
+        <input
+          id="form-nombre"
+          type="text"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          placeholder="Ej. Escritorio de oficina, Laptop Dell..."
+          className="input"
+        />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <label>
-          Tipo de mueble o equipo
-          <input
-            type="text"
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value)}
-            placeholder="Ej. Mueble, Equipo de cómputo, Silla..."
-          />
-        </label>
+      <div>
+        <label className="label" htmlFor="form-tipo">Tipo de mueble o equipo</label>
+        <input
+          id="form-tipo"
+          type="text"
+          value={tipo}
+          onChange={(e) => setTipo(e.target.value)}
+          placeholder="Ej. Mueble, Equipo de cómputo, Silla..."
+          className="input"
+        />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        <label>
-          Estado *
-          <select value={estado} onChange={(e) => setEstado(e.target.value)}>
-            {ESTADOS.map((op) => (
-              <option key={op} value={op}>
-                {op}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div>
+        <label className="label" htmlFor="form-estado">Estado *</label>
+        <select
+          id="form-estado"
+          value={estado}
+          onChange={(e) => setEstado(e.target.value)}
+          className="input"
+        >
+          {ESTADOS.map((op) => (
+            <option key={op} value={op}>
+              {op}
+            </option>
+          ))}
+        </select>
       </div>
 
       <TrabajadorSelect value={idTrabajador} onChange={setIdTrabajador} required />
       <UbicacionSelect value={idUbicacion} onChange={setIdUbicacion} />
 
       {error && (
-        <p style={{ color: 'red' }}>
+        <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
           {error}
         </p>
       )}
 
-      <button type="submit" disabled={loading} style={{ padding: '0.75rem 1rem' }}>
-        {loading ? 'Guardando...' : modo === 'create' ? 'Registrar bien' : 'Guardar cambios'}
+      <button type="submit" disabled={loading} className="btn-primary w-full">
+        {loading ? (
+          <>
+            <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            Guardando...
+          </>
+        ) : (
+          modo === 'create' ? 'Registrar bien' : 'Guardar cambios'
+        )}
       </button>
     </form>
   )
 }
-

@@ -41,7 +41,7 @@ export function BienDetail() {
         return
       }
 
-      const raw = data as any
+      const raw = data as { id: number; codigo_patrimonial: string; nombre_mueble_equipo: string; tipo_mueble_equipo: string | null; estado: string; id_trabajador: number | null; ubicacion: string | null; fecha_registro: string | null }
       let trabajadorNombre: string | null = null
 
       if (raw.id_trabajador) {
@@ -103,55 +103,46 @@ export function BienDetail() {
   }
 
   return (
-    <main style={{ padding: '1.5rem' }}>
-      <h1>Detalle de bien</h1>
+    <div>
+      <h1 className="page-title">Detalle de bien</h1>
 
-      {loading && <p>Cargando información del bien...</p>}
+      {loading && (
+        <p className="mt-6 flex items-center gap-2 text-slate-600">
+          <span className="size-4 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+          Cargando información del bien...
+        </p>
+      )}
 
       {error && !loading && (
-        <p style={{ color: 'red' }}>
+        <p className="mt-6 rounded-xl bg-red-50 text-red-700 px-4 py-3">
           {error}
         </p>
       )}
 
       {bien && !loading && !error && (
-        <section style={{ marginTop: '1rem' }}>
-          <dl style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '0.5rem 1rem' }}>
-            <div>
-              <dt style={{ fontWeight: 600 }}>Código patrimonial</dt>
-              <dd>{bien.codigo_patrimonial}</dd>
-            </div>
-            <div>
-              <dt style={{ fontWeight: 600 }}>Nombre / modelo</dt>
-              <dd>{bien.nombre_mueble_equipo}</dd>
-            </div>
-            <div>
-              <dt style={{ fontWeight: 600 }}>Tipo</dt>
-              <dd>{bien.tipo_mueble_equipo || '—'}</dd>
-            </div>
-            <div>
-              <dt style={{ fontWeight: 600 }}>Estado</dt>
-              <dd>{bien.estado}</dd>
-            </div>
-            <div>
-              <dt style={{ fontWeight: 600 }}>Responsable</dt>
-              <dd>{bien.trabajador_nombre || 'Sin responsable asignado'}</dd>
-            </div>
-            <div>
-              <dt style={{ fontWeight: 600 }}>Ubicación</dt>
-              <dd>{bien.ubicacion || 'Sin ubicación registrada'}</dd>
-            </div>
-            <div>
-              <dt style={{ fontWeight: 600 }}>Fecha de registro</dt>
-              <dd>{bien.fecha_registro ? new Date(bien.fecha_registro).toLocaleString() : '—'}</dd>
-            </div>
+        <div className="mt-6 card overflow-hidden">
+          <dl className="divide-y divide-slate-100">
+            {[
+              { term: 'Código patrimonial', value: bien.codigo_patrimonial },
+              { term: 'Nombre / modelo', value: bien.nombre_mueble_equipo },
+              { term: 'Tipo', value: bien.tipo_mueble_equipo || '—' },
+              { term: 'Estado', value: bien.estado },
+              { term: 'Responsable', value: bien.trabajador_nombre || 'Sin responsable asignado' },
+              { term: 'Ubicación', value: bien.ubicacion || 'Sin ubicación registrada' },
+              { term: 'Fecha de registro', value: bien.fecha_registro ? new Date(bien.fecha_registro).toLocaleString() : '—' },
+            ].map(({ term, value }) => (
+              <div key={term} className="px-6 py-4 sm:grid sm:grid-cols-2 sm:gap-4">
+                <dt className="text-sm font-medium text-slate-500">{term}</dt>
+                <dd className="mt-1 text-slate-900 sm:mt-0">{value}</dd>
+              </div>
+            ))}
           </dl>
 
-          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
+          <div className="px-6 py-4 bg-slate-50/50 flex flex-wrap gap-3">
             <button
               type="button"
               onClick={() => navigate(`/bienes/${bien.id}/editar`)}
-              style={{ padding: '0.5rem 1rem' }}
+              className="btn-primary"
             >
               Editar
             </button>
@@ -159,14 +150,13 @@ export function BienDetail() {
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              style={{ padding: '0.5rem 1rem', backgroundColor: '#fee2e2' }}
+              className="btn-danger"
             >
               {deleting ? 'Eliminando...' : 'Eliminar'}
             </button>
           </div>
-        </section>
+        </div>
       )}
-    </main>
+    </div>
   )
 }
-

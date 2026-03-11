@@ -17,12 +17,19 @@ export function UbicacionSelect({ value, onChange, label = 'Ubicación', require
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-      <label>
+    <div>
+      <label className="label" htmlFor="ubicacion-select">
         {label}
         {required ? ' *' : ''}
       </label>
-      <select value={value ?? ''} onChange={handleChange} disabled={loading || !!error} required={required}>
+      <select
+        id="ubicacion-select"
+        value={value ?? ''}
+        onChange={handleChange}
+        disabled={loading || !!error}
+        required={required}
+        className={`input ${error ? 'input-error' : ''}`}
+      >
         <option value="">{loading ? 'Cargando ubicaciones...' : 'Seleccione una ubicación'}</option>
         {ubicaciones.map((u) => (
           <option key={u.id} value={u.id}>
@@ -30,10 +37,11 @@ export function UbicacionSelect({ value, onChange, label = 'Ubicación', require
           </option>
         ))}
       </select>
-      {error ? (
-        <small style={{ color: 'red' }}>Error cargando ubicaciones: {error}</small>
-      ) : null}
+      {error && (
+        <small className="mt-1 block text-red-600 text-sm">
+          Error cargando ubicaciones: {error}
+        </small>
+      )}
     </div>
   )
 }
-

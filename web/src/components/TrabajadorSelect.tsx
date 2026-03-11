@@ -17,12 +17,19 @@ export function TrabajadorSelect({ value, onChange, label = 'Responsable', requi
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-      <label>
+    <div>
+      <label className="label" htmlFor="trabajador-select">
         {label}
         {required ? ' *' : ''}
       </label>
-      <select value={value ?? ''} onChange={handleChange} disabled={loading || !!error} required={required}>
+      <select
+        id="trabajador-select"
+        value={value ?? ''}
+        onChange={handleChange}
+        disabled={loading || !!error}
+        required={required}
+        className={`input ${error ? 'input-error' : ''}`}
+      >
         <option value="">{loading ? 'Cargando responsables...' : 'Seleccione un responsable'}</option>
         {trabajadores.map((t) => (
           <option key={t.id} value={t.id}>
@@ -30,10 +37,11 @@ export function TrabajadorSelect({ value, onChange, label = 'Responsable', requi
           </option>
         ))}
       </select>
-      {error ? (
-        <small style={{ color: 'red' }}>Error cargando responsables: {error}</small>
-      ) : null}
+      {error && (
+        <small className="mt-1 block text-red-600 text-sm">
+          Error cargando responsables: {error}
+        </small>
+      )}
     </div>
   )
 }
-

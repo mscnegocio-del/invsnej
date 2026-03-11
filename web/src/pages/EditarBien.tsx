@@ -16,18 +16,19 @@ export function EditarBien() {
   }, [id])
 
   return (
-    <main style={{ padding: '1.5rem' }}>
-      <h1>Editar bien</h1>
-      <p>Actualiza la información del bien seleccionado.</p>
+    <div>
+      <h1 className="page-title">Editar bien</h1>
+      <p className="page-subtitle">Actualiza la información del bien seleccionado.</p>
 
-      <section style={{ marginTop: '1.5rem', maxWidth: 480 }}>
-        {bienId ? (
-          <BienForm modo="edit" bienId={bienId} />
-        ) : (
-          <p style={{ color: 'red' }}>ID de bien no válido.</p>
-        )}
+      <section className="mt-6">
+        <div className="card p-6">
+          {bienId ? (
+            <BienForm modo="edit" bienId={bienId} />
+          ) : (
+            <p className="text-red-600 rounded-xl bg-red-50 px-4 py-3">ID de bien no válido.</p>
+          )}
+        </div>
       </section>
-    </main>
+    </div>
   )
 }
-
