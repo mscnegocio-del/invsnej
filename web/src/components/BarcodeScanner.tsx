@@ -20,9 +20,15 @@ type Props = {
 
 export function BarcodeScanner({ onDetected }: Props) {
   const [rotation, setRotation] = useState(getStoredRotation)
-  const { videoRef, error, hasTorch, torchOn, toggleTorch } = useBarcodeScanner({
-    onCode: onDetected,
-  })
+  const {
+    videoRef,
+    error,
+    hasTorch,
+    torchOn,
+    toggleTorch,
+    captureManual,
+    capturing,
+  } = useBarcodeScanner({ onCode: onDetected })
 
   useEffect(() => {
     try {
@@ -31,7 +37,7 @@ export function BarcodeScanner({ onDetected }: Props) {
   }, [rotation])
 
   const cycleRotation = () => {
-    setRotation((prev) => (prev + 90) % 360 as 0 | 90 | 180 | 270)
+    setRotation((prev) => ((prev + 90) % 360) as 0 | 90 | 180 | 270)
   }
 
   return (
@@ -53,6 +59,21 @@ export function BarcodeScanner({ onDetected }: Props) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={captureManual}
+          disabled={capturing}
+          className="btn-primary"
+        >
+          {capturing ? (
+            <>
+              <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Leyendo...
+            </>
+          ) : (
+            '📸 Capturar y leer'
+          )}
+        </button>
         {hasTorch && (
           <button
             type="button"
@@ -78,10 +99,13 @@ export function BarcodeScanner({ onDetected }: Props) {
         </p>
       )}
       {!error && (
-        <p className="text-slate-600 text-sm">
-          Apunta la cámara al código de barras del bien.
-          {rotation !== 0 && ' Si la imagen se ve mal, usa "Rotar vista".'}
-        </p>
+        <div className="text-slate-600 text-sm space-y-1">
+          <p>Centra solo el código de barras en el recuadro verde.</p>
+          <p className="text-slate-500 text-xs">
+            Si no se lee automático: usa «Capturar y leer». Evita reflejos; prueba sin flash en etiquetas brillantes.
+            {rotation !== 0 && ' Usa «Rotar vista» si la imagen se ve mal.'}
+          </p>
+        </div>
       )}
     </section>
   )
