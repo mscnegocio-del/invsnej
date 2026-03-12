@@ -2,18 +2,18 @@ import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { BarcodeScanModal } from '../components/BarcodeScanModal'
+import { TrabajadorSearchableSelect } from '../components/TrabajadorSearchableSelect'
 import type { BienResumen } from '../types'
-import { useCatalogs } from '../context/CatalogContext'
-
 const PAGE_SIZE = 20
 
 export function Search() {
   const navigate = useNavigate()
-  const { trabajadores } = useCatalogs()
 
   const [codigo, setCodigo] = useState('')
   const [idTrabajador, setIdTrabajador] = useState<number | ''>('')
   const [textoUbicacion, setTextoUbicacion] = useState('')
+  const [showScanModal, setShowScanModal] = useState(false)
 
   const [page, setPage] = useState(0)
   const [resultados, setResultados] = useState<BienResumen[]>([])
@@ -80,6 +80,12 @@ export function Search() {
     setTimeout(() => void handleSearch(), 0)
   }
 
+  const handleCodeScanned = (code: string) => {
+    setCodigo(code.trim())
+    setPage(0)
+    setTimeout(() => void handleSearch(), 0)
+  }
+
   const totalPages = total !== null ? Math.ceil(total / PAGE_SIZE) : null
 
   return (
@@ -89,36 +95,40 @@ export function Search() {
 
       <form onSubmit={handleSubmit} className="mt-6 card p-6 space-y-4 max-w-xl">
         <div>
-          <label className="label" htmlFor="search-codigo">Código patrimonial</label>
-          <input
-            id="search-codigo"
-            type="text"
-            value={codigo}
-            onChange={(e) => setCodigo(e.target.value)}
-            placeholder="Ej. código exacto"
-            className="input"
-          />
+          <label className="label" htmlFor="search-codigo">
+            Código patrimonial
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="search-codigo"
+              type="text"
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value)}
+              placeholder="Ej. código exacto"
+              className="input flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => setShowScanModal(true)}
+              className="btn-secondary shrink-0 px-4"
+              title="Buscar por escaneo de código de barras"
+            >
+              📷
+            </button>
+          </div>
         </div>
 
-        <div>
-          <label className="label" htmlFor="search-responsable">Responsable</label>
-          <select
-            id="search-responsable"
-            value={idTrabajador}
-            onChange={(e) => setIdTrabajador(e.target.value ? Number(e.target.value) : '')}
-            className="input"
-          >
-            <option value="">Todos</option>
-            {trabajadores.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
+        <TrabajadorSearchableSelect
+          value={idTrabajador}
+          onChange={(v) => setIdTrabajador(v === null ? '' : v)}
+          label="Responsable"
+          allowAll
+        />
 
         <div>
-          <label className="label" htmlFor="search-ubicacion">Ubicación (contiene)</label>
+          <label className="label" htmlFor="search-ubicacion">
+            Ubicación (contiene)
+          </label>
           <input
             id="search-ubicacion"
             type="text"
@@ -141,10 +151,15 @@ export function Search() {
         </button>
       </form>
 
+      {showScanModal && (
+        <BarcodeScanModal
+          onDetected={handleCodeScanned}
+          onClose={() => setShowScanModal(false)}
+        />
+      )}
+
       {error && (
-        <p className="mt-4 rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
-          {error}
-        </p>
+        <p className="mt-4 rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</p>
       )}
 
       {!loading && resultados.length > 0 && (

@@ -2,7 +2,7 @@ import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { TrabajadorSelect } from './TrabajadorSelect'
+import { TrabajadorSearchableSelect } from './TrabajadorSearchableSelect'
 import { UbicacionSelect } from './UbicacionSelect'
 import type { BienDetalle } from '../types'
 
@@ -203,7 +203,11 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
         </select>
       </div>
 
-      <TrabajadorSelect value={idTrabajador} onChange={setIdTrabajador} required />
+      <TrabajadorSearchableSelect
+        value={idTrabajador}
+        onChange={(v) => setIdTrabajador(v === '' || v === null ? null : v)}
+        label="Responsable *"
+      />
       <UbicacionSelect value={idUbicacion} onChange={setIdUbicacion} />
 
       {error && (
