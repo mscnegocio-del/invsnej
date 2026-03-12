@@ -1,42 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BrowserMultiFormatReader } from '@zxing/browser'
-import { BarcodeFormat, DecodeHintType } from '@zxing/library'
+import Quagga, { type QuaggaJSResultObject } from '@ericblade/quagga2'
 import { useCamera } from '../context/CameraContext'
 
 type UseBarcodeScannerOptions = {
   onCode: (code: string) => void
+  containerRef: React.RefObject<HTMLDivElement | null>
+  videoRef: React.RefObject<HTMLVideoElement | null>
 }
 
-const BARCODE_HINTS = new Map<DecodeHintType, unknown>([
-  [DecodeHintType.TRY_HARDER, true],
-  [
-    DecodeHintType.POSSIBLE_FORMATS,
-    [
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8,
-      BarcodeFormat.UPC_A,
-      BarcodeFormat.UPC_E,
-    ],
-  ],
-])
+const USE_QUAGGA = !('BarcodeDetector' in window)
 
-const SCANNER_OPTIONS = {
-  delayBetweenScanAttempts: 800,
-  delayBetweenScanSuccess: 600,
-}
+type BarcodeDetectorLike = { detect: (src: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>> }
 
-export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
+const QUAGGA_READERS = [
+  'code_128_reader',
+  'code_39_reader',
+  'ean_reader',
+  'ean_8_reader',
+  'upc_reader',
+  'upc_e_reader',
+] as const
+
+export function useBarcodeScanner({ onCode, containerRef, videoRef }: UseBarcodeScannerOptions) {
   const { requestStream, error: cameraError } = useCamera()
-  const videoRef = useRef<HTMLVideoElement | null>(null)
   const [hasTorch, setHasTorch] = useState(false)
   const [capturing, setCapturing] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
   const lastCodeRef = useRef<string | null>(null)
-  const zxingControlsRef = useRef<{ stop: () => void } | null>(null)
-  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null)
-  const detectorRef = useRef<any>(null)
+  const detectorRef = useRef<BarcodeDetectorLike | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const captureManual = useCallback(async () => {
@@ -46,18 +37,9 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
     setCapturing(true)
     try {
       const detector = detectorRef.current
-      const codeReader = codeReaderRef.current
-
       if (detector) {
         const barcodes = await detector.detect(video)
         const raw = barcodes?.[0]?.rawValue
-        if (raw) {
-          lastCodeRef.current = raw
-          onCode(raw)
-        }
-      } else if (codeReader) {
-        const decoded = await codeReader.decodeOnceFromVideoElement(video)
-        const raw = decoded?.getText()
         if (raw) {
           lastCodeRef.current = raw
           onCode(raw)
@@ -68,9 +50,59 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
     } finally {
       setCapturing(false)
     }
-  }, [onCode])
+  }, [onCode, videoRef])
 
   useEffect(() => {
+    if (USE_QUAGGA) {
+      // Modo Quagga2: usa su propio stream, no CameraContext
+      const container = containerRef.current
+      if (!container) return
+
+      let cancelled = false
+      const handleDetected = (result: QuaggaJSResultObject) => {
+        if (cancelled) return
+        const raw = result?.codeResult?.code ?? ''
+        if (raw && raw !== lastCodeRef.current) {
+          lastCodeRef.current = raw
+          onCode(raw)
+        }
+      }
+
+      Quagga.init(
+        {
+          inputStream: {
+            type: 'LiveStream',
+            target: container,
+            constraints: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+          },
+          decoder: { readers: [...QUAGGA_READERS] },
+        },
+        (err: unknown) => {
+          if (err || cancelled) {
+            if (err && !cancelled) {
+              console.error('Error al iniciar Quagga2', err)
+              setError('No se pudo iniciar el escáner de códigos de barras.')
+            }
+            return
+          }
+          Quagga.start()
+        },
+      )
+
+      Quagga.onDetected(handleDetected)
+
+      return () => {
+        cancelled = true
+        Quagga.offDetected(handleDetected)
+        Quagga.stop()
+      }
+    }
+
+    // Modo BarcodeDetector: usa CameraContext
     let cancelled = false
 
     async function start() {
@@ -92,7 +124,8 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
       }
 
       if ('BarcodeDetector' in window) {
-        const detector = new (window as any).BarcodeDetector({
+        const BarcodeDetectorCtor = (window as unknown as { BarcodeDetector: new (opts: unknown) => BarcodeDetectorLike }).BarcodeDetector
+        const detector = new BarcodeDetectorCtor({
           formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e'],
         })
         detectorRef.current = detector
@@ -120,34 +153,6 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
         }
 
         requestAnimationFrame(scanFrame)
-      } else {
-        try {
-          const codeReader = new BrowserMultiFormatReader(BARCODE_HINTS, SCANNER_OPTIONS)
-          codeReaderRef.current = codeReader
-
-          const controls = await codeReader.decodeFromStream(
-            stream,
-            video ?? undefined,
-            (result, err) => {
-              if (cancelled) return
-              if (err && err.name !== 'NotFoundException') {
-                console.error('Error al decodificar con ZXing', err)
-                return
-              }
-              if (result) {
-                const raw = result.getText()
-                if (raw && raw !== lastCodeRef.current) {
-                  lastCodeRef.current = raw
-                  onCode(raw)
-                }
-              }
-            },
-          )
-          zxingControlsRef.current = controls
-        } catch (e) {
-          console.error('Error al iniciar ZXing', e)
-          setError('No se pudo iniciar el escáner de códigos de barras.')
-        }
       }
     }
 
@@ -155,12 +160,9 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
 
     return () => {
       cancelled = true
-      zxingControlsRef.current?.stop()
-      zxingControlsRef.current = null
-      codeReaderRef.current = null
       detectorRef.current = null
     }
-  }, [onCode, requestStream])
+  }, [onCode, requestStream, containerRef, videoRef])
 
   const [torchOnState, setTorchOnState] = useState(false)
 
@@ -170,20 +172,29 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
     const track = stream.getVideoTracks()[0]
     const next = !torchOnState
     try {
-      await (track as any).applyConstraints({ advanced: [{ torch: next }] })
+      await (track as MediaStreamTrack & { applyConstraints: (c: unknown) => Promise<void> }).applyConstraints({
+        advanced: [{ torch: next }],
+      })
       setTorchOnState(next)
     } catch (e) {
       console.error('No se pudo cambiar el estado del flash', e)
     }
   }, [torchOnState])
 
+  // Quagga2 no expone el video stream para torch; ocultamos el botón en ese modo
+  const effectiveHasTorch = USE_QUAGGA ? false : hasTorch
+  const effectiveCaptureManual = USE_QUAGGA ? undefined : captureManual
+  const effectiveCapturing = USE_QUAGGA ? false : capturing
+
   return {
+    useQuagga: USE_QUAGGA,
     videoRef,
+    containerRef,
     error: cameraError ?? error,
-    hasTorch,
+    hasTorch: effectiveHasTorch,
     torchOn: torchOnState,
     toggleTorch,
-    captureManual,
-    capturing,
+    captureManual: effectiveCaptureManual,
+    capturing: effectiveCapturing,
   }
 }

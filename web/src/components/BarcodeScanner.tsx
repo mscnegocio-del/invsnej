@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
 
 const ROTATION_KEY = 'inv-web-camera-rotation'
@@ -19,16 +19,23 @@ type Props = {
 }
 
 export function BarcodeScanner({ onDetected }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const [rotation, setRotation] = useState(getStoredRotation)
+
   const {
-    videoRef,
+    useQuagga,
     error,
     hasTorch,
     torchOn,
     toggleTorch,
     captureManual,
     capturing,
-  } = useBarcodeScanner({ onCode: onDetected })
+  } = useBarcodeScanner({
+    onCode: onDetected,
+    containerRef,
+    videoRef,
+  })
 
   useEffect(() => {
     try {
@@ -42,15 +49,20 @@ export function BarcodeScanner({ onDetected }: Props) {
 
   return (
     <section className="mt-6 flex flex-col gap-4">
-      <div className="relative w-full max-w-md mx-auto aspect-[3/4] rounded-2xl overflow-hidden bg-slate-900 shadow-lg ring-1 ring-slate-200/50">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: `rotate(${rotation}deg)` }}
-        />
+      <div
+        ref={containerRef}
+        className="relative w-full max-w-md mx-auto aspect-[3/4] rounded-2xl overflow-hidden bg-slate-900 shadow-lg ring-1 ring-slate-200/50"
+      >
+        {!useQuagga && (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ transform: `rotate(${rotation}deg)` }}
+          />
+        )}
         {/* Marco de área de escaneo */}
         <div
           className="absolute inset-[20%] rounded-xl border-2 border-emerald-400/80 shadow-[0_0_24px_rgba(52,211,153,0.3)] pointer-events-none"
@@ -59,21 +71,23 @@ export function BarcodeScanner({ onDetected }: Props) {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={captureManual}
-          disabled={capturing}
-          className="btn-primary"
-        >
-          {capturing ? (
-            <>
-              <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              Leyendo...
-            </>
-          ) : (
-            '📸 Capturar y leer'
-          )}
-        </button>
+        {!useQuagga && captureManual != null && (
+          <button
+            type="button"
+            onClick={captureManual}
+            disabled={capturing}
+            className="btn-primary"
+          >
+            {capturing ? (
+              <>
+                <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                Leyendo...
+              </>
+            ) : (
+              '📸 Capturar y leer'
+            )}
+          </button>
+        )}
         {hasTorch && (
           <button
             type="button"
@@ -83,14 +97,16 @@ export function BarcodeScanner({ onDetected }: Props) {
             {torchOn ? 'Apagar flash' : 'Encender flash'}
           </button>
         )}
-        <button
-          type="button"
-          onClick={cycleRotation}
-          className="btn-ghost text-sm"
-          title="Rotar vista de cámara"
-        >
-          🔄 Rotar vista ({rotation}°)
-        </button>
+        {!useQuagga && (
+          <button
+            type="button"
+            onClick={cycleRotation}
+            className="btn-ghost text-sm"
+            title="Rotar vista de cámara"
+          >
+            🔄 Rotar vista ({rotation}°)
+          </button>
+        )}
       </div>
 
       {error && (
@@ -105,8 +121,10 @@ export function BarcodeScanner({ onDetected }: Props) {
             Mantén una distancia de 15–30 cm. Si se ve borro, aleja un poco la cámara. Para códigos pequeños, aléjate hasta que se vea nítido.
           </p>
           <p className="text-slate-500 text-xs">
-            Si no se lee automático: usa «Capturar y leer». Evita reflejos; prueba sin flash en etiquetas brillantes.
-            {rotation !== 0 && ' Usa «Rotar vista» si la imagen se ve mal.'}
+            {useQuagga
+              ? 'Quagga2 detecta códigos en distintos ángulos y tamaños.'
+              : 'Si no se lee automático: usa «Capturar y leer». Evita reflejos; prueba sin flash en etiquetas brillantes.'}
+            {!useQuagga && rotation !== 0 && ' Usa «Rotar vista» si la imagen se ve mal.'}
           </p>
         </div>
       )}
