@@ -22,8 +22,16 @@ export function CameraProvider({ children }: { children: React.ReactNode }) {
     setError(null)
 
     try {
+      // Resolución 720p para mejor detección de códigos pequeños.
+      // focusMode: 'continuous' mejora el enfoque (no está en tipos TS pero algunos navegadores lo soportan).
+      const videoConstraints = {
+        facingMode: 'environment' as const,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        advanced: [{ focusMode: 'continuous' }],
+      }
       const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: videoConstraints as unknown as MediaTrackConstraints,
         audio: false,
       })
       streamRef.current = newStream

@@ -102,6 +102,9 @@ export function BarcodeScanner({ onDetected }: Props) {
         <div className="text-slate-600 text-sm space-y-1">
           <p>Centra solo el código de barras en el recuadro verde.</p>
           <p className="text-slate-500 text-xs">
+            Mantén una distancia de 15–30 cm. Si se ve borro, aleja un poco la cámara. Para códigos pequeños, aléjate hasta que se vea nítido.
+          </p>
+          <p className="text-slate-500 text-xs">
             Si no se lee automático: usa «Capturar y leer». Evita reflejos; prueba sin flash en etiquetas brillantes.
             {rotation !== 0 && ' Usa «Rotar vista» si la imagen se ve mal.'}
           </p>
