@@ -1,108 +1,96 @@
 import { useEffect, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
+import { useCamera } from '../context/CameraContext'
 
 type UseBarcodeScannerOptions = {
   onCode: (code: string) => void
 }
 
 export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
+  const { requestStream, error: cameraError } = useCamera()
   const videoRef = useRef<HTMLVideoElement | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [hasTorch, setHasTorch] = useState(false)
   const [torchOn, setTorchOn] = useState(false)
   const streamRef = useRef<MediaStream | null>(null)
   const lastCodeRef = useRef<string | null>(null)
   const zxingControlsRef = useRef<{ stop: () => void } | null>(null)
 
+  // Get error and setError from context - we'll need to expose setError from context or handle locally
+  // Actually the CameraContext has error. But useBarcodeScanner also sets error for ZXing init failure. Let me keep a local error state for scanner-specific errors, and use context error for camera access.
+  const [error, setError] = useState<string | null>(null)
+
   useEffect(() => {
     let cancelled = false
 
     async function start() {
-      try {
-        const constraints: MediaStreamConstraints = {
-          video: {
-            facingMode: 'environment',
-          },
-          audio: false,
-        }
+      const stream = await requestStream()
+      if (!stream || cancelled) return
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints)
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop())
-          return
-        }
+      streamRef.current = stream
 
-        streamRef.current = stream
+      const video = videoRef.current
+      if (video) {
+        video.srcObject = stream
+        await video.play()
+      }
 
-        const video = videoRef.current
-        if (video) {
-          video.srcObject = stream
-          await video.play()
-        }
+      const track = stream.getVideoTracks()[0]
+      const capabilities = track.getCapabilities?.() as MediaTrackCapabilities | undefined
+      if (capabilities && 'torch' in capabilities) {
+        setHasTorch(true)
+      }
 
-        const track = stream.getVideoTracks()[0]
-        const capabilities = track.getCapabilities?.() as MediaTrackCapabilities | undefined
-        if (capabilities && 'torch' in capabilities) {
-          setHasTorch(true)
-        }
+      // Escaneo usando BarcodeDetector si está disponible
+      if ('BarcodeDetector' in window) {
+        const detector = new (window as any).BarcodeDetector({
+          formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e'],
+        })
 
-        // Escaneo usando BarcodeDetector si está disponible
-        if ('BarcodeDetector' in window) {
-          // @ts-expect-error BarcodeDetector es experimental pero está disponible en navegadores modernos
-          const detector = new window.BarcodeDetector({
-            formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e'],
-          })
-
-          const scanFrame = async () => {
-            if (cancelled || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-              requestAnimationFrame(scanFrame)
-              return
-            }
-
-            try {
-              const barcodes = await detector.detect(video)
-              if (barcodes.length > 0) {
-                const raw = barcodes[0].rawValue || ''
-                if (raw && raw !== lastCodeRef.current) {
-                  lastCodeRef.current = raw
-                  onCode(raw)
-                }
-              }
-            } catch (e) {
-              console.error('Error al detectar código de barras', e)
-            }
-
+        const scanFrame = async () => {
+          if (cancelled || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
             requestAnimationFrame(scanFrame)
+            return
+          }
+
+          try {
+            const barcodes = await detector.detect(video)
+            if (barcodes.length > 0) {
+              const raw = barcodes[0].rawValue || ''
+              if (raw && raw !== lastCodeRef.current) {
+                lastCodeRef.current = raw
+                onCode(raw)
+              }
+            }
+          } catch (e) {
+            console.error('Error al detectar código de barras', e)
           }
 
           requestAnimationFrame(scanFrame)
-        } else {
-          // Fallback con ZXing para Safari, Chrome en escritorio y otros navegadores
-          try {
-            const codeReader = new BrowserMultiFormatReader()
-            const controls = await codeReader.decodeFromStream(stream, video ?? undefined, (result, err) => {
-              if (cancelled) return
-              if (err && !(err.name === 'NotFoundException')) {
-                console.error('Error al decodificar con ZXing', err)
-                return
-              }
-              if (result) {
-                const raw = result.getText()
-                if (raw && raw !== lastCodeRef.current) {
-                  lastCodeRef.current = raw
-                  onCode(raw)
-                }
-              }
-            })
-            zxingControlsRef.current = controls
-          } catch (e) {
-            console.error('Error al iniciar ZXing', e)
-            setError('No se pudo iniciar el escáner de códigos de barras.')
-          }
         }
-      } catch (e) {
-        console.error(e)
-        setError('No se pudo acceder a la cámara. Revisa los permisos del navegador.')
+
+        requestAnimationFrame(scanFrame)
+      } else {
+        try {
+          const codeReader = new BrowserMultiFormatReader()
+          const controls = await codeReader.decodeFromStream(stream, video ?? undefined, (result, err) => {
+            if (cancelled) return
+            if (err && !(err.name === 'NotFoundException')) {
+              console.error('Error al decodificar con ZXing', err)
+              return
+            }
+            if (result) {
+              const raw = result.getText()
+              if (raw && raw !== lastCodeRef.current) {
+                lastCodeRef.current = raw
+                onCode(raw)
+              }
+            }
+          })
+          zxingControlsRef.current = controls
+        } catch (e) {
+          console.error('Error al iniciar ZXing', e)
+          setError('No se pudo iniciar el escáner de códigos de barras.')
+        }
       }
     }
 
@@ -112,11 +100,9 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
       cancelled = true
       zxingControlsRef.current?.stop()
       zxingControlsRef.current = null
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop())
-      }
+      // No detenemos el stream aquí - el CameraContext lo mantiene para reutilizar
     }
-  }, [onCode])
+  }, [onCode, requestStream])
 
   const toggleTorch = async () => {
     const stream = streamRef.current
@@ -124,8 +110,7 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
     const track = stream.getVideoTracks()[0]
     const next = !torchOn
     try {
-      // @ts-expect-error advanced constraints
-      await track.applyConstraints({ advanced: [{ torch: next }] })
+      await (track as any).applyConstraints({ advanced: [{ torch: next }] })
       setTorchOn(next)
     } catch (e) {
       console.error('No se pudo cambiar el estado del flash', e)
@@ -134,7 +119,7 @@ export function useBarcodeScanner({ onCode }: UseBarcodeScannerOptions) {
 
   return {
     videoRef,
-    error,
+    error: cameraError ?? error,
     hasTorch,
     torchOn,
     toggleTorch,
