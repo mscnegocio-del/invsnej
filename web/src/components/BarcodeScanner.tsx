@@ -22,6 +22,8 @@ export function BarcodeScanner({ onDetected }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [rotation, setRotation] = useState(getStoredRotation)
+  const [showManualInput, setShowManualInput] = useState(false)
+  const [manualCode, setManualCode] = useState('')
 
   const {
     useQuagga,
@@ -107,7 +109,49 @@ export function BarcodeScanner({ onDetected }: Props) {
             🔄 Rotar vista ({rotation}°)
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setShowManualInput((v) => !v)}
+          className="btn-ghost text-sm"
+          title="Si la cámara no lee bien, escribe el código a mano"
+        >
+          ✏️ Escribir manualmente
+        </button>
       </div>
+
+      {showManualInput && (
+        <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <label htmlFor="manual-code" className="text-sm font-medium text-slate-700">
+            Código patrimonial
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="manual-code"
+              type="text"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              placeholder="Ej: PAT-2024-00123"
+              className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const code = manualCode.trim()
+                if (code) {
+                  onDetected(code)
+                  setManualCode('')
+                  setShowManualInput(false)
+                }
+              }}
+              disabled={!manualCode.trim()}
+              className="btn-primary shrink-0"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
