@@ -13,10 +13,10 @@ export function Home() {
         >
           <span className="text-4xl mb-3">📷</span>
           <h2 className="text-lg font-semibold text-slate-900 group-hover:text-teal-600 transition-colors">
-            Escanear bien
+            Registrar bien
           </h2>
           <p className="text-slate-600 text-sm mt-1">
-            Usa la cámara para leer el código de barras
+            Abre la cámara para escanear o escribir el código manualmente
           </p>
         </Link>
 

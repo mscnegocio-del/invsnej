@@ -43,10 +43,22 @@ export function Scan() {
 
   return (
     <div>
-      <h1 className="page-title">Escanear bien</h1>
-      <p className="page-subtitle">Apunta la cámara al código de barras del bien.</p>
+      <h1 className="page-title">Registrar bien</h1>
+      <p className="page-subtitle">
+        Escanea el código de barras o escribe el código manualmente para registrar el bien.
+      </p>
 
       <BarcodeScanner onDetected={handleDetected} />
+
+      <div className="mt-4 text-sm text-slate-600">
+        <button
+          type="button"
+          onClick={() => navigate('/registro')}
+          className="btn-ghost"
+        >
+          Registrar bien sin usar la cámara
+        </button>
+      </div>
 
       {checking && (
         <p className="mt-4 flex items-center gap-2 text-slate-600">

@@ -57,7 +57,6 @@ export function useBarcodeScanner({ onCode, containerRef, videoRef }: UseBarcode
       // Modo Quagga2: usa su propio stream, no CameraContext
       const container = containerRef.current
       if (!container) return
-
       let cancelled = false
       const handleDetected = (result: QuaggaJSResultObject) => {
         if (cancelled) return
@@ -161,6 +160,11 @@ export function useBarcodeScanner({ onCode, containerRef, videoRef }: UseBarcode
     return () => {
       cancelled = true
       detectorRef.current = null
+      const stream = streamRef.current
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
     }
   }, [onCode, requestStream, containerRef, videoRef])
 

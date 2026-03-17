@@ -4,11 +4,13 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { BarcodeScanModal } from '../components/BarcodeScanModal'
 import { TrabajadorSearchableSelect } from '../components/TrabajadorSearchableSelect'
+import { useCatalogs } from '../context/CatalogContext'
 import type { BienResumen } from '../types'
 const PAGE_SIZE = 20
 
 export function Search() {
   const navigate = useNavigate()
+  const { trabajadores } = useCatalogs()
 
   const [codigo, setCodigo] = useState('')
   const [idTrabajador, setIdTrabajador] = useState<number | ''>('')
@@ -20,6 +22,45 @@ export function Search() {
   const [total, setTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [exportingAll, setExportingAll] = useState(false)
+
+  const findResponsableNombre = (idTrab: number | null) => {
+    if (!idTrab) return null
+    const t = trabajadores.find((tr) => tr.id === idTrab)
+    return t?.nombre ?? null
+  }
+
+  const buildCsv = (rows: Array<BienResumen & { responsableNombre?: string | null }>) => {
+    const header = ['id', 'codigo_patrimonial', 'nombre_mueble_equipo', 'responsable', 'ubicacion']
+    const lines = rows.map((b) => {
+      const responsable = b.responsableNombre ?? findResponsableNombre(b.id_trabajador) ?? ''
+      const values = [
+        String(b.id),
+        b.codigo_patrimonial ?? '',
+        b.nombre_mueble_equipo ?? '',
+        responsable,
+        b.ubicacion ?? '',
+      ]
+      return values
+        .map((v) =>
+          `"${String(v).replace(/"/g, '""')}"`,
+        )
+        .join(',')
+    })
+    return [header.join(','), ...lines].join('\n')
+  }
+
+  const downloadFile = (filename: string, mime: string, content: string) => {
+    const blob = new Blob([content], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
 
   const handleSearch = async (event?: FormEvent) => {
     if (event) event.preventDefault()
@@ -87,6 +128,84 @@ export function Search() {
   }
 
   const totalPages = total !== null ? Math.ceil(total / PAGE_SIZE) : null
+
+  const handleCopyResultados = async () => {
+    if (!resultados.length) return
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(resultados, null, 2))
+      // No mostrar alert blocking para no interrumpir flujo
+    } catch (e) {
+      console.error('No se pudo copiar al portapapeles', e)
+    }
+  }
+
+  const handleDownloadResultadosJson = () => {
+    if (!resultados.length) return
+    downloadFile('bienes-busqueda.json', 'application/json', JSON.stringify(resultados, null, 2))
+  }
+
+  const handleDownloadResultadosCsv = () => {
+    if (!resultados.length) return
+    const rows = resultados.map((b) => ({
+      ...b,
+      responsableNombre: findResponsableNombre(b.id_trabajador),
+    }))
+    const csv = buildCsv(rows)
+    downloadFile('bienes-busqueda.csv', 'text/csv;charset=utf-8;', csv)
+  }
+
+  const handleExportAll = async (format: 'json' | 'csv') => {
+    setExportingAll(true)
+    setError(null)
+    try {
+      const pageSize = 1000
+      let from = 0
+      const all: any[] = []
+
+      // Paginado en bloques de 1000 hasta agotar registros
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { data, error: supaError } = await supabase
+          .from('bienes')
+          .select('id, codigo_patrimonial, nombre_mueble_equipo, id_trabajador, ubicacion, estado, fecha_registro')
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1)
+
+        if (supaError) {
+          console.error(supaError)
+          setError('No se pudo exportar todos los bienes. Intenta nuevamente.')
+          break
+        }
+
+        if (!data || data.length === 0) {
+          break
+        }
+
+        all.push(...data)
+
+        if (data.length < pageSize) {
+          break
+        }
+
+        from += pageSize
+      }
+
+      if (all.length === 0) return
+
+      if (format === 'json') {
+        downloadFile('bienes-todos.json', 'application/json', JSON.stringify(all, null, 2))
+      } else {
+        const rows = all.map((b) => ({
+          ...(b as any),
+          responsableNombre: findResponsableNombre((b as any).id_trabajador ?? null),
+        }))
+        const csv = buildCsv(rows)
+        downloadFile('bienes-todos.csv', 'text/csv;charset=utf-8;', csv)
+      }
+    } finally {
+      setExportingAll(false)
+    }
+  }
 
   return (
     <div>
@@ -165,12 +284,40 @@ export function Search() {
       {!loading && resultados.length > 0 && (
         <section className="mt-8">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Resultados</h2>
-            <p className="text-sm text-slate-600">
-              Página {page + 1}
-              {totalPages ? ` de ${totalPages}` : ''}
-              {total !== null ? ` · ${total} bienes` : ''}
-            </p>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-slate-900">Resultados</h2>
+              <p className="text-sm text-slate-600">
+                Página {page + 1}
+                {totalPages ? ` de ${totalPages}` : ''}
+                {total !== null ? ` · ${total} bienes` : ''}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <button
+                type="button"
+                onClick={handleCopyResultados}
+                className="btn-ghost px-2"
+                title="Copiar resultados como JSON"
+              >
+                📋 Copiar
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadResultadosJson}
+                className="btn-ghost px-2"
+                title="Descargar resultados en JSON"
+              >
+                🧾 JSON
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadResultadosCsv}
+                className="btn-ghost px-2"
+                title="Descargar resultados en Excel (CSV)"
+              >
+                📑 Excel
+              </button>
+            </div>
           </div>
 
           <ul className="space-y-0 divide-y divide-slate-200 card overflow-hidden">
@@ -184,7 +331,11 @@ export function Search() {
                 <div className="text-slate-600">{b.nombre_mueble_equipo || 'Sin nombre'}</div>
                 <div className="text-sm text-slate-500 mt-0.5">
                   {b.ubicacion || 'Sin ubicación'}
-                  {b.id_trabajador ? ` · Responsable ID ${b.id_trabajador}` : ''}
+                  {(() => {
+                    const nombre = findResponsableNombre(b.id_trabajador)
+                    if (!nombre) return ''
+                    return ` · Responsable ${nombre}`
+                  })()}
                 </div>
               </li>
             ))}
@@ -218,6 +369,32 @@ export function Search() {
       {!loading && !error && resultados.length === 0 && total === 0 && (
         <p className="mt-8 text-slate-500 text-center py-8">No se encontraron bienes con esos filtros.</p>
       )}
+
+      <section className="mt-10 card p-6 space-y-3">
+        <h2 className="text-lg font-semibold text-slate-900">Descargar todos los bienes</h2>
+        <p className="text-sm text-slate-600">
+          Exporta el inventario completo en bloques de hasta 1000 registros (límite de Supabase) hasta cubrir
+          todos los bienes.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => handleExportAll('csv')}
+            disabled={exportingAll}
+            className="btn-primary"
+          >
+            {exportingAll ? 'Preparando Excel…' : 'Descargar todo en Excel (CSV)'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportAll('json')}
+            disabled={exportingAll}
+            className="btn-secondary"
+          >
+            {exportingAll ? 'Preparando JSON…' : 'Descargar todo en JSON'}
+          </button>
+        </div>
+      </section>
     </div>
   )
 }
