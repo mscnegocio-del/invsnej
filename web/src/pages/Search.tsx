@@ -23,6 +23,7 @@ export function Search() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exportingAll, setExportingAll] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const findResponsableNombre = (idTrab: number | null) => {
     if (!idTrab) return null
@@ -131,9 +132,30 @@ export function Search() {
 
   const handleCopyResultados = async () => {
     if (!resultados.length) return
+
+    const encabezado = `Resultados de búsqueda (${resultados.length} bien${resultados.length === 1 ? '' : 'es'})`
+
+    const bloques = resultados.map((b, index) => {
+      const responsable = findResponsableNombre(b.id_trabajador)
+      const lineas: string[] = []
+      lineas.push(`#${index + 1}`)
+      lineas.push(`Código: ${b.codigo_patrimonial}`)
+      lineas.push(`Nombre: ${b.nombre_mueble_equipo || 'Sin nombre'}`)
+      if (responsable) {
+        lineas.push(`Responsable: ${responsable}`)
+      }
+      if (b.ubicacion) {
+        lineas.push(`Ubicación: ${b.ubicacion}`)
+      }
+      return lineas.join('\n')
+    })
+
+    const texto = [encabezado, ...bloques].join('\n\n')
+
     try {
-      await navigator.clipboard.writeText(JSON.stringify(resultados, null, 2))
-      // No mostrar alert blocking para no interrumpir flujo
+      await navigator.clipboard.writeText(texto)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2500)
     } catch (e) {
       console.error('No se pudo copiar al portapapeles', e)
     }
@@ -297,7 +319,7 @@ export function Search() {
                 type="button"
                 onClick={handleCopyResultados}
                 className="btn-ghost px-2"
-                title="Copiar resultados como JSON"
+                title="Copiar resumen de resultados para compartir"
               >
                 📋 Copiar
               </button>
@@ -317,6 +339,9 @@ export function Search() {
               >
                 📑 Excel
               </button>
+              {copied && (
+                <span className="text-xs text-teal-700">Copiado</span>
+              )}
             </div>
           </div>
 

@@ -1,18 +1,21 @@
+import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarcodeScanner } from '../components/BarcodeScanner'
+import { BarcodeScanModal } from '../components/BarcodeScanModal'
 import { supabase } from '../lib/supabaseClient'
 import { DuplicateAlert } from '../components/DuplicateAlert'
 import type { BienResumen } from '../types'
 
 export function Scan() {
+  const [codigo, setCodigo] = useState('')
   const [lastCode, setLastCode] = useState<string | null>(null)
   const [bienDuplicado, setBienDuplicado] = useState<BienResumen | null>(null)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showScanModal, setShowScanModal] = useState(false)
   const navigate = useNavigate()
 
-  const handleDetected = async (code: string) => {
+  const verificarCodigo = async (code: string) => {
     if (checking) return
     setLastCode(code)
     setError(null)
@@ -41,6 +44,19 @@ export function Scan() {
     }
   }
 
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    const valor = codigo.trim()
+    if (!valor) return
+    await verificarCodigo(valor)
+  }
+
+  const handleDetected = (code: string) => {
+    const limpio = code.trim()
+    if (!limpio) return
+    setCodigo(limpio)
+  }
+
   return (
     <div>
       <h1 className="page-title">Registrar bien</h1>
@@ -48,7 +64,54 @@ export function Scan() {
         Escanea el código de barras o escribe el código manualmente para registrar el bien.
       </p>
 
-      <BarcodeScanner onDetected={handleDetected} />
+      <form onSubmit={handleSubmit} className="mt-6 card p-6 space-y-4 max-w-xl">
+        <div>
+          <label className="label" htmlFor="scan-codigo">
+            Código patrimonial
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="scan-codigo"
+              type="text"
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value)}
+              placeholder="Escribe o escanea el código"
+              className="input flex-1"
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              onClick={() => setShowScanModal(true)}
+              className="btn-secondary shrink-0 px-4"
+              title="Escanear código de barras con la cámara"
+            >
+              📷
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={checking || !codigo.trim()}
+          className="btn-primary w-full"
+        >
+          {checking ? (
+            <>
+              <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Verificando código...
+            </>
+          ) : (
+            'Continuar'
+          )}
+        </button>
+      </form>
+
+      {showScanModal && (
+        <BarcodeScanModal
+          onDetected={handleDetected}
+          onClose={() => setShowScanModal(false)}
+        />
+      )}
 
       <div className="mt-4 text-sm text-slate-600">
         <button
