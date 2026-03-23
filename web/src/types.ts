@@ -12,6 +12,7 @@ export type BienResumen = {
   id: number
   codigo_patrimonial: string
   nombre_mueble_equipo: string
+  estado?: string | null
   id_trabajador: number | null
   ubicacion: string | null
 }

@@ -42,13 +42,14 @@ export function Search() {
   }
 
   const buildCsv = (rows: Array<BienResumen & { responsableNombre?: string | null }>) => {
-    const header = ['id', 'codigo_patrimonial', 'nombre_mueble_equipo', 'responsable', 'ubicacion']
+    const header = ['id', 'codigo_patrimonial', 'nombre_mueble_equipo', 'estado', 'responsable', 'ubicacion']
     const lines = rows.map((b) => {
       const responsable = b.responsableNombre ?? findResponsableNombre(b.id_trabajador) ?? ''
       const values = [
         String(b.id),
         b.codigo_patrimonial ?? '',
         b.nombre_mueble_equipo ?? '',
+        b.estado ?? '',
         responsable,
         findUbicacionNombre(b.ubicacion) ?? '',
       ]
@@ -80,7 +81,7 @@ export function Search() {
 
     let query = supabase
       .from('bienes')
-      .select('id, codigo_patrimonial, nombre_mueble_equipo, id_trabajador, ubicacion', {
+      .select('id, codigo_patrimonial, nombre_mueble_equipo, estado, id_trabajador, ubicacion', {
         count: 'exact',
       })
 
@@ -151,6 +152,9 @@ export function Search() {
       lineas.push(`#${index + 1}`)
       lineas.push(`Código: ${b.codigo_patrimonial}`)
       lineas.push(`Nombre: ${b.nombre_mueble_equipo || 'Sin nombre'}`)
+      if (b.estado) {
+        lineas.push(`Estado: ${b.estado}`)
+      }
       if (responsable) {
         lineas.push(`Responsable: ${responsable}`)
       }
