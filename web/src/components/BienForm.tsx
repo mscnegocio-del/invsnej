@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { TrabajadorSearchableSelect } from './TrabajadorSearchableSelect'
 import { UbicacionSelect } from './UbicacionSelect'
+import { useCatalogs } from '../context/CatalogContext'
 import type { BienDetalle } from '../types'
 
 type Props = {
@@ -17,6 +18,7 @@ const ESTADOS = ['Nuevo', 'Bueno', 'Regular', 'Malo', 'Muy malo'] as const
 export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { ubicaciones } = useCatalogs()
 
   const codigoFromQuery = searchParams.get('codigo') ?? ''
 
@@ -61,7 +63,17 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       setTipo(raw.tipo_mueble_equipo ?? '')
       setEstado(raw.estado)
       setIdTrabajador(raw.id_trabajador)
-      setIdUbicacion(null)
+      if (raw.ubicacion) {
+        const asNumber = Number(raw.ubicacion)
+        if (!Number.isNaN(asNumber)) {
+          setIdUbicacion(asNumber)
+        } else {
+          const byName = ubicaciones.find((u) => u.nombre === raw.ubicacion)
+          setIdUbicacion(byName?.id ?? null)
+        }
+      } else {
+        setIdUbicacion(null)
+      }
       setLoading(false)
     }
 
@@ -70,7 +82,7 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
     return () => {
       cancelled = true
     }
-  }, [modo, bienId])
+  }, [modo, bienId, ubicaciones])
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -89,6 +101,10 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       return
     }
 
+    const ubicacionNombre = idUbicacion
+      ? (ubicaciones.find((u) => u.id === idUbicacion)?.nombre ?? null)
+      : null
+
     setLoading(true)
 
     if (modo === 'create') {
@@ -100,7 +116,7 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
           tipo_mueble_equipo: tipo.trim() || null,
           estado,
           id_trabajador: idTrabajador,
-          ubicacion: idUbicacion ?? null,
+          ubicacion: ubicacionNombre,
         })
         .select('id')
         .maybeSingle()
@@ -129,7 +145,7 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
           tipo_mueble_equipo: tipo.trim() || null,
           estado,
           id_trabajador: idTrabajador,
-          ubicacion: idUbicacion ?? null,
+          ubicacion: ubicacionNombre,
         })
         .eq('id', bienId)
 

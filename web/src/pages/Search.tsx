@@ -10,7 +10,7 @@ const PAGE_SIZE = 20
 
 export function Search() {
   const navigate = useNavigate()
-  const { trabajadores } = useCatalogs()
+  const { trabajadores, ubicaciones } = useCatalogs()
 
   const [codigo, setCodigo] = useState('')
   const [idTrabajador, setIdTrabajador] = useState<number | ''>('')
@@ -31,6 +31,16 @@ export function Search() {
     return t?.nombre ?? null
   }
 
+  const findUbicacionNombre = (ubicacionRaw: string | null) => {
+    if (!ubicacionRaw) return null
+    const asNumber = Number(ubicacionRaw)
+    if (!Number.isNaN(asNumber)) {
+      const byId = ubicaciones.find((u) => u.id === asNumber)
+      return byId?.nombre ?? ubicacionRaw
+    }
+    return ubicacionRaw
+  }
+
   const buildCsv = (rows: Array<BienResumen & { responsableNombre?: string | null }>) => {
     const header = ['id', 'codigo_patrimonial', 'nombre_mueble_equipo', 'responsable', 'ubicacion']
     const lines = rows.map((b) => {
@@ -40,7 +50,7 @@ export function Search() {
         b.codigo_patrimonial ?? '',
         b.nombre_mueble_equipo ?? '',
         responsable,
-        b.ubicacion ?? '',
+        findUbicacionNombre(b.ubicacion) ?? '',
       ]
       return values
         .map((v) =>
@@ -145,7 +155,7 @@ export function Search() {
         lineas.push(`Responsable: ${responsable}`)
       }
       if (b.ubicacion) {
-        lineas.push(`Ubicación: ${b.ubicacion}`)
+        lineas.push(`Ubicación: ${findUbicacionNombre(b.ubicacion) ?? b.ubicacion}`)
       }
       return lineas.join('\n')
     })
@@ -163,7 +173,11 @@ export function Search() {
 
   const handleDownloadResultadosJson = () => {
     if (!resultados.length) return
-    downloadFile('bienes-busqueda.json', 'application/json', JSON.stringify(resultados, null, 2))
+    const normalized = resultados.map((b) => ({
+      ...b,
+      ubicacion: findUbicacionNombre(b.ubicacion),
+    }))
+    downloadFile('bienes-busqueda.json', 'application/json', JSON.stringify(normalized, null, 2))
   }
 
   const handleDownloadResultadosCsv = () => {
@@ -215,7 +229,11 @@ export function Search() {
       if (all.length === 0) return
 
       if (format === 'json') {
-        downloadFile('bienes-todos.json', 'application/json', JSON.stringify(all, null, 2))
+        const normalized = all.map((b) => ({
+          ...(b as any),
+          ubicacion: findUbicacionNombre((b as any).ubicacion ?? null),
+        }))
+        downloadFile('bienes-todos.json', 'application/json', JSON.stringify(normalized, null, 2))
       } else {
         const rows = all.map((b) => ({
           ...(b as any),
@@ -355,7 +373,7 @@ export function Search() {
                 <div className="font-semibold text-slate-900">{b.codigo_patrimonial}</div>
                 <div className="text-slate-600">{b.nombre_mueble_equipo || 'Sin nombre'}</div>
                 <div className="text-sm text-slate-500 mt-0.5">
-                  {b.ubicacion || 'Sin ubicación'}
+                  {findUbicacionNombre(b.ubicacion) || 'Sin ubicación'}
                   {(() => {
                     const nombre = findResponsableNombre(b.id_trabajador)
                     if (!nombre) return ''
