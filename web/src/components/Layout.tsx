@@ -1,4 +1,5 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom'
+import { useSede } from '../context/SedeContext'
 
 const navItems = [
   { to: '/', label: 'Inicio', icon: '🏠' },
@@ -11,6 +12,7 @@ const mainPaths = ['/', '/scan', '/search']
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { sedeActiva, limpiarSede } = useSede()
   const isMainPath = mainPaths.includes(location.pathname)
 
   return (
@@ -31,7 +33,25 @@ export function Layout() {
             <span className="text-2xl shrink-0">📋</span>
             <span className="font-bold text-lg text-slate-800 truncate">Inventario</span>
           </Link>
+          {sedeActiva && (
+            <div className="hidden sm:flex items-center gap-2 text-sm">
+              <span className="text-slate-600 truncate max-w-[180px]" title={sedeActiva.nombre}>
+                📍 {sedeActiva.nombre}
+              </span>
+              <button type="button" onClick={limpiarSede} className="btn-ghost text-xs px-2 py-1">
+                Cambiar
+              </button>
+            </div>
+          )}
         </div>
+        {sedeActiva && (
+          <div className="max-w-2xl mx-auto px-4 pb-2 sm:hidden flex items-center justify-between">
+            <span className="text-xs text-slate-600 truncate pr-2">📍 {sedeActiva.nombre}</span>
+            <button type="button" onClick={limpiarSede} className="btn-ghost text-xs px-2 py-1 shrink-0">
+              Cambiar
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main content */}

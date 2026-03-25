@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import type { Trabajador, Ubicacion } from '../types'
+import type { Sede, Trabajador, Ubicacion } from '../types'
 
 type CatalogContextValue = {
   trabajadores: Trabajador[]
   ubicaciones: Ubicacion[]
+  sedes: Sede[]
   loading: boolean
   error: string | null
   reload: () => void
@@ -18,6 +19,7 @@ const CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutos
 type CachePayload = {
   trabajadores: Trabajador[]
   ubicaciones: Ubicacion[]
+  sedes: Sede[]
   timestamp: number
 }
 
@@ -46,6 +48,7 @@ function saveToCache(payload: CachePayload) {
 export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([])
   const [ubicaciones, setUbicaciones] = useState<Ubicacion[]>([])
+  const [sedes, setSedes] = useState<Sede[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
@@ -62,21 +65,24 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       if (cached && !cancelled) {
         setTrabajadores(cached.trabajadores)
         setUbicaciones(cached.ubicaciones)
+        setSedes(cached.sedes ?? [])
         setLoading(false)
         return
       }
 
-      const [trabajadoresRes, ubicacionesRes] = await Promise.all([
+      const [trabajadoresRes, ubicacionesRes, sedesRes] = await Promise.all([
         supabase.from('trabajadores').select('id, nombre').order('nombre', { ascending: true }),
         supabase.from('ubicaciones').select('id, nombre').order('nombre', { ascending: true }),
+        supabase.from('sedes').select('id, nombre, codigo').order('nombre', { ascending: true }),
       ])
 
       if (cancelled) return
 
-      if (trabajadoresRes.error || ubicacionesRes.error) {
+      if (trabajadoresRes.error || ubicacionesRes.error || sedesRes.error) {
         setError(
           trabajadoresRes.error?.message ??
             ubicacionesRes.error?.message ??
+            sedesRes.error?.message ??
             'Error cargando catálogos',
         )
         setLoading(false)
@@ -85,12 +91,15 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
 
       const trabajadoresData = (trabajadoresRes.data ?? []) as Trabajador[]
       const ubicacionesData = (ubicacionesRes.data ?? []) as Ubicacion[]
+      const sedesData = (sedesRes.data ?? []) as Sede[]
 
       setTrabajadores(trabajadoresData)
       setUbicaciones(ubicacionesData)
+      setSedes(sedesData)
       saveToCache({
         trabajadores: trabajadoresData,
         ubicaciones: ubicacionesData,
+        sedes: sedesData,
         timestamp: Date.now(),
       })
       setLoading(false)
@@ -106,7 +115,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const reload = () => setReloadToken((t) => t + 1)
 
   return (
-    <CatalogContext.Provider value={{ trabajadores, ubicaciones, loading, error, reload }}>
+    <CatalogContext.Provider value={{ trabajadores, ubicaciones, sedes, loading, error, reload }}>
       {children}
     </CatalogContext.Provider>
   )

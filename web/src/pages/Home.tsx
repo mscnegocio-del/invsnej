@@ -32,6 +32,19 @@ export function Home() {
             Filtra por código, responsable o ubicación
           </p>
         </Link>
+
+        <Link
+          to="/admin"
+          className="card flex flex-col p-6 hover:shadow-md hover:border-amber-200 transition-all duration-200 group sm:col-span-2"
+        >
+          <span className="text-4xl mb-3">⚙️</span>
+          <h2 className="text-lg font-semibold text-slate-900 group-hover:text-amber-600 transition-colors">
+            Administración SIGA PJ
+          </h2>
+          <p className="text-slate-600 text-sm mt-1">
+            Carga el Excel del SIGA PJ para pre-rellenar datos al registrar bienes
+          </p>
+        </Link>
       </div>
     </div>
   )

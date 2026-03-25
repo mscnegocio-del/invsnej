@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarcodeScanModal } from '../components/BarcodeScanModal'
 import { supabase } from '../lib/supabaseClient'
 import { DuplicateAlert } from '../components/DuplicateAlert'
-import type { BienResumen } from '../types'
+import type { BienResumen, SigaDatos } from '../types'
 
 export function Scan() {
   const [codigo, setCodigo] = useState('')
@@ -40,7 +40,26 @@ export function Scan() {
       setBienDuplicado(data as BienResumen)
     } else {
       setBienDuplicado(null)
-      navigate(`/registro?codigo=${encodeURIComponent(code)}`)
+
+      // Consultar siga_bienes para pre-rellenar el formulario
+      const { data: sigaData } = await supabase
+        .from('siga_bienes')
+        .select('marca, modelo, serie, orden_compra, valor, descripcion')
+        .eq('codigo_patrimonial', code)
+        .maybeSingle()
+
+      const params = new URLSearchParams({ codigo: code })
+      if (sigaData) {
+        const siga = sigaData as SigaDatos
+        if (siga.marca) params.set('siga_marca', siga.marca)
+        if (siga.modelo) params.set('siga_modelo', siga.modelo)
+        if (siga.serie) params.set('siga_serie', siga.serie)
+        if (siga.orden_compra) params.set('siga_oc', siga.orden_compra)
+        if (siga.valor != null) params.set('siga_valor', String(siga.valor))
+        if (siga.descripcion) params.set('siga_descripcion', siga.descripcion)
+      }
+
+      navigate(`/registro?${params.toString()}`)
     }
   }
 

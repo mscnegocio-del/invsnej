@@ -5,17 +5,20 @@ import { supabase } from '../lib/supabaseClient'
 import { BarcodeScanModal } from '../components/BarcodeScanModal'
 import { TrabajadorSearchableSelect } from '../components/TrabajadorSearchableSelect'
 import { useCatalogs } from '../context/CatalogContext'
+import { useSede } from '../context/SedeContext'
 import type { BienResumen } from '../types'
 const PAGE_SIZE = 20
 
 export function Search() {
   const navigate = useNavigate()
-  const { trabajadores, ubicaciones } = useCatalogs()
+  const { trabajadores, ubicaciones, sedes } = useCatalogs()
+  const { sedeActiva } = useSede()
 
   const [codigo, setCodigo] = useState('')
   const [idTrabajador, setIdTrabajador] = useState<number | ''>('')
   const [textoUbicacion, setTextoUbicacion] = useState('')
   const [showScanModal, setShowScanModal] = useState(false)
+  const [todasLasSedes, setTodasLasSedes] = useState(false)
 
   const [page, setPage] = useState(0)
   const [resultados, setResultados] = useState<BienResumen[]>([])
@@ -41,8 +44,22 @@ export function Search() {
     return ubicacionRaw
   }
 
-  const buildCsv = (rows: Array<BienResumen & { responsableNombre?: string | null }>) => {
-    const header = ['id', 'codigo_patrimonial', 'nombre_mueble_equipo', 'estado', 'responsable', 'ubicacion']
+  const findSedeNombre = (sedeId: number | null | undefined) => {
+    if (!sedeId) return null
+    return sedes.find((s) => s.id === sedeId)?.nombre ?? `Sede ${sedeId}`
+  }
+
+  type RowWithExtras = BienResumen & {
+    responsableNombre?: string | null
+    marca?: string | null
+    modelo?: string | null
+    serie?: string | null
+    orden_compra?: string | null
+    valor?: number | null
+  }
+
+  const buildCsv = (rows: RowWithExtras[]) => {
+    const header = ['id', 'codigo_patrimonial', 'nombre_mueble_equipo', 'estado', 'responsable', 'ubicacion', 'sede', 'marca', 'modelo', 'serie', 'orden_compra', 'valor']
     const lines = rows.map((b) => {
       const responsable = b.responsableNombre ?? findResponsableNombre(b.id_trabajador) ?? ''
       const values = [
@@ -52,6 +69,12 @@ export function Search() {
         b.estado ?? '',
         responsable,
         findUbicacionNombre(b.ubicacion) ?? '',
+        findSedeNombre(b.sede_id) ?? '',
+        b.marca ?? '',
+        b.modelo ?? '',
+        b.serie ?? '',
+        b.orden_compra ?? '',
+        b.valor != null ? String(b.valor) : '',
       ]
       return values
         .map((v) =>
@@ -81,9 +104,13 @@ export function Search() {
 
     let query = supabase
       .from('bienes')
-      .select('id, codigo_patrimonial, nombre_mueble_equipo, estado, id_trabajador, ubicacion', {
+      .select('id, codigo_patrimonial, nombre_mueble_equipo, estado, id_trabajador, ubicacion, sede_id, marca, modelo, serie, orden_compra, valor', {
         count: 'exact',
       })
+
+    if (sedeActiva && !todasLasSedes) {
+      query = query.eq('sede_id', sedeActiva.id)
+    }
 
     if (codigo.trim()) {
       query = query.eq('codigo_patrimonial', codigo.trim())
@@ -146,7 +173,7 @@ export function Search() {
 
     const encabezado = `Resultados de búsqueda (${resultados.length} bien${resultados.length === 1 ? '' : 'es'})`
 
-    const bloques = resultados.map((b, index) => {
+    const bloques = (resultados as RowWithExtras[]).map((b, index) => {
       const responsable = findResponsableNombre(b.id_trabajador)
       const lineas: string[] = []
       lineas.push(`#${index + 1}`)
@@ -155,12 +182,24 @@ export function Search() {
       if (b.estado) {
         lineas.push(`Estado: ${b.estado}`)
       }
+      const sede = findSedeNombre(b.sede_id)
+      if (sede) {
+        lineas.push(`Sede: ${sede}`)
+      }
       if (responsable) {
         lineas.push(`Responsable: ${responsable}`)
       }
       if (b.ubicacion) {
         lineas.push(`Ubicación: ${findUbicacionNombre(b.ubicacion) ?? b.ubicacion}`)
       }
+      // Campos SIGA (solo si existen)
+      const sigaParts: string[] = []
+      if (b.marca) sigaParts.push(`Marca: ${b.marca}`)
+      if (b.modelo) sigaParts.push(`Modelo: ${b.modelo}`)
+      if (b.serie) sigaParts.push(`Serie: ${b.serie}`)
+      if (b.orden_compra) sigaParts.push(`OC: ${b.orden_compra}`)
+      if (b.valor != null) sigaParts.push(`Valor: S/. ${b.valor.toLocaleString()}`)
+      if (sigaParts.length) lineas.push(sigaParts.join(' | '))
       return lineas.join('\n')
     })
 
@@ -177,16 +216,18 @@ export function Search() {
 
   const handleDownloadResultadosJson = () => {
     if (!resultados.length) return
-    const normalized = resultados.map((b) => ({
+    const normalized = (resultados as RowWithExtras[]).map((b) => ({
       ...b,
       ubicacion: findUbicacionNombre(b.ubicacion),
+      responsable: findResponsableNombre(b.id_trabajador),
+      sede: findSedeNombre(b.sede_id),
     }))
     downloadFile('bienes-busqueda.json', 'application/json', JSON.stringify(normalized, null, 2))
   }
 
   const handleDownloadResultadosCsv = () => {
     if (!resultados.length) return
-    const rows = resultados.map((b) => ({
+    const rows = (resultados as RowWithExtras[]).map((b) => ({
       ...b,
       responsableNombre: findResponsableNombre(b.id_trabajador),
     }))
@@ -207,7 +248,7 @@ export function Search() {
       while (true) {
         const { data, error: supaError } = await supabase
           .from('bienes')
-          .select('id, codigo_patrimonial, nombre_mueble_equipo, id_trabajador, ubicacion, estado, fecha_registro')
+          .select('id, codigo_patrimonial, nombre_mueble_equipo, id_trabajador, ubicacion, estado, sede_id, fecha_registro, marca, modelo, serie, orden_compra, valor')
           .order('id', { ascending: true })
           .range(from, from + pageSize - 1)
 
@@ -234,14 +275,16 @@ export function Search() {
 
       if (format === 'json') {
         const normalized = all.map((b) => ({
-          ...(b as any),
-          ubicacion: findUbicacionNombre((b as any).ubicacion ?? null),
+          ...(b as RowWithExtras),
+          ubicacion: findUbicacionNombre((b as RowWithExtras).ubicacion ?? null),
+          responsable: findResponsableNombre((b as RowWithExtras).id_trabajador ?? null),
+          sede: findSedeNombre((b as RowWithExtras).sede_id ?? null),
         }))
         downloadFile('bienes-todos.json', 'application/json', JSON.stringify(normalized, null, 2))
       } else {
         const rows = all.map((b) => ({
-          ...(b as any),
-          responsableNombre: findResponsableNombre((b as any).id_trabajador ?? null),
+          ...(b as RowWithExtras),
+          responsableNombre: findResponsableNombre((b as RowWithExtras).id_trabajador ?? null),
         }))
         const csv = buildCsv(rows)
         downloadFile('bienes-todos.csv', 'text/csv;charset=utf-8;', csv)
@@ -301,6 +344,19 @@ export function Search() {
             className="input"
           />
         </div>
+
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={todasLasSedes}
+            onChange={(e) => setTodasLasSedes(e.target.checked)}
+            className="size-4 rounded border-slate-300"
+          />
+          Buscar en todas las sedes
+          {!todasLasSedes && sedeActiva && (
+            <span className="text-slate-500">({sedeActiva.nombre})</span>
+          )}
+        </label>
 
         <button type="submit" disabled={loading} className="btn-primary w-full">
           {loading ? (
@@ -382,6 +438,11 @@ export function Search() {
                     const nombre = findResponsableNombre(b.id_trabajador)
                     if (!nombre) return ''
                     return ` · Responsable ${nombre}`
+                  })()}
+                  {(() => {
+                    const sede = findSedeNombre(b.sede_id)
+                    if (!sede) return ''
+                    return ` · ${sede}`
                   })()}
                 </div>
               </li>

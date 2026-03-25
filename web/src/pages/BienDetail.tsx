@@ -22,7 +22,7 @@ export function BienDetail() {
 
       const { data, error: supaError } = await supabase
         .from('bienes')
-        .select('id, codigo_patrimonial, nombre_mueble_equipo, tipo_mueble_equipo, estado, id_trabajador, ubicacion, fecha_registro')
+        .select('id, codigo_patrimonial, nombre_mueble_equipo, tipo_mueble_equipo, estado, id_trabajador, ubicacion, fecha_registro, marca, modelo, serie, orden_compra, valor')
         .eq('id', id)
         .maybeSingle()
 
@@ -41,7 +41,7 @@ export function BienDetail() {
         return
       }
 
-      const raw = data as { id: number; codigo_patrimonial: string; nombre_mueble_equipo: string; tipo_mueble_equipo: string | null; estado: string; id_trabajador: number | null; ubicacion: string | null; fecha_registro: string | null }
+      const raw = data as { id: number; codigo_patrimonial: string; nombre_mueble_equipo: string; tipo_mueble_equipo: string | null; estado: string; id_trabajador: number | null; ubicacion: string | null; fecha_registro: string | null; marca: string | null; modelo: string | null; serie: string | null; orden_compra: string | null; valor: number | null }
       let trabajadorNombre: string | null = null
 
       if (raw.id_trabajador) {
@@ -68,6 +68,11 @@ export function BienDetail() {
         ubicacion: raw.ubicacion,
         fecha_registro: raw.fecha_registro,
         trabajador_nombre: trabajadorNombre,
+        marca: raw.marca,
+        modelo: raw.modelo,
+        serie: raw.serie,
+        orden_compra: raw.orden_compra,
+        valor: raw.valor,
       }
 
       setBien(detalle)
@@ -136,6 +141,29 @@ export function BienDetail() {
                 <dd className="mt-1 text-slate-900 sm:mt-0">{value}</dd>
               </div>
             ))}
+
+            {/* Campos SIGA (solo si existen) */}
+            {(bien.marca || bien.modelo || bien.serie || bien.orden_compra || bien.valor != null) && (
+              <>
+                <div className="px-6 py-3 bg-amber-50/60">
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Datos SIGA PJ</p>
+                </div>
+                {[
+                  { term: 'Marca', value: bien.marca },
+                  { term: 'Modelo', value: bien.modelo },
+                  { term: 'N° Serie', value: bien.serie },
+                  { term: 'Orden de compra', value: bien.orden_compra },
+                  { term: 'Valor', value: bien.valor != null ? `S/. ${bien.valor.toLocaleString()}` : null },
+                ]
+                  .filter(({ value }) => value != null)
+                  .map(({ term, value }) => (
+                    <div key={term} className="px-6 py-4 sm:grid sm:grid-cols-2 sm:gap-4">
+                      <dt className="text-sm font-medium text-slate-500">{term}</dt>
+                      <dd className="mt-1 text-slate-900 sm:mt-0">{value}</dd>
+                    </div>
+                  ))}
+              </>
+            )}
           </dl>
 
           <div className="px-6 py-4 bg-slate-50/50 flex flex-wrap gap-3">
