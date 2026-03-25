@@ -16,9 +16,10 @@ function getStoredRotation(): number {
 
 type Props = {
   onDetected: (code: string) => void
+  hideManualInput?: boolean
 }
 
-export function BarcodeScanner({ onDetected }: Props) {
+export function BarcodeScanner({ onDetected, hideManualInput = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const [rotation, setRotation] = useState(getStoredRotation)
@@ -109,17 +110,19 @@ export function BarcodeScanner({ onDetected }: Props) {
             🔄 Rotar vista ({rotation}°)
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => setShowManualInput((v) => !v)}
-          className="btn-ghost text-sm"
-          title="Si la cámara no lee bien, escribe el código a mano"
-        >
-          ✏️ Escribir manualmente
-        </button>
+        {!hideManualInput && (
+          <button
+            type="button"
+            onClick={() => setShowManualInput((v) => !v)}
+            className="btn-ghost text-sm"
+            title="Si la cámara no lee bien, escribe el código a mano"
+          >
+            ✏️ Escribir manualmente
+          </button>
+        )}
       </div>
 
-      {showManualInput && (
+      {!hideManualInput && showManualInput && (
         <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
           <label htmlFor="manual-code" className="text-sm font-medium text-slate-700">
             Código patrimonial

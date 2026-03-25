@@ -35,7 +35,7 @@ export function BarcodeScanModal({ onDetected, onClose }: Props) {
           </button>
         </div>
         <div className="p-4 max-h-[80vh] overflow-y-auto">
-          <BarcodeScanner onDetected={handleDetected} />
+          <BarcodeScanner onDetected={handleDetected} hideManualInput />
         </div>
       </div>
     </div>
