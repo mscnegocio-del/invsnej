@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabaseClient'
 type SigaRow = {
   codigo_patrimonial: string
   descripcion: string | null
+  usuario: string | null
   marca: string | null
   modelo: string | null
   serie: string | null
@@ -16,6 +17,7 @@ type SigaRow = {
 const COLUMN_MAP: Record<keyof SigaRow, string[]> = {
   codigo_patrimonial: ['CÓDIGO', 'CODIGO', 'COD_PATRIMONIAL', 'CÓDIGO PATRIMONIAL', 'CODIGO PATRIMONIAL'],
   descripcion: ['DESCRIPCIÓN', 'DESCRIPCION', 'NOMBRE', 'NOMBRE DEL BIEN'],
+  usuario: ['USUARIO', 'RESPONSABLE', 'ASIGNADO', 'USUARIO ASIGNADO'],
   marca: ['MARCA'],
   modelo: ['MODELO'],
   serie: ['N° SERIE', 'SERIE', 'NRO SERIE', 'N_SERIE', 'NUMERO DE SERIE'],
@@ -45,6 +47,7 @@ function mapRow(headers: string[], row: unknown[]): SigaRow | null {
   return {
     codigo_patrimonial: codigo,
     descripcion: get(COLUMN_MAP.descripcion),
+    usuario: get(COLUMN_MAP.usuario),
     marca: get(COLUMN_MAP.marca),
     modelo: get(COLUMN_MAP.modelo),
     serie: get(COLUMN_MAP.serie),
@@ -61,8 +64,8 @@ export function Admin() {
   const [allRows, setAllRows] = useState<SigaRow[]>([])
   const [headers, setHeaders] = useState<string[]>([])
   const [fase, setFase] = useState<'idle' | 'preview' | 'loading' | 'done'>('idle')
-  const [progress, setProgress] = useState({ cargados: 0, total: 0 })
-  const [resumen, setResumen] = useState<{ nuevos: number; errores: number } | null>(null)
+  const [progress, setProgress] = useState({ procesados: 0, total: 0 })
+  const [resumen, setResumen] = useState<{ exitosos: number; errores: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,12 +113,12 @@ export function Admin() {
 
   const handleConfirmar = async () => {
     setFase('loading')
-    setProgress({ cargados: 0, total: allRows.length })
+    setProgress({ procesados: 0, total: allRows.length })
     setResumen(null)
     setError(null)
 
     let errores = 0
-    let cargados = 0
+    let exitosos = 0
 
     for (let i = 0; i < allRows.length; i += BATCH_SIZE) {
       const batch = allRows.slice(i, i + BATCH_SIZE)
@@ -127,13 +130,13 @@ export function Admin() {
         console.error('Error en batch', i, supaError)
         errores += batch.length
       } else {
-        cargados += batch.length
+        exitosos += batch.length
       }
 
-      setProgress({ cargados: cargados + errores, total: allRows.length })
+      setProgress({ procesados: exitosos + errores, total: allRows.length })
     }
 
-    setResumen({ nuevos: cargados, errores })
+    setResumen({ exitosos, errores })
     setFase('done')
   }
 
@@ -142,13 +145,13 @@ export function Admin() {
     setPreview([])
     setAllRows([])
     setHeaders([])
-    setProgress({ cargados: 0, total: 0 })
+    setProgress({ procesados: 0, total: 0 })
     setResumen(null)
     setError(null)
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  const pct = progress.total > 0 ? Math.round((progress.cargados / progress.total) * 100) : 0
+  const pct = progress.total > 0 ? Math.round((progress.procesados / progress.total) * 100) : 0
 
   return (
     <div>
@@ -162,7 +165,7 @@ export function Admin() {
           <div className="space-y-3">
             <p className="text-sm text-slate-600">
               Selecciona el archivo Excel (.xlsx) con los bienes del SIGA PJ. Se usará para pre-rellenar
-              marca, modelo, serie, orden de compra y valor al registrar un nuevo bien.
+              descripción, usuario, marca, modelo, serie, orden de compra y valor al registrar un nuevo bien.
             </p>
             <label className="block">
               <span className="sr-only">Seleccionar archivo Excel</span>
@@ -191,7 +194,7 @@ export function Admin() {
               <table className="text-xs min-w-full">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
-                    {['Código', 'Descripción', 'Marca', 'Modelo', 'Serie', 'OC', 'Valor'].map((h) => (
+                    {['Código', 'Descripción', 'Usuario', 'Marca', 'Modelo', 'Serie', 'OC', 'Valor'].map((h) => (
                       <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -201,6 +204,7 @@ export function Admin() {
                     <tr key={i} className="text-slate-700">
                       <td className="px-3 py-2 font-mono whitespace-nowrap">{r.codigo_patrimonial}</td>
                       <td className="px-3 py-2 max-w-[160px] truncate">{r.descripcion ?? '—'}</td>
+                      <td className="px-3 py-2 max-w-[120px] truncate" title={r.usuario ?? undefined}>{r.usuario ?? '—'}</td>
                       <td className="px-3 py-2">{r.marca ?? '—'}</td>
                       <td className="px-3 py-2">{r.modelo ?? '—'}</td>
                       <td className="px-3 py-2">{r.serie ?? '—'}</td>
@@ -227,27 +231,57 @@ export function Admin() {
         )}
 
         {fase === 'loading' && (
-          <div className="space-y-3">
-            <p className="text-sm text-slate-700">
-              Cargando en Supabase... <strong>{progress.cargados}</strong> / {progress.total.toLocaleString()}
-            </p>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+              <div>
+                <p className="text-sm font-medium text-slate-800">
+                  Subiendo a Supabase…
+                </p>
+                <p className="text-sm text-slate-600 mt-0.5">
+                  <strong>{progress.procesados.toLocaleString()}</strong> de{' '}
+                  <strong>{progress.total.toLocaleString()}</strong> registros procesados
+                </p>
+              </div>
+            </div>
             <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
               <div
                 className="bg-teal-500 h-3 rounded-full transition-all duration-300"
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <p className="text-xs text-slate-500">{pct}% completado</p>
+            <p className="text-xs text-slate-500">{pct}% — No cierres esta pestaña hasta que termine.</p>
           </div>
         )}
 
         {fase === 'done' && resumen && (
           <div className="space-y-4">
-            <div className="rounded-xl bg-teal-50 border border-teal-200 px-4 py-3 text-sm text-teal-900 space-y-1">
-              <p className="font-semibold">Carga completada</p>
-              <p>✅ Registros cargados/actualizados: <strong>{resumen.nuevos.toLocaleString()}</strong></p>
-              {resumen.errores > 0 && (
-                <p>⚠️ Registros con error: <strong>{resumen.errores}</strong></p>
+            <div
+              className={`rounded-xl border px-4 py-4 text-sm space-y-2 ${
+                resumen.errores === 0
+                  ? 'bg-teal-50 border-teal-200 text-teal-900'
+                  : 'bg-amber-50 border-amber-200 text-amber-950'
+              }`}
+            >
+              {resumen.errores === 0 ? (
+                <>
+                  <p className="text-lg font-semibold text-teal-800">¡Subido correctamente!</p>
+                  <p>
+                    Se guardaron <strong>{resumen.exitosos.toLocaleString()}</strong> registros en la base SIGA
+                    (nuevos o actualizados por código patrimonial).
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold">Carga finalizada con advertencias</p>
+                  <p>
+                    ✅ Registros OK: <strong>{resumen.exitosos.toLocaleString()}</strong>
+                  </p>
+                  <p>
+                    ⚠️ Registros con error: <strong>{resumen.errores.toLocaleString()}</strong> (revisa la consola del
+                    navegador para detalles)
+                  </p>
+                </>
               )}
             </div>
             <button type="button" onClick={handleReset} className="btn-secondary w-full">
