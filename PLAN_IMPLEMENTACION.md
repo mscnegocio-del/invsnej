@@ -215,6 +215,7 @@ CREATE TABLE IF NOT EXISTS siga_bienes (
   id SERIAL PRIMARY KEY,
   codigo_patrimonial TEXT UNIQUE NOT NULL,  -- clave de cruce con bienes
   descripcion TEXT,
+  usuario TEXT,
   marca TEXT,
   modelo TEXT,
   serie TEXT,

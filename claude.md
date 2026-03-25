@@ -4,7 +4,7 @@
 
 App web de inventario patrimonial para móvil. Permite escanear códigos de barras, registrar bienes en Supabase, validar duplicados y realizar CRUD completo (crear, leer, editar, eliminar).
 
-## Stack
+## Stackk
 
 - React 19 + Vite 6
 - Tailwind CSS
