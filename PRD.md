@@ -1,10 +1,10 @@
 # PRD - Sistema de Inventario Web con Escaneo de Barras (v2)
 
-## 1. Visión del productooo
+## 1. Visión del producto
 
 Sistema web móvil para registrar, buscar, ver, editar y eliminar bienes patrimoniales escaneando códigos de barras desde el celular. Incluye validación de duplicados, CRUD completo, búsqueda filtrada y exportación flexible (JSON, CSV, texto para compartir). Almacenamiento en Supabase. Actualmente con 1900+ registros en producción.
 
-## 2. Usuarios objetivoooo
+## 2. Usuarios objetivo
 
 Personal de inventario que usa smartphone para registrar y gestionar bienes en campo, así como personal administrativo que requiere reportes y exports en múltiples formatos.
 
