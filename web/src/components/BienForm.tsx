@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { TrabajadorSearchableSelect } from './TrabajadorSearchableSelect'
 import { UbicacionSelect } from './UbicacionSelect'
+import { NombreSearchableInput } from './NombreSearchableInput'
+import type { SigaSugerencia } from './NombreSearchableInput'
 import { useCatalogs } from '../context/CatalogContext'
 import { useSede } from '../context/SedeContext'
 import type { BienDetalle } from '../types'
@@ -106,6 +108,16 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       cancelled = true
     }
   }, [modo, bienId, ubicaciones])
+
+  const handleNombreSelect = (row: SigaSugerencia) => {
+    setNombre(row.descripcion)
+    // Solo rellena campos SIGA si están vacíos (no sobreescribe datos ya precargados)
+    if (!marca && row.marca) setMarca(row.marca)
+    if (!modelo && row.modelo) setModelo(row.modelo)
+    if (!serie && row.serie) setSerie(row.serie)
+    if (!ordenCompra && row.orden_compra) setOrdenCompra(row.orden_compra)
+    if (!valor && row.valor != null) setValor(String(row.valor))
+  }
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -266,17 +278,11 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
         />
       </div>
 
-      <div>
-        <label className="label" htmlFor="form-nombre">Nombre / modelo del bien *</label>
-        <input
-          id="form-nombre"
-          type="text"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          placeholder="Ej. Escritorio de oficina, Laptop Dell..."
-          className="input"
-        />
-      </div>
+      <NombreSearchableInput
+        value={nombre}
+        onChange={setNombre}
+        onSelect={handleNombreSelect}
+      />
 
       <div>
         <label className="label" htmlFor="form-tipo">Tipo de mueble o equipo</label>
