@@ -33,6 +33,15 @@ export type SigaDatos = {
   descripcion: string | null
 }
 
+export type BienHistorial = {
+  id: number
+  bien_id: number
+  campo: string
+  valor_antes: string | null
+  valor_despues: string | null
+  fecha: string
+}
+
 export type BienDetalle = {
   id: number
   codigo_patrimonial: string
@@ -43,6 +52,7 @@ export type BienDetalle = {
   ubicacion: string | null
   fecha_registro: string | null
   trabajador_nombre: string | null
+  sede_id?: number | null
   // campos SIGA (opcionales)
   marca?: string | null
   modelo?: string | null

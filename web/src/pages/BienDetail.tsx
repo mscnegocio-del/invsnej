@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import type { BienDetalle } from '../types'
+import { useCatalogs } from '../context/CatalogContext'
+import type { BienDetalle, BienHistorial } from '../types'
 
 export function BienDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { sedes, ubicaciones } = useCatalogs()
   const [bien, setBien] = useState<BienDetalle | null>(null)
+  const [historial, setHistorial] = useState<BienHistorial[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -22,7 +25,7 @@ export function BienDetail() {
 
       const { data, error: supaError } = await supabase
         .from('bienes')
-        .select('id, codigo_patrimonial, nombre_mueble_equipo, tipo_mueble_equipo, estado, id_trabajador, ubicacion, fecha_registro, marca, modelo, serie, orden_compra, valor')
+        .select('id, codigo_patrimonial, nombre_mueble_equipo, tipo_mueble_equipo, estado, id_trabajador, ubicacion, fecha_registro, sede_id, marca, modelo, serie, orden_compra, valor')
         .eq('id', id)
         .maybeSingle()
 
@@ -41,7 +44,7 @@ export function BienDetail() {
         return
       }
 
-      const raw = data as { id: number; codigo_patrimonial: string; nombre_mueble_equipo: string; tipo_mueble_equipo: string | null; estado: string; id_trabajador: number | null; ubicacion: string | null; fecha_registro: string | null; marca: string | null; modelo: string | null; serie: string | null; orden_compra: string | null; valor: number | null }
+      const raw = data as { id: number; codigo_patrimonial: string; nombre_mueble_equipo: string; tipo_mueble_equipo: string | null; estado: string; id_trabajador: number | null; ubicacion: string | null; fecha_registro: string | null; sede_id: number | null; marca: string | null; modelo: string | null; serie: string | null; orden_compra: string | null; valor: number | null }
       let trabajadorNombre: string | null = null
 
       if (raw.id_trabajador) {
@@ -68,6 +71,7 @@ export function BienDetail() {
         ubicacion: raw.ubicacion,
         fecha_registro: raw.fecha_registro,
         trabajador_nombre: trabajadorNombre,
+        sede_id: raw.sede_id,
         marca: raw.marca,
         modelo: raw.modelo,
         serie: raw.serie,
@@ -76,6 +80,19 @@ export function BienDetail() {
       }
 
       setBien(detalle)
+
+      // Cargar historial del bien
+      const { data: historialData } = await supabase
+        .from('bien_historial')
+        .select('id, bien_id, campo, valor_antes, valor_despues, fecha')
+        .eq('bien_id', raw.id)
+        .order('fecha', { ascending: false })
+        .limit(30)
+
+      if (!cancelled) {
+        setHistorial((historialData ?? []) as BienHistorial[])
+      }
+
       setLoading(false)
     }
 
@@ -124,7 +141,24 @@ export function BienDetail() {
         </p>
       )}
 
-      {bien && !loading && !error && (
+      {bien && !loading && !error && (() => {
+        // Resolver sede a nombre
+        const sedeNombre = bien.sede_id
+          ? (sedes.find((s) => s.id === bien.sede_id)?.nombre ?? `Sede ${bien.sede_id}`)
+          : null
+
+        // Resolver ubicacion: puede ser un ID antiguo (número) o ya un nombre
+        const ubicacionNombre = (() => {
+          if (!bien.ubicacion) return null
+          const asNum = Number(bien.ubicacion)
+          if (!Number.isNaN(asNum)) {
+            return ubicaciones.find((u) => u.id === asNum)?.nombre ?? bien.ubicacion
+          }
+          return bien.ubicacion
+        })()
+
+        return (
+        <>
         <div className="mt-6 card overflow-hidden">
           <dl className="divide-y divide-slate-100">
             {[
@@ -133,7 +167,8 @@ export function BienDetail() {
               { term: 'Tipo', value: bien.tipo_mueble_equipo || '—' },
               { term: 'Estado', value: bien.estado },
               { term: 'Responsable', value: bien.trabajador_nombre || 'Sin responsable asignado' },
-              { term: 'Ubicación', value: bien.ubicacion || 'Sin ubicación registrada' },
+              { term: 'Ubicación', value: ubicacionNombre || 'Sin ubicación registrada' },
+              { term: 'Sede', value: sedeNombre || 'Sin sede asignada' },
               { term: 'Fecha de registro', value: bien.fecha_registro ? new Date(bien.fecha_registro).toLocaleString() : '—' },
             ].map(({ term, value }) => (
               <div key={term} className="px-6 py-4 sm:grid sm:grid-cols-2 sm:gap-4">
@@ -184,7 +219,49 @@ export function BienDetail() {
             </button>
           </div>
         </div>
-      )}
+
+        {/* Historial de cambios */}
+        {historial.length > 0 && (
+          <div className="mt-6 card overflow-hidden">
+            <div className="px-6 py-3 border-b border-slate-100">
+              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+                Historial de cambios
+              </h2>
+            </div>
+            <ul className="divide-y divide-slate-100">
+              {historial.map((h) => {
+                const etiquetaCampo: Record<string, string> = {
+                  estado: 'Estado',
+                  responsable: 'Responsable',
+                  ubicacion: 'Ubicación',
+                }
+                const fecha = new Date(h.fecha).toLocaleString('es-PE', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+                return (
+                  <li key={h.id} className="px-6 py-3 flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-4">
+                    <span className="text-xs text-slate-400 shrink-0 w-36">{fecha}</span>
+                    <span className="text-xs font-semibold text-slate-600 w-24 shrink-0">
+                      {etiquetaCampo[h.campo] ?? h.campo}
+                    </span>
+                    <span className="text-sm text-slate-700">
+                      <span className="text-slate-400">{h.valor_antes ?? '—'}</span>
+                      <span className="mx-2 text-slate-300">→</span>
+                      <span className="font-medium text-slate-900">{h.valor_despues ?? '—'}</span>
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
+        </>
+        )
+      })()}
     </div>
   )
 }

@@ -19,7 +19,7 @@ const ESTADOS = ['Nuevo', 'Bueno', 'Regular', 'Malo', 'Muy malo'] as const
 export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { ubicaciones } = useCatalogs()
+  const { ubicaciones, trabajadores } = useCatalogs()
   const { sedeActiva } = useSede()
 
   const codigoFromQuery = searchParams.get('codigo') ?? ''
@@ -168,6 +168,13 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       const nuevoId = data.id as number
       navigate(`/bienes/${nuevoId}`, { replace: true })
     } else {
+      // Leer valores actuales antes del update para calcular el diff
+      const { data: anterior } = await supabase
+        .from('bienes')
+        .select('estado, id_trabajador, ubicacion')
+        .eq('id', bienId)
+        .maybeSingle()
+
       const { error: supaError } = await supabase
         .from('bienes')
         .update({
@@ -191,6 +198,50 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
         console.error(supaError)
         setError('No se pudo actualizar el bien. Intenta nuevamente.')
         return
+      }
+
+      // Registrar historial de campos cambiados
+      if (anterior && bienId) {
+        const prev = anterior as { estado: string; id_trabajador: number | null; ubicacion: string | null }
+
+        const resolveUbicacion = (val: string | null): string | null => {
+          if (!val) return null
+          const asNum = Number(val)
+          if (!Number.isNaN(asNum)) {
+            return ubicaciones.find((u) => u.id === asNum)?.nombre ?? val
+          }
+          return val
+        }
+
+        const resolveTrabajador = (id: number | null): string | null => {
+          if (!id) return null
+          return trabajadores.find((t) => t.id === id)?.nombre ?? String(id)
+        }
+
+        type HistorialFila = { bien_id: number; campo: string; valor_antes: string | null; valor_despues: string | null }
+        const filas: HistorialFila[] = []
+
+        if (prev.estado !== estado) {
+          filas.push({ bien_id: bienId, campo: 'estado', valor_antes: prev.estado ?? null, valor_despues: estado })
+        }
+
+        if (prev.id_trabajador !== idTrabajador) {
+          filas.push({
+            bien_id: bienId,
+            campo: 'responsable',
+            valor_antes: resolveTrabajador(prev.id_trabajador),
+            valor_despues: resolveTrabajador(idTrabajador),
+          })
+        }
+
+        const ubicAntes = resolveUbicacion(prev.ubicacion)
+        if (ubicAntes !== ubicacionNombre) {
+          filas.push({ bien_id: bienId, campo: 'ubicacion', valor_antes: ubicAntes, valor_despues: ubicacionNombre })
+        }
+
+        if (filas.length > 0) {
+          await supabase.from('bien_historial').insert(filas)
+        }
       }
 
       if (bienId) {
