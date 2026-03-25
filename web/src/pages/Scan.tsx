@@ -5,6 +5,8 @@ import { BarcodeScanModal } from '../components/BarcodeScanModal'
 import { supabase } from '../lib/supabaseClient'
 import { DuplicateAlert } from '../components/DuplicateAlert'
 import type { BienResumen, SigaDatos } from '../types'
+import { useSede } from '../context/SedeContext'
+import { useCatalogs } from '../context/CatalogContext'
 
 export function Scan() {
   const [codigo, setCodigo] = useState('')
@@ -14,6 +16,13 @@ export function Scan() {
   const [error, setError] = useState<string | null>(null)
   const [showScanModal, setShowScanModal] = useState(false)
   const navigate = useNavigate()
+  const { sedeActiva } = useSede()
+  const { sedes } = useCatalogs()
+
+  const findSedeNombre = (sedeId: number | null | undefined): string | null => {
+    if (!sedeId) return null
+    return sedes.find((s) => s.id === sedeId)?.nombre ?? `Sede ${sedeId}`
+  }
 
   const verificarCodigo = async (code: string) => {
     if (checking) return
@@ -23,7 +32,7 @@ export function Scan() {
 
     const { data, error: supaError } = await supabase
       .from('bienes')
-      .select('id, codigo_patrimonial, nombre_mueble_equipo, id_trabajador, ubicacion')
+      .select('id, codigo_patrimonial, nombre_mueble_equipo, id_trabajador, ubicacion, sede_id')
       .eq('codigo_patrimonial', code)
       .maybeSingle()
 
@@ -154,17 +163,26 @@ export function Scan() {
         </p>
       )}
 
-      {lastCode && bienDuplicado && (
-        <DuplicateAlert
-          codigo={lastCode}
-          bien={bienDuplicado}
-          onRegisterAnother={() => {
-            setBienDuplicado(null)
-            setLastCode(null)
-          }}
-          onCancel={() => navigate('/')}
-        />
-      )}
+      {lastCode && bienDuplicado && (() => {
+        const bienSedeId = bienDuplicado.sede_id ?? null
+        const esOtraSede =
+          bienSedeId !== null &&
+          sedeActiva !== null &&
+          bienSedeId !== sedeActiva.id
+        const sedeOrigen = esOtraSede ? findSedeNombre(bienSedeId) : null
+        return (
+          <DuplicateAlert
+            codigo={lastCode}
+            bien={bienDuplicado}
+            sedeOrigen={sedeOrigen}
+            onRegisterAnother={() => {
+              setBienDuplicado(null)
+              setLastCode(null)
+            }}
+            onCancel={() => navigate('/')}
+          />
+        )
+      })()}
     </div>
   )
 }
