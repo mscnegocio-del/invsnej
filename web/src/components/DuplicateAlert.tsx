@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { useCatalogs } from '../context/CatalogContext'
 import type { BienResumen } from '../types'
 
 type Props = {
@@ -12,8 +13,18 @@ type Props = {
 
 export function DuplicateAlert({ codigo, bien, sedeOrigen, onRegisterAnother, onCancel }: Props) {
   const navigate = useNavigate()
+  const { ubicaciones } = useCatalogs()
 
   const esOtraSede = typeof sedeOrigen === 'string' && sedeOrigen.length > 0
+
+  const ubicacionNombre = (() => {
+    if (!bien.ubicacion) return null
+    const asNum = Number(bien.ubicacion)
+    if (!Number.isNaN(asNum)) {
+      return ubicaciones.find((u) => u.id === asNum)?.nombre ?? bien.ubicacion
+    }
+    return bien.ubicacion
+  })()
 
   return (
     <section
@@ -58,7 +69,7 @@ export function DuplicateAlert({ codigo, bien, sedeOrigen, onRegisterAnother, on
             Ubicación actual
           </dt>
           <dd className={esOtraSede ? 'text-orange-900' : 'text-amber-900'}>
-            {bien.ubicacion || 'Sin ubicación registrada'}
+            {ubicacionNombre || 'Sin ubicación registrada'}
           </dd>
         </div>
         {esOtraSede && (
