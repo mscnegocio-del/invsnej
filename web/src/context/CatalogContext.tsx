@@ -14,7 +14,7 @@ type CatalogContextValue = {
 const CatalogContext = createContext<CatalogContextValue | undefined>(undefined)
 
 const CACHE_KEY = 'invweb_catalogs_v1'
-const CACHE_TTL_MS = 15 * 60 * 1000 // 15 minutos
+const CACHE_TTL_MS = 1 * 60 * 1000 // 1 minuto
 
 type CachePayload = {
   trabajadores: Trabajador[]
