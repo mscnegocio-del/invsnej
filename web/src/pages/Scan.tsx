@@ -34,6 +34,7 @@ export function Scan() {
       .from('bienes')
       .select('id, codigo_patrimonial, nombre_mueble_equipo, id_trabajador, ubicacion, sede_id')
       .eq('codigo_patrimonial', code)
+      .is('eliminado_at', null)
       .maybeSingle()
 
     setChecking(false)

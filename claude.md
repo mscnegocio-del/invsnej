@@ -4,7 +4,7 @@
 
 App web de inventario patrimonial para móvil. Permite escanear códigos de barras, registrar bienes en Supabase, validar duplicados y realizar CRUD completo (crear, leer, editar, eliminar).
 
-## Stackk
+## Stack
 
 - React 19 + Vite 6
 - Tailwind CSS
@@ -22,6 +22,19 @@ App web de inventario patrimonial para móvil. Permite escanear códigos de barr
 - **bienes.ubicacion**: texto (nombre de ubicación, no ID)
 - **bienes.estado**: Nuevo, Bueno, Regular, Malo, Muy malo
 - **Recomendado**: índice en `codigo_patrimonial` para búsquedas rápidas.
+
+## Autenticación recomendada (marzo 2026)
+
+- **Opción base (recomendada)**: Supabase Auth con OTP por correo (magic link o código OTP), priorizando simplicidad de adopción en móvil y menor fricción operativa.
+- **Evolución posible**: passkeys/WebAuthn como mejora futura para reducir dependencia de correo y aumentar seguridad de inicio de sesión.
+- **Estado esperado en tareas futuras**: tratar este bloque como guía de arquitectura; no asumir que OTP, passkeys o controles avanzados ya están implementados.
+
+### Checklist de seguridad mínima
+
+- **RLS estricto**: políticas por tabla y operación (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) con `auth.uid()` y principio de mínimo privilegio.
+- **CORS de producción**: permitir solo dominios oficiales de la app (producción y, si aplica, preview controlado), evitando comodines.
+- **Auditoría de cambios**: registrar altas/ediciones/eliminaciones con actor, timestamp y before/after para trazabilidad.
+- **Protección brute force/rate limiting**: limitar intentos de autenticación y endpoints sensibles (login, recuperación, operaciones críticas).
 
 ## Reglas de negocio clave
 

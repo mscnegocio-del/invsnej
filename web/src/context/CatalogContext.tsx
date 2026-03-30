@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from './AuthContext'
 import type { Sede, Trabajador, Ubicacion } from '../types'
 
 type CatalogContextValue = {
@@ -46,6 +47,7 @@ function saveToCache(payload: CachePayload) {
 }
 
 export function CatalogProvider({ children }: { children: React.ReactNode }) {
+  const { user, authReady } = useAuth()
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([])
   const [ubicaciones, setUbicaciones] = useState<Ubicacion[]>([])
   const [sedes, setSedes] = useState<Sede[]>([])
@@ -57,6 +59,15 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false
 
     async function fetchData() {
+      if (!authReady || !user) {
+        setTrabajadores([])
+        setUbicaciones([])
+        setSedes([])
+        setLoading(false)
+        setError(null)
+        return
+      }
+
       setLoading(true)
       setError(null)
 
@@ -110,7 +121,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [reloadToken])
+  }, [reloadToken, authReady, user])
 
   const reload = () => setReloadToken((t) => t + 1)
 
@@ -121,6 +132,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- patrón estándar context + hook
 export function useCatalogs() {
   const ctx = useContext(CatalogContext)
   if (!ctx) {

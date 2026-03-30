@@ -1,18 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { BienForm } from '../components/BienForm'
 
 export function EditarBien() {
   const { id } = useParams()
-  const [bienId, setBienId] = useState<number | null>(null)
 
-  useEffect(() => {
-    if (id) {
-      const parsed = Number(id)
-      if (!Number.isNaN(parsed)) {
-        setBienId(parsed)
-      }
-    }
+  const bienId = useMemo(() => {
+    if (!id) return null
+    const parsed = Number(id)
+    return Number.isNaN(parsed) ? null : parsed
   }, [id])
 
   return (

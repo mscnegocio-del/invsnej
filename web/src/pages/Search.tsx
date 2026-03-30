@@ -107,6 +107,7 @@ export function Search() {
       .select('id, codigo_patrimonial, nombre_mueble_equipo, estado, id_trabajador, ubicacion, sede_id, marca, modelo, serie, orden_compra, valor', {
         count: 'exact',
       })
+      .is('eliminado_at', null)
 
     if (sedeActiva && !todasLasSedes) {
       query = query.eq('sede_id', sedeActiva.id)
@@ -241,34 +242,36 @@ export function Search() {
     try {
       const pageSize = 1000
       let from = 0
-      const all: any[] = []
+      const all: RowWithExtras[] = []
+      let hasMore = true
 
-      // Paginado en bloques de 1000 hasta agotar registros
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
+      while (hasMore) {
         const { data, error: supaError } = await supabase
           .from('bienes')
           .select('id, codigo_patrimonial, nombre_mueble_equipo, id_trabajador, ubicacion, estado, sede_id, fecha_registro, marca, modelo, serie, orden_compra, valor')
+          .is('eliminado_at', null)
           .order('id', { ascending: true })
           .range(from, from + pageSize - 1)
 
         if (supaError) {
           console.error(supaError)
           setError('No se pudo exportar todos los bienes. Intenta nuevamente.')
+          hasMore = false
           break
         }
 
         if (!data || data.length === 0) {
+          hasMore = false
           break
         }
 
-        all.push(...data)
+        all.push(...(data as RowWithExtras[]))
 
         if (data.length < pageSize) {
-          break
+          hasMore = false
+        } else {
+          from += pageSize
         }
-
-        from += pageSize
       }
 
       if (all.length === 0) return

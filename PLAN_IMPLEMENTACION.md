@@ -2,22 +2,37 @@
 
 Sistema de inventario web con escaneo de barras, validación de duplicados, CRUD, búsqueda y exportación flexible.
 
+**Última revisión del documento:** marzo 2026
+
 ---
 
-## Estado actual (Fase 12 - Completado)
+## Estado actual (resumen ejecutivo)
 
-✅ **Fases 0–11**: Completadas (app en producción)
+✅ **Fases 0–15**: Completadas en línea con el código (app en producción / Vercel).
 
-Desde la última actualización:
+✅ **Mejoras posteriores a la Fase 15** (también implementadas):
+- Alerta de duplicado cuando el bien existe en **otra sede** (`Scan` + `DuplicateAlert` con nombre de sede de origen).
+- `DuplicateAlert` y vistas relacionadas: **ubicación** antigua guardada como ID numérico se **resuelve a nombre** desde el catálogo.
+- **Agregar responsable** desde el buscable (`TrabajadorSearchableSelect`): insert en `trabajadores`, nombre en mayúsculas, `reload()` del catálogo.
+- **Historial de cambios** (`bien_historial`): registro al editar estado, responsable y ubicación; listado en `BienDetail`.
+- **Nombre del bien con autocompletado** desde `siga_bienes.descripcion` (`NombreSearchableInput` + debounce).
+- Modal de escaneo: input manual duplicado **oculto** en modal (`BarcodeScanModal` / `hideManualInput`).
+- Carga Excel SIGA: columna **usuario**, barra de progreso y mensaje de éxito en `Admin`.
+- Catálogo maestro (`CatalogContext`): **TTL 1 minuto** (no 15) para ver cambios más rápido entre dispositivos.
+
+🔄 **Fase 16 (autenticación y seguridad)**: **parcialmente avanzada en frontend** — existen `AuthContext`, `/login`, OTP por correo, hook WebAuthn, `AuthGuard`, `RoleGuard` (admin / operador / consulta) y rutas protegidas. **Pendiente validar en producción**: RLS exhaustivo en todas las tablas, MFA admin, rate limiting/lockout robustos y auditoría de accesos según criterios de la propia Fase 16.
+
+### Estado histórico (Fase 12)
+
 - ✅ Cambio de ZXing a **Quagga2** como fallback de escaneo
 - ✅ Flujo de **Scan**: input de código + icono cámara (modal)
 - ✅ **Cámara**: solo activa en modal, se libera al cerrar (ahorro batería)
 - ✅ **Copiar para compartir**: texto legible formateado para WhatsApp/Telegram
-- ✅ **Exportación**: CSV, JSON, descarga todo en bloques 1000
-- ✅ **Ubicación**: se guarda nombre (no ID), se resuelven IDs antiguos
+- ✅ **Exportación**: CSV, JSON, descarga todo en bloques 1000 (incluye columna **sede** y campos SIGA cuando aplica)
+- ✅ **Ubicación**: se guarda nombre (no ID), se resuelven IDs antiguos en UI y exportaciones
 - ✅ **Estado**: incluido en exportaciones y visualización
 - ✅ **Responsable**: nombre resuelto en UI y exportaciones
-- ✅ **Input manual**: opción "Escribir manualmente" en BarcodeScanner
+- ✅ **Input manual**: opción "Escribir manualmente" en `BarcodeScanner` (fuera del modal de cámara)
 
 ---
 
@@ -40,16 +55,16 @@ Desde la última actualización:
 
 ## Fase 13: Optimizaciones y extensiones futuras (propuesto)
 
-| # | Tarea | Descripción | Prioridad |
-|---|-------|-------------|-----------|
-| 13.1 | Offline-first | Service worker + sync cuando hay conexión | Media |
-| 13.2 | Soft delete | Marcar `eliminado_at` en lugar de DELETE | Media |
-| 13.3 | Auditoría | Log de cambios (quién, cuándo, qué) | Baja |
-| 13.4 | Roles y permisos | Restricciones por usuario en Supabase RLS | Baja |
-| 13.5 | Importación masiva | CSV upload para registrar múltiples bienes | Baja |
-| 13.6 | Etiquetas de código | Generar e imprimir etiquetas con códigos | Baja |
-| 13.7 | Estadísticas | Dashboard de bienes por estado, ubicación, etc. | Baja |
-| 13.8 | Modo oscuro | Tema dark mode configurable | Baja |
+| # | Tarea | Descripción | Prioridad | Nota (marzo 2026) |
+|---|-------|-------------|-----------|-------------------|
+| 13.1 | Offline-first | Service worker + sync cuando hay conexión | Media | Pendiente |
+| 13.2 | Soft delete | Marcar `eliminado_at` en lugar de DELETE | Media | Pendiente |
+| 13.3 | Auditoría | Log de cambios (quién, cuándo, qué) | Baja | **Parcial:** tabla `bien_historial` para cambios de estado, responsable y ubicación en edición; no cubre aún todas las entidades ni login |
+| 13.4 | Roles y permisos | Restricciones por usuario en Supabase RLS | Baja | **Parcial:** roles en app (`RoleGuard`); RLS en BD debe alinearse con Fase 16 |
+| 13.5 | Importación masiva | CSV upload para registrar múltiples bienes | Baja | Pendiente |
+| 13.6 | Etiquetas de código | Generar e imprimir etiquetas con códigos | Baja | Pendiente |
+| 13.7 | Estadísticas | Dashboard de bienes por estado, ubicación, etc. | Baja | Pendiente |
+| 13.8 | Modo oscuro | Tema dark mode configurable | Baja | Pendiente |
 
 ---
 
@@ -129,13 +144,12 @@ Crear `src/pages/SedeSelector.tsx`:
 └─────────────────────────────┘
 ```
 
-### 14.3 — Header con sede activa
+### 14.3 — Barra superior con sede activa
 
-Crear `src/components/Header.tsx`:
+Implementado en `src/components/Layout.tsx` (no existe `Header.tsx` separado):
 
-- Barra superior fija en todas las páginas (excepto SedeSelector)
-- Muestra: `📍 [nombre de sede activa]` + botón `[Cambiar]`
-- Botón Cambiar → llama `limpiarSede()` → vuelve a SedeSelector
+- Barra superior en el layout de la app (cuando ya hay sede y sesión)
+- Muestra sede activa + botón **Cambiar** → limpia sede y vuelve a `SedeSelector`
 
 ```
 ┌─────────────────────────────────────┐
@@ -162,8 +176,9 @@ Modificar `src/pages/Search.tsx`:
 
 Modificar `src/context/CatalogContext.tsx`:
 
-- Agregar carga de `sedes` con mismo TTL 15 min
-- Exponer `sedes[]` para uso en filtros y visualización
+- Agregar carga de `sedes` con cache en localStorage
+- **TTL actual del catálogo: 1 minuto** (ajustable; antes se documentaba 15 min)
+- Exponer `sedes[]` y `reload()` para uso en filtros y visualización
 
 ### Flujo completo Fase 14
 
@@ -188,16 +203,15 @@ Cambiar sede
 
 ### Checklist Fase 14
 
-- [ ] SQL ejecutado en Supabase (tabla sedes + columna sede_id + índice)
-- [ ] Sedes iniciales insertadas en BD
-- [ ] `SedeContext` creado y envuelve la app en `App.tsx`
-- [ ] `SedeSelector` muestra lista y guarda selección
-- [ ] `Header` visible en todas las páginas con sede activa
-- [ ] `BienForm` guarda `sede_id` al crear
-- [ ] `Search` filtra por sede activa
-- [ ] Exportación CSV/JSON incluye columna sede
-- [ ] Toggle "todas las sedes" funciona en búsqueda
-- [ ] Build sin errores
+- [x] SQL ejecutado en Supabase (tabla sedes + columna sede_id + índice)
+- [x] Sedes iniciales insertadas en BD
+- [x] `SedeContext` creado; flujo post-login en `AuthenticatedShell` (muestra `SedeSelector` si no hay sede)
+- [x] `SedeSelector` muestra lista y guarda selección
+- [x] `Layout` muestra sede activa y botón Cambiar
+- [x] `BienForm` guarda `sede_id` al crear
+- [x] `Search` filtra por sede activa; toggle "todas las sedes"
+- [x] Exportación CSV/JSON incluye columna sede (también en descarga completa vía `buildCsv`)
+- [x] Build sin errores
 
 ---
 
@@ -247,10 +261,11 @@ Crear `src/pages/Admin.tsx` (accesible desde Home o menú):
 
 ```typescript
 // Mapeo esperado de columnas del Excel SIGA PJ
-// Ajustar los nombres exactos según el Excel real
+// Incluye USUARIO; ajustar sinónimos según el Excel real
 const COLUMN_MAP = {
   codigo_patrimonial: ['CÓDIGO', 'CODIGO', 'COD_PATRIMONIAL', 'CÓDIGO PATRIMONIAL'],
   descripcion:        ['DESCRIPCIÓN', 'DESCRIPCION', 'NOMBRE'],
+  usuario:            ['USUARIO', 'USER'],
   marca:              ['MARCA'],
   modelo:             ['MODELO'],
   serie:              ['N° SERIE', 'SERIE', 'NRO SERIE'],
@@ -351,18 +366,89 @@ Exportación
 
 ### Checklist Fase 15
 
-- [ ] SQL ejecutado (tabla siga_bienes + columnas en bienes)
-- [ ] Página Admin accesible desde Home/menú
-- [ ] SheetJS parsea Excel correctamente
-- [ ] Mapeo de columnas funciona con el Excel SIGA real
-- [ ] Preview de 5 filas antes de confirmar
-- [ ] Upsert en bloques 500 con progreso
-- [ ] Resumen de carga (nuevos / actualizados / errores)
-- [ ] Al escanear: consulta siga_bienes y prerellena BienForm
-- [ ] Indicador visual "Desde SIGA" en campos prellenados
-- [ ] BienDetail muestra campos SIGA si existen
-- [ ] Exportación CSV incluye columnas SIGA
-- [ ] Build sin errores
+- [x] SQL ejecutado (tabla siga_bienes + columnas en bienes)
+- [x] Página Admin protegida por rol admin (`/admin`)
+- [x] SheetJS parsea Excel correctamente
+- [x] Mapeo de columnas (incl. usuario) según Excel SIGA
+- [x] Preview antes de confirmar
+- [x] Carga en bloques con barra de progreso y mensaje de éxito/error
+- [x] Al escanear: consulta `siga_bienes` y prerellena vía query params / formulario
+- [x] Indicador visual "Desde SIGA" en campos prellenados
+- [x] `BienDetail` muestra bloque SIGA y sede cuando aplica
+- [x] Exportaciones incluyen columnas SIGA y sede
+- [x] Opcional operativo: SQL de backfill `bienes` desde `siga_bienes` para marca/modelo/serie/valor/OC donde faltaban datos
+- [x] Build sin errores
+
+---
+
+## Fase 16: Autenticación y seguridad externa (marzo 2026, sin dominio propio) (NUEVO)
+
+Fortalece la seguridad de acceso usando Supabase Auth y controles en aplicación/API, considerando un entorno donde no se dispone de dominio propio para correo corporativo ni configuración avanzada de autenticación federada.
+
+**Estado en código (marzo 2026):** ya existen rutas `/login` y `/auth/callback`, `AuthGuard`, `Login` con flujo OTP por correo, integración WebAuthn en hook, y `RoleGuard` para `admin` / `operador` / `consulta`. Lo que sigue siendo crítico es **cerrar el círculo en Supabase**: políticas RLS por rol, cierre de datos sensibles sin sesión, y controles de abuso (rate limit / lockout) según tabla inferior.
+
+### 16.1 — Fase mínima: OTP email + RLS (obligatoria)
+
+| # | Tarea | Descripción | Prioridad |
+|---|-------|-------------|-----------|
+| 16.1.1 | Habilitar OTP por email | Activar login por código/OTP vía Supabase Auth (sin contraseña persistente) | Alta |
+| 16.1.2 | Restringir altas públicas | Desactivar sign-up abierto y permitir solo usuarios autorizados por admin | Alta |
+| 16.1.3 | RLS en tablas críticas | Aplicar políticas RLS en `bienes`, `trabajadores`, `ubicaciones`, `sedes`, `siga_bienes` | Alta |
+| 16.1.4 | Roles base en metadata | Definir `app_role` (`admin`, `operador`, `consulta`) en `user_metadata` o tabla de perfiles | Alta |
+| 16.1.5 | Guard de sesión en frontend | Redirigir a login cuando no hay sesión válida y proteger rutas sensibles (`Admin`, edición, eliminación) | Alta |
+| 16.1.6 | Auditoría mínima de acceso | Registrar último login, IP aproximada y acción sensible (crear/editar/eliminar/carga Excel) | Media |
+
+### 16.2 — Fase intermedia: MFA admin + rate limit + lockout
+
+| # | Tarea | Descripción | Prioridad |
+|---|-------|-------------|-----------|
+| 16.2.1 | MFA para cuentas admin | Exigir segundo factor para `app_role=admin` (TOTP preferente) | Alta |
+| 16.2.2 | Rate limiting de login/OTP | Limitar intentos por IP y por email (ej. ventana de 15 min) | Alta |
+| 16.2.3 | Lockout temporal | Bloquear temporalmente cuenta/IP tras N intentos fallidos consecutivos | Alta |
+| 16.2.4 | Alertas de seguridad | Notificar intentos sospechosos y bloqueos (email admin / panel) | Media |
+| 16.2.5 | Hardening de sesiones | Reducir TTL de sesión en admin y forzar reautenticación para acciones críticas | Media |
+
+### 16.3 — Fase avanzada: passkeys (WebAuthn)
+
+| # | Tarea | Descripción | Prioridad |
+|---|-------|-------------|-----------|
+| 16.3.1 | Habilitar passkeys progresivo | Permitir registrar passkey como factor principal o adicional por usuario | Media |
+| 16.3.2 | Flujo híbrido de fallback | Si passkey falla/no soportado, fallback a OTP email o MFA TOTP | Alta |
+| 16.3.3 | Gestión de credenciales | Pantalla para ver/revocar passkeys registradas por dispositivo | Media |
+| 16.3.4 | Política por rol | Requerir passkey o MFA fuerte para `admin`; opcional para `operador` | Media |
+
+### Criterios de aceptación (Fase 16)
+
+- [x] Usuario sin sesión no puede leer inventario por API: RLS activa y políticas `auth.uid() IS NOT NULL` + `is_session_active()` en tablas críticas (`bienes`, `trabajadores`, `ubicaciones`, `sedes`, `siga_bienes`, `bien_historial`)
+- [x] Usuario `operador` no accede a funciones admin en frontend: ruta `/admin` protegida por `RoleGuard` (rol `admin`)
+- [~] Login OTP funciona en frontend (`/login` + `AuthContext` + `AuthGuard`); pendiente prueba formal de latencia objetivo (< 60 s)
+- [ ] Cuentas admin requieren MFA y no pueden omitir segundo factor
+- [ ] Rate limit y lockout bloquean ataques de fuerza bruta (verificado con pruebas controladas)
+- [~] Eventos de seguridad: existe `bien_historial` para cambios de bienes; pendiente auditoría completa de autenticación (login fallido, lockout, etc.)
+- [~] Fallback de autenticación: existe base para WebAuthn en frontend (`useWebAuthn`), pendiente política final de fallback en producción
+
+### Verificación MCP (marzo 2026)
+
+Consultas ejecutadas en Supabase vía MCP para validar estado real de Fase 16:
+
+- `pg_tables`: RLS (`rowsecurity=true`) confirmada en `bienes`, `trabajadores`, `ubicaciones`, `sedes`, `siga_bienes`, `bien_historial`.
+- `pg_policies`: políticas activas por tabla/operación, incluyendo:
+  - `bienes_select_activos` con `auth.uid() IS NOT NULL` e `is_session_active()`.
+  - `bienes_insert_oper` / `bienes_update_oper` con `is_operador_o_admin()`.
+  - `siga_bienes_insert` / `siga_bienes_update` con `is_admin()`.
+- `pg_proc`: funciones `is_admin`, `is_operador_o_admin`, `is_session_active` existen en esquema `public`.
+- `auth.users`: actualmente no hay evidencia de `app_role` en `raw_user_meta_data` ni en `raw_app_meta_data` (0 de 1 usuarios con `app_role`), por lo que la estrategia de roles debe seguir revisándose entre frontend/claims/RLS.
+
+### Riesgos y mitigaciones
+
+| Riesgo | Impacto | Mitigación recomendada |
+|--------|---------|------------------------|
+| Entrega tardía de OTP por proveedor de correo | Alto (bloqueo operativo) | Proveedor transaccional confiable, reintento, expiración razonable, canal alterno para admins |
+| Configuración RLS incompleta | Crítico (fuga o manipulación de datos) | Pruebas por rol, revisión de políticas SQL, validación en staging antes de producción |
+| Fatiga operativa por MFA en campo | Medio | Aplicar MFA obligatorio solo a admin y acciones críticas; sesión adaptable para operadores |
+| Falsos positivos en rate limit/lockout | Medio | Umbrales progresivos, whitelist operativa por sede/IP confiable, canal de desbloqueo |
+| Soporte desigual de passkeys en dispositivos antiguos | Medio | Mantener fallback OTP/MFA y despliegue gradual por grupos piloto |
+| Dependencia de servicios externos (Auth/email) | Alto | Monitoreo, alertas, runbook de contingencia y cuentas break-glass controladas |
 
 ---
 
@@ -388,31 +474,46 @@ Exportación
 7. **Búsqueda filtrada**: código, responsable, ubicación, sede
 8. **Exportación flexible**: copiar, JSON, CSV con todos los campos enriquecidos
 9. **Normalización de datos**: ubicaciones y responsables resueltos en UI/exportación
-10. **Cache de datos maestros**: trabajadores, ubicaciones y sedes con TTL 15 min
+10. **Cache de datos maestros**: trabajadores, ubicaciones y sedes con **TTL 1 min** y `reload()` manual
+11. **Historial de cambios** en ficha de bien (`bien_historial`) para estado, responsable y ubicación
+12. **Autocompletado de nombre** desde `siga_bienes` al registrar (`NombreSearchableInput`)
 
 ### Base de datos
-- 1900+ registros de bienes
+- 1900+ registros de bienes (orden de magnitud)
 - Índices en: codigo_patrimonial, id_trabajador, ubicacion, sede_id
-- Tabla `sedes`: catálogo de sedes (2–5 registros)
-- Tabla `siga_bienes`: base de conocimiento SIGA PJ (todos los bienes del Poder Judicial)
-- Modelo limpio con ubicacion como string (nombre)
+- Tabla `sedes`: catálogo de sedes
+- Tabla `siga_bienes`: base de conocimiento SIGA PJ (carga masiva vía Admin)
+- Tabla `bien_historial`: historial de cambios en campos clave del bien
+- Modelo: `ubicacion` como texto (nombre); registros antiguos pueden tener ID como string hasta normalizar
 
-### Estructura de archivos nuevos/modificados
+### Estructura de archivos relevantes (actualizada)
 
 ```
-src/
+web/src/
 ├── components/
-│   ├── Header.tsx              # NUEVO: barra sede activa + botón cambiar
-│   ├── BienForm.tsx            # MODIFICADO: sede_id + campos SIGA
-│   └── BienDetail.tsx          # MODIFICADO: muestra campos SIGA
+│   ├── Layout.tsx              # Barra navegación + sede activa
+│   ├── AuthGuard.tsx           # Sesión requerida
+│   ├── AuthenticatedShell.tsx  # SedeSelector si no hay sede
+│   ├── RoleGuard.tsx           # admin / operador / consulta
+│   ├── BienForm.tsx            # sede_id, SIGA, historial al editar, NombreSearchableInput
+│   ├── BienDetail.tsx          # SIGA, sede, historial
+│   ├── DuplicateAlert.tsx      # Incluye sede origen y ubicación resuelta
+│   ├── NombreSearchableInput.tsx
+│   ├── BarcodeScanModal.tsx / BarcodeScanner.tsx
+│   └── TrabajadorSearchableSelect.tsx
 ├── pages/
-│   ├── SedeSelector.tsx        # NUEVO: pantalla selección de sede
-│   ├── Admin.tsx               # NUEVO: carga Excel SIGA
-│   └── Search.tsx              # MODIFICADO: filtro por sede + exportación enriquecida
+│   ├── Login.tsx / AuthCallback.tsx
+│   ├── SedeSelector.tsx
+│   ├── Admin.tsx
+│   ├── Scan.tsx / Search.tsx
+│   └── ...
 ├── context/
-│   ├── SedeContext.tsx         # NUEVO: sede activa en localStorage
-│   └── CatalogContext.tsx      # MODIFICADO: incluye sedes[]
-└── App.tsx                     # MODIFICADO: SedeContext + SedeSelector guard
+│   ├── AuthContext.tsx
+│   ├── SedeContext.tsx
+│   └── CatalogContext.tsx
+├── hooks/
+│   └── useWebAuthn.ts
+└── App.tsx                     # Rutas + guards
 ```
 
 ---
@@ -461,8 +562,7 @@ UPDATE bienes SET sede_id = 1 WHERE sede_id IS NULL;
 ```
 
 ### Columnas SIGA en el Excel real
-Antes de implementar Fase 15, verificar los nombres exactos de columnas del Excel SIGA PJ
-y ajustar el `COLUMN_MAP` en `src/pages/Admin.tsx` según corresponda.
+Los nombres de columnas pueden variar: mantener actualizado el `COLUMN_MAP` en `web/src/pages/Admin.tsx` (incluye variante **USUARIO**).
 
 ### Backfill de ubicaciones (opcional)
 Si se desea normalizar toda la BD a nombres:

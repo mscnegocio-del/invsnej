@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { startTransition, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 export type SigaSugerencia = {
@@ -49,9 +49,11 @@ export function NombreSearchableInput({
 
     const trimmed = value.trim()
     if (trimmed.length < MIN_CHARS) {
-      setSugerencias([])
-      setSinResultados(false)
-      setOpen(false)
+      startTransition(() => {
+        setSugerencias([])
+        setSinResultados(false)
+        setOpen(false)
+      })
       return
     }
 

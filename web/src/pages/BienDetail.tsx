@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useCatalogs } from '../context/CatalogContext'
+import { useAuth } from '../context/AuthContext'
 import type { BienDetalle, BienHistorial } from '../types'
 
 export function BienDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { sedes, ubicaciones } = useCatalogs()
+  const { user, canEdit, isAdmin } = useAuth()
   const [bien, setBien] = useState<BienDetalle | null>(null)
   const [historial, setHistorial] = useState<BienHistorial[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,8 +27,11 @@ export function BienDetail() {
 
       const { data, error: supaError } = await supabase
         .from('bienes')
-        .select('id, codigo_patrimonial, nombre_mueble_equipo, tipo_mueble_equipo, estado, id_trabajador, ubicacion, fecha_registro, sede_id, marca, modelo, serie, orden_compra, valor')
+        .select(
+          'id, codigo_patrimonial, nombre_mueble_equipo, tipo_mueble_equipo, estado, id_trabajador, ubicacion, fecha_registro, sede_id, marca, modelo, serie, orden_compra, valor, creado_por_email',
+        )
         .eq('id', id)
+        .is('eliminado_at', null)
         .maybeSingle()
 
       if (cancelled) return
@@ -44,7 +49,23 @@ export function BienDetail() {
         return
       }
 
-      const raw = data as { id: number; codigo_patrimonial: string; nombre_mueble_equipo: string; tipo_mueble_equipo: string | null; estado: string; id_trabajador: number | null; ubicacion: string | null; fecha_registro: string | null; sede_id: number | null; marca: string | null; modelo: string | null; serie: string | null; orden_compra: string | null; valor: number | null }
+      const raw = data as {
+        id: number
+        codigo_patrimonial: string
+        nombre_mueble_equipo: string
+        tipo_mueble_equipo: string | null
+        estado: string
+        id_trabajador: number | null
+        ubicacion: string | null
+        fecha_registro: string | null
+        sede_id: number | null
+        marca: string | null
+        modelo: string | null
+        serie: string | null
+        orden_compra: string | null
+        valor: number | null
+        creado_por_email: string | null
+      }
       let trabajadorNombre: string | null = null
 
       if (raw.id_trabajador) {
@@ -77,6 +98,7 @@ export function BienDetail() {
         serie: raw.serie,
         orden_compra: raw.orden_compra,
         valor: raw.valor,
+        creado_por_email: raw.creado_por_email,
       }
 
       setBien(detalle)
@@ -84,7 +106,7 @@ export function BienDetail() {
       // Cargar historial del bien
       const { data: historialData } = await supabase
         .from('bien_historial')
-        .select('id, bien_id, campo, valor_antes, valor_despues, fecha')
+        .select('id, bien_id, campo, valor_antes, valor_despues, fecha, usuario_email, accion')
         .eq('bien_id', raw.id)
         .order('fecha', { ascending: false })
         .limit(30)
@@ -107,12 +129,31 @@ export function BienDetail() {
     if (!id || !bien) return
 
     const confirmar = window.confirm(
-      `¿Seguro que deseas eliminar el bien con código ${bien.codigo_patrimonial}? Esta acción no se puede deshacer.`,
+      `¿Seguro que deseas eliminar el bien con código ${bien.codigo_patrimonial}? Quedará marcado como eliminado (solo administradores).`,
     )
     if (!confirmar) return
 
     setDeleting(true)
-    const { error: supaError } = await supabase.from('bienes').delete().eq('id', id)
+    const { error: histErr } = await supabase.from('bien_historial').insert({
+      bien_id: bien.id,
+      campo: 'eliminacion',
+      valor_antes: bien.nombre_mueble_equipo,
+      valor_despues: null,
+      usuario_id: user?.id ?? null,
+      usuario_email: user?.email ?? null,
+      accion: 'eliminacion',
+    })
+    if (histErr) {
+      console.error(histErr)
+      setDeleting(false)
+      setError('No se pudo registrar la eliminación. Intenta nuevamente.')
+      return
+    }
+
+    const { error: supaError } = await supabase
+      .from('bienes')
+      .update({ eliminado_at: new Date().toISOString() })
+      .eq('id', id)
     setDeleting(false)
 
     if (supaError) {
@@ -170,6 +211,7 @@ export function BienDetail() {
               { term: 'Ubicación', value: ubicacionNombre || 'Sin ubicación registrada' },
               { term: 'Sede', value: sedeNombre || 'Sin sede asignada' },
               { term: 'Fecha de registro', value: bien.fecha_registro ? new Date(bien.fecha_registro).toLocaleString() : '—' },
+              { term: 'Registrado por', value: bien.creado_por_email || '—' },
             ].map(({ term, value }) => (
               <div key={term} className="px-6 py-4 sm:grid sm:grid-cols-2 sm:gap-4">
                 <dt className="text-sm font-medium text-slate-500">{term}</dt>
@@ -202,21 +244,25 @@ export function BienDetail() {
           </dl>
 
           <div className="px-6 py-4 bg-slate-50/50 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => navigate(`/bienes/${bien.id}/editar`)}
-              className="btn-primary"
-            >
-              Editar
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="btn-danger"
-            >
-              {deleting ? 'Eliminando...' : 'Eliminar'}
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => navigate(`/bienes/${bien.id}/editar`)}
+                className="btn-primary"
+              >
+                Editar
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="btn-danger"
+              >
+                {deleting ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -234,7 +280,10 @@ export function BienDetail() {
                   estado: 'Estado',
                   responsable: 'Responsable',
                   ubicacion: 'Ubicación',
+                  creacion: 'Alta',
+                  eliminacion: 'Baja',
                 }
+                const accion = h.accion ?? 'edicion'
                 const fecha = new Date(h.fecha).toLocaleString('es-PE', {
                   day: '2-digit',
                   month: '2-digit',
@@ -243,12 +292,15 @@ export function BienDetail() {
                   minute: '2-digit',
                 })
                 return (
-                  <li key={h.id} className="px-6 py-3 flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-4">
+                  <li key={h.id} className="px-6 py-3 flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-4">
                     <span className="text-xs text-slate-400 shrink-0 w-36">{fecha}</span>
-                    <span className="text-xs font-semibold text-slate-600 w-24 shrink-0">
-                      {etiquetaCampo[h.campo] ?? h.campo}
+                    <span className="text-xs text-slate-500 shrink-0 max-w-[200px] truncate" title={h.usuario_email ?? undefined}>
+                      {h.usuario_email ?? '—'}
                     </span>
-                    <span className="text-sm text-slate-700">
+                    <span className="text-xs font-semibold text-slate-600 w-28 shrink-0">
+                      {accion === 'creacion' ? 'Alta' : accion === 'eliminacion' ? 'Baja' : etiquetaCampo[h.campo] ?? h.campo}
+                    </span>
+                    <span className="text-sm text-slate-700 flex-1 min-w-0">
                       <span className="text-slate-400">{h.valor_antes ?? '—'}</span>
                       <span className="mx-2 text-slate-300">→</span>
                       <span className="font-medium text-slate-900">{h.valor_despues ?? '—'}</span>

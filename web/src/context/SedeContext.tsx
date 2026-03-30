@@ -51,6 +51,7 @@ export function SedeProvider({ children }: { children: React.ReactNode }) {
   return <SedeContext.Provider value={value}>{children}</SedeContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- patrón estándar context + hook
 export function useSede() {
   const ctx = useContext(SedeContext)
   if (!ctx) throw new Error('useSede debe usarse dentro de SedeProvider')

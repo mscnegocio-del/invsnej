@@ -1,3 +1,12 @@
+export type AppRole = 'admin' | 'operador' | 'consulta'
+
+export type Perfil = {
+  id: string
+  app_role: AppRole
+  nombre: string | null
+  activo: boolean
+}
+
 export type Trabajador = {
   id: number
   nombre: string
@@ -33,6 +42,8 @@ export type SigaDatos = {
   descripcion: string | null
 }
 
+export type HistorialAccion = 'creacion' | 'edicion' | 'eliminacion'
+
 export type BienHistorial = {
   id: number
   bien_id: number
@@ -40,6 +51,9 @@ export type BienHistorial = {
   valor_antes: string | null
   valor_despues: string | null
   fecha: string
+  usuario_id?: string | null
+  usuario_email?: string | null
+  accion?: HistorialAccion
 }
 
 export type BienDetalle = {
@@ -53,11 +67,19 @@ export type BienDetalle = {
   fecha_registro: string | null
   trabajador_nombre: string | null
   sede_id?: number | null
-  // campos SIGA (opcionales)
   marca?: string | null
   modelo?: string | null
   serie?: string | null
   orden_compra?: string | null
   valor?: number | null
+  creado_por_email?: string | null
 }
 
+export type AdminUserRow = {
+  id: string
+  email: string | null
+  created_at: string
+  app_role: AppRole
+  nombre: string | null
+  activo: boolean
+}

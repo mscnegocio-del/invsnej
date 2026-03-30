@@ -246,3 +246,42 @@ CREATE INDEX IF NOT EXISTS idx_bienes_ubicacion
 | Exportación completa | Bloques de 1000 registros (límite Supabase) |
 | Detalle | `.select().eq('id', id).single()` (una fila) |
 | Columnas | Siempre `.select('col1,col2,...')`, evitar `*` |
+
+---
+
+## 11. Autenticación y seguridad (actualizado: marzo 2026)
+
+### Estado actual del proyecto
+- Actualmente la app opera sin un módulo de autenticación de usuarios finalizado en producción.
+- Lo siguiente define la **implementación recomendada inmediata** y la **evolución por fases**.
+
+### 11.1 Implementación recomendada inmediata (Fase 1)
+- **Supabase Auth con OTP por correo** (`magic link` o código de un solo uso).
+- Flujo recomendado:
+  - Usuario ingresa correo institucional.
+  - Supabase envía enlace mágico o código OTP.
+  - Frontend valida sesión con `@supabase/supabase-js` y opera con token de usuario.
+- Ventajas para este contexto (Vercel + sin dominio propio):
+  - Menor complejidad operativa que OAuth social.
+  - No exige configurar app OAuth de terceros para salir a producción inicial.
+  - Permite activar control de acceso real en base de datos con RLS.
+
+### 11.2 Evolución recomendada (Fase 2)
+- **Passkeys / WebAuthn** como mejora futura de seguridad y UX.
+- Objetivo: reducir fricción de login y fortalecer resistencia a phishing.
+- Estado: **propuesta**, no asumida como implementada.
+
+### 11.3 Google OAuth sin dominio propio: limitaciones prácticas
+- Puede no ser viable o puede retrasar salida en este contexto porque:
+  - Requiere configurar correctamente pantalla de consentimiento, orígenes autorizados y redirect URIs.
+  - En modo externo, Google puede exigir verificación adicional según alcance/branding/políticas.
+  - Cambios de URL por previews o ajustes de despliegue en Vercel elevan mantenimiento de callbacks.
+- Por esto, para etapa inicial se recomienda OTP por correo y dejar OAuth social como fase posterior.
+
+### 11.4 Controles de seguridad obligatorios (mínimo)
+- **RLS habilitado** en tablas sensibles (`bienes`, `trabajadores`, `ubicaciones`) con políticas por rol/usuario.
+- **Nunca exponer `service_role` en frontend**; usar solo `anon key` en cliente.
+- **Rate limiting** en autenticación y operaciones sensibles (login OTP, búsquedas intensivas, escrituras repetidas).
+- **Auditoría**:
+  - Registrar eventos críticos (inicio de sesión, altas, ediciones, eliminaciones, intentos denegados).
+  - Conservar trazabilidad mínima: usuario, acción, timestamp, entidad afectada.

@@ -8,6 +8,26 @@ Sistema web móvil para registrar, buscar, ver, editar y eliminar bienes patrimo
 
 Personal de inventario que usa smartphone para registrar y gestionar bienes en campo, así como personal administrativo que requiere reportes y exports en múltiples formatos.
 
+### 2.1 Objetivos de autenticación y seguridad
+
+- Proteger el acceso al sistema de inventario para evitar uso no autorizado.
+- Garantizar trazabilidad básica de accesos y eventos de seguridad relevantes.
+- Mantener una experiencia móvil simple, con inicio de sesión rápido vía OTP.
+- Preparar la evolución futura hacia autenticación resistente a phishing (passkeys).
+
+### 2.2 Alcance (autenticación y seguridad)
+
+- Autenticación por OTP enviado por correo electrónico (magic link o código de un solo uso).
+- Protección de rutas y acciones críticas (crear, editar, eliminar, exportar) solo para usuarios autenticados.
+- Gestión de sesión en frontend con renovación controlada y cierre de sesión manual.
+- Registro de eventos mínimos de seguridad (login exitoso/fallido, intentos bloqueados, logout).
+
+### 2.3 Fuera de alcance (versión actual)
+
+- Implementación de passkeys/WebAuthn en producción (queda como mejora futura).
+- Integración SSO empresarial (Google Workspace, Azure AD, etc.).
+- Roles avanzados por área (RBAC granular); en esta etapa se prioriza acceso autenticado básico.
+
 ---
 
 ## 3. Requisitos funcionales
@@ -87,6 +107,21 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | RF-39 | Deploy en Vercel | Alta |
 | RF-40 | Service worker para precaching | Media |
 
+### 3.8 Autenticación y seguridad
+
+| ID   | Requisito | Prioridad |
+|------|-----------|-----------|
+| RF-41 | Mostrar pantalla de login antes de acceder al sistema | Alta |
+| RF-42 | Login por OTP vía correo (enlace mágico o código de un solo uso) | Alta |
+| RF-43 | Validar OTP con expiración corta (ej. 5-10 minutos) | Alta |
+| RF-44 | Permitir reenvío de OTP con cooldown visible para el usuario | Alta |
+| RF-45 | Proteger rutas privadas: Home, Scan, Registro, Search, Detail, Editar | Alta |
+| RF-46 | Cerrar sesión explícitamente desde interfaz y limpiar estado local sensible | Alta |
+| RF-47 | Bloquear temporalmente intentos excesivos por usuario/IP y mostrar mensaje claro | Alta |
+| RF-48 | Registrar eventos de seguridad básicos (login ok, login fallido, bloqueo) | Media |
+| RF-49 | UX de error no técnica: mensajes claros para OTP expirado, inválido o ya usado | Alta |
+| RF-50 | Definir passkeys (WebAuthn) como fase futura compatible con el flujo actual | Media |
+
 ---
 
 ## 4. Requisitos no funcionales
@@ -103,6 +138,13 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | RNF-08 | Soportar 1900+ registros sin degradación |
 | RNF-09 | Exportación en bloques 1000 (límite Supabase) |
 | RNF-10 | Resolución automática de ubicaciones antiguas (ID → nombre) |
+| RNF-11 | Sesiones autenticadas con expiración y renovación controlada |
+| RNF-12 | Rate limiting para OTP y login para reducir abuso |
+| RNF-13 | Mensajes de autenticación claros en español y orientados a acción |
+| RNF-14 | Auditoría mínima de accesos y eventos de seguridad |
+| RNF-15 | Arquitectura compatible con passkeys sin reescribir flujo principal |
+| RNF-16 | Operar sin dominio propio: usar dominio provisto por plataforma (Vercel) |
+| RNF-17 | Cookies/sesión seguras bajo HTTPS en entorno productivo |
 
 ---
 
@@ -164,6 +206,15 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 - Resultados paginados muestran máximo 20 items
 - Click resultado navega a detalle con todos los datos
 
+### Autenticación (OTP)
+
+- **Dado** que ingreso un correo válido en login
+- **Cuando** solicito acceso
+- **Entonces** recibo OTP (enlace o código) y puedo iniciar sesión si está vigente
+- **Y** al expirar o usar OTP inválido se muestra error claro con opción de reintento
+- **Y** tras múltiples intentos fallidos se bloquea temporalmente el acceso y se informa el tiempo de espera
+- **Y** al iniciar sesión se habilita acceso a rutas protegidas
+
 ---
 
 ## 7. Estrategias de rendimiento (1900+ registros)
@@ -211,3 +262,18 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 - Quagga2 fallback en navegadores sin BarcodeDetector (Safari, Chrome desktop)
 - Supabase limita queries a 1000 registros (se resuelve con paginación)
 - Ubicación antigua como ID se resuelve en visualización (no en BD)
+- Sin dominio propio en esta fase: se usa subdominio de plataforma para despliegue.
+- Al no tener dominio propio, no se implementan políticas avanzadas de correo corporativo (SPF/DKIM/DMARC personalizadas) en esta etapa.
+- Passkeys se documenta como evolución futura; no es requisito de salida de la versión actual.
+
+---
+
+## 10. Métricas de éxito (básicas)
+
+| Métrica | Definición | Meta inicial |
+|---------|------------|--------------|
+| Tasa de login exitoso | % de inicios de sesión exitosos sobre intentos totales | >= 90% |
+| Tiempo medio de login OTP | Tiempo desde solicitud OTP hasta sesión activa | <= 60 segundos |
+| OTP expirado/inválido | % de intentos fallidos por OTP vencido o incorrecto | <= 10% |
+| Intentos bloqueados | Cantidad de bloqueos temporales por abuso en ventana definida | Monitoreado; tendencia estable o a la baja |
+| Reintento exitoso tras error | % de usuarios que corrigen y logran login tras un fallo inicial | >= 70% |

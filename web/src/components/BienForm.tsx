@@ -8,6 +8,7 @@ import { NombreSearchableInput } from './NombreSearchableInput'
 import type { SigaSugerencia } from './NombreSearchableInput'
 import { useCatalogs } from '../context/CatalogContext'
 import { useSede } from '../context/SedeContext'
+import { useAuth } from '../context/AuthContext'
 import type { BienDetalle } from '../types'
 
 type Props = {
@@ -23,6 +24,7 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const [searchParams] = useSearchParams()
   const { ubicaciones, trabajadores } = useCatalogs()
   const { sedeActiva } = useSede()
+  const { user } = useAuth()
 
   const codigoFromQuery = searchParams.get('codigo') ?? ''
 
@@ -65,6 +67,7 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
           'id, codigo_patrimonial, nombre_mueble_equipo, tipo_mueble_equipo, estado, id_trabajador, ubicacion, marca, modelo, serie, orden_compra, valor',
         )
         .eq('id', bienId)
+        .is('eliminado_at', null)
         .maybeSingle()
 
       if (cancelled) return
@@ -160,6 +163,8 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
           serie: serie.trim() || null,
           orden_compra: ordenCompra.trim() || null,
           valor: valorNum != null && !Number.isNaN(valorNum) ? valorNum : null,
+          creado_por: user?.id ?? null,
+          creado_por_email: user?.email ?? null,
         })
         .select('id')
         .maybeSingle()
@@ -178,6 +183,17 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       }
 
       const nuevoId = data.id as number
+
+      await supabase.from('bien_historial').insert({
+        bien_id: nuevoId,
+        campo: 'creacion',
+        valor_antes: null,
+        valor_despues: nombre.trim(),
+        usuario_id: user?.id ?? null,
+        usuario_email: user?.email ?? null,
+        accion: 'creacion',
+      })
+
       navigate(`/bienes/${nuevoId}`, { replace: true })
     } else {
       // Leer valores actuales antes del update para calcular el diff
@@ -230,11 +246,29 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
           return trabajadores.find((t) => t.id === id)?.nombre ?? String(id)
         }
 
-        type HistorialFila = { bien_id: number; campo: string; valor_antes: string | null; valor_despues: string | null }
+        type HistorialFila = {
+          bien_id: number
+          campo: string
+          valor_antes: string | null
+          valor_despues: string | null
+          usuario_id: string | null
+          usuario_email: string | null
+          accion: 'edicion'
+        }
+        const uid = user?.id ?? null
+        const uemail = user?.email ?? null
         const filas: HistorialFila[] = []
 
         if (prev.estado !== estado) {
-          filas.push({ bien_id: bienId, campo: 'estado', valor_antes: prev.estado ?? null, valor_despues: estado })
+          filas.push({
+            bien_id: bienId,
+            campo: 'estado',
+            valor_antes: prev.estado ?? null,
+            valor_despues: estado,
+            usuario_id: uid,
+            usuario_email: uemail,
+            accion: 'edicion',
+          })
         }
 
         if (prev.id_trabajador !== idTrabajador) {
@@ -243,12 +277,23 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
             campo: 'responsable',
             valor_antes: resolveTrabajador(prev.id_trabajador),
             valor_despues: resolveTrabajador(idTrabajador),
+            usuario_id: uid,
+            usuario_email: uemail,
+            accion: 'edicion',
           })
         }
 
         const ubicAntes = resolveUbicacion(prev.ubicacion)
         if (ubicAntes !== ubicacionNombre) {
-          filas.push({ bien_id: bienId, campo: 'ubicacion', valor_antes: ubicAntes, valor_despues: ubicacionNombre })
+          filas.push({
+            bien_id: bienId,
+            campo: 'ubicacion',
+            valor_antes: ubicAntes,
+            valor_despues: ubicacionNombre,
+            usuario_id: uid,
+            usuario_email: uemail,
+            accion: 'edicion',
+          })
         }
 
         if (filas.length > 0) {

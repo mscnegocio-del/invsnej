@@ -70,6 +70,7 @@ export function CameraProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- patrón estándar context + hook
 export function useCamera() {
   const ctx = useContext(CameraContext)
   if (!ctx) throw new Error('useCamera must be used within CameraProvider')

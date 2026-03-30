@@ -10,7 +10,9 @@ function getStoredRotation(): number {
       const n = Number(stored)
       if ([0, 90, 180, 270].includes(n)) return n
     }
-  } catch {}
+  } catch {
+    /* noop: localStorage no disponible */
+  }
   return 0
 }
 
@@ -43,7 +45,9 @@ export function BarcodeScanner({ onDetected, hideManualInput = false }: Props) {
   useEffect(() => {
     try {
       localStorage.setItem(ROTATION_KEY, String(rotation))
-    } catch {}
+    } catch {
+      /* noop */
+    }
   }, [rotation])
 
   const cycleRotation = () => {

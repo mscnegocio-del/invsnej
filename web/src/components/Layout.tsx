@@ -1,19 +1,24 @@
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom'
 import { useSede } from '../context/SedeContext'
+import { useAuth } from '../context/AuthContext'
+import type { AppRole } from '../types'
 
-const navItems = [
-  { to: '/', label: 'Inicio', icon: '🏠' },
-  { to: '/scan', label: 'Escanear', icon: '📷' },
-  { to: '/search', label: 'Buscar', icon: '🔍' },
+const navItemsAll: { to: string; label: string; icon: string; roles: AppRole[] }[] = [
+  { to: '/', label: 'Inicio', icon: '🏠', roles: ['admin', 'operador', 'consulta'] },
+  { to: '/scan', label: 'Escanear', icon: '📷', roles: ['admin', 'operador'] },
+  { to: '/search', label: 'Buscar', icon: '🔍', roles: ['admin', 'operador', 'consulta'] },
 ]
-
-const mainPaths = ['/', '/scan', '/search']
 
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { sedeActiva, limpiarSede } = useSede()
+  const { user, perfil, signOut } = useAuth()
+  const role = perfil?.app_role ?? 'consulta'
+  const navItems = navItemsAll.filter((n) => n.roles.includes(role))
+  const mainPaths = navItems.map((n) => n.to)
   const isMainPath = mainPaths.includes(location.pathname)
+  const displayName = perfil?.nombre?.trim() || user?.email || 'Usuario'
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -33,25 +38,39 @@ export function Layout() {
             <span className="text-2xl shrink-0">📋</span>
             <span className="font-bold text-lg text-slate-800 truncate">Inventario</span>
           </Link>
-          {sedeActiva && (
-            <div className="hidden sm:flex items-center gap-2 text-sm">
-              <span className="text-slate-600 truncate max-w-[180px]" title={sedeActiva.nombre}>
-                📍 {sedeActiva.nombre}
-              </span>
-              <button type="button" onClick={limpiarSede} className="btn-ghost text-xs px-2 py-1">
-                Cambiar
-              </button>
-            </div>
-          )}
-        </div>
-        {sedeActiva && (
-          <div className="max-w-2xl mx-auto px-4 pb-2 sm:hidden flex items-center justify-between">
-            <span className="text-xs text-slate-600 truncate pr-2">📍 {sedeActiva.nombre}</span>
-            <button type="button" onClick={limpiarSede} className="btn-ghost text-xs px-2 py-1 shrink-0">
-              Cambiar
+          <div className="hidden sm:flex items-center gap-2 text-sm shrink-0">
+            {sedeActiva && (
+              <>
+                <span className="text-slate-600 truncate max-w-[140px]" title={sedeActiva.nombre}>
+                  📍 {sedeActiva.nombre}
+                </span>
+                <button type="button" onClick={limpiarSede} className="btn-ghost text-xs px-2 py-1">
+                  Cambiar
+                </button>
+              </>
+            )}
+            <span className="text-slate-500 truncate max-w-[120px]" title={user?.email ?? undefined}>
+              {displayName}
+            </span>
+            <button type="button" onClick={() => void signOut()} className="btn-ghost text-xs px-2 py-1">
+              Salir
             </button>
           </div>
-        )}
+        </div>
+        <div className="max-w-2xl mx-auto px-4 pb-2 sm:hidden flex items-center justify-between gap-2 flex-wrap">
+          {sedeActiva && (
+            <>
+              <span className="text-xs text-slate-600 truncate pr-2">📍 {sedeActiva.nombre}</span>
+              <button type="button" onClick={limpiarSede} className="btn-ghost text-xs px-2 py-1 shrink-0">
+                Cambiar
+              </button>
+            </>
+          )}
+          <span className="text-xs text-slate-500 truncate">{displayName}</span>
+          <button type="button" onClick={() => void signOut()} className="btn-ghost text-xs px-2 py-1 shrink-0">
+            Salir
+          </button>
+        </div>
       </header>
 
       {/* Main content */}
