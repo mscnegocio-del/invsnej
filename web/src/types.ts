@@ -7,6 +7,17 @@ export type Perfil = {
   activo: boolean
 }
 
+export type UserPasskey = {
+  id: string
+  credential_id: string
+  device_name: string | null
+  created_at: string
+  last_used_at: string | null
+  revoked_at: string | null
+  backed_up?: boolean | null
+  device_type?: string | null
+}
+
 export type Trabajador = {
   id: number
   nombre: string

@@ -12,6 +12,7 @@ import { EditarBien } from './pages/EditarBien'
 import { Admin } from './pages/Admin'
 import { Login } from './pages/Login'
 import { AuthCallback } from './pages/AuthCallback'
+import { Security } from './pages/Security'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route element={<AuthenticatedShell />}>
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />
+            <Route path="/security" element={<Security />} />
             <Route path="/search" element={<Search />} />
             <Route path="/bienes/:id" element={<BienDetail />} />
             <Route

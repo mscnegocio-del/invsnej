@@ -20,9 +20,11 @@ export function Login() {
   const { user, loading, authReady } = useAuth()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? '/'
-  const { isSupported } = useWebAuthn()
+  const { isSupported, authenticate } = useWebAuthn()
 
   const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [phase, setPhase] = useState<'email' | 'code'>('email')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cooldown, setCooldown] = useState(0)
@@ -37,7 +39,7 @@ export function Login() {
     return <Navigate to={from} replace />
   }
 
-  const sendMagicLink = async () => {
+  const sendCode = async () => {
     setError(null)
     const trimmed = email.trim()
     if (!trimmed) {
@@ -55,12 +57,61 @@ export function Login() {
       setError(mapAuthError(supaError.message))
       return
     }
+    setPhase('code')
     setCooldown(120)
   }
 
-  const handleSendMagicLink = (e: FormEvent) => {
+  const handleSendCode = (e: FormEvent) => {
     e.preventDefault()
-    void sendMagicLink()
+    void sendCode()
+  }
+
+  const handleVerifyCode = async (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    const trimmed = email.trim()
+    const token = code.trim()
+    if (!trimmed || !token) {
+      setError('Ingresa el código de 6 dígitos que recibiste por correo.')
+      return
+    }
+    setSubmitting(true)
+    const { error: supaError } = await supabase.auth.verifyOtp({
+      email: trimmed,
+      token,
+      type: 'email',
+    })
+    setSubmitting(false)
+    if (supaError) {
+      setError(mapAuthError(supaError.message))
+      return
+    }
+  }
+
+  const handlePasskey = async () => {
+    setError(null)
+    const trimmed = email.trim()
+    if (!trimmed) {
+      setError('Ingresa tu correo antes de continuar con passkey.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const result = await authenticate(trimmed, window.location.origin)
+      if (result === 'unsupported') {
+        setError('Este dispositivo o navegador no soporta passkeys.')
+      } else if (result === 'cancelled') {
+        setError('Se canceló la verificación con passkey.')
+      } else if (result === 'fallback') {
+        setError('No se encontró una passkey válida. Usa el código enviado a tu correo.')
+      }
+    } catch (e) {
+      console.error(e)
+      setError('No se pudo completar el acceso con passkey. Usa el código por correo como fallback.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -68,12 +119,10 @@ export function Login() {
       <div className="w-full max-w-md card p-6 space-y-6">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Inventario patrimonial</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Ingresa con tu correo. Te enviaremos un enlace mágico para completar el acceso.
-          </p>
+          <p className="text-sm text-slate-600 mt-1">Ingresa con tu correo. Recibirás un código de 6 dígitos para iniciar sesión.</p>
         </div>
 
-        <form onSubmit={handleSendMagicLink} className="space-y-4">
+        <form onSubmit={phase === 'email' ? handleSendCode : handleVerifyCode} className="space-y-4">
           <div>
             <label className="label" htmlFor="login-email">
               Correo electrónico
@@ -88,35 +137,67 @@ export function Login() {
               placeholder="tu.correo@institucion.gob.pe"
             />
           </div>
-          <p className="text-sm text-slate-600">
-            Abre el enlace desde el mismo navegador del dispositivo donde estás usando la app.
-          </p>
+          {phase === 'code' && (
+            <div>
+              <label className="label" htmlFor="login-code">
+                Código de 6 dígitos
+              </label>
+              <input
+                id="login-code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={code}
+                onChange={(ev) => setCode(ev.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="input tracking-[0.35em] font-mono"
+                placeholder="000000"
+                maxLength={6}
+              />
+            </div>
+          )}
+
+          {phase === 'email' ? (
+            <p className="text-sm text-slate-600">
+              Puedes abrir el correo en el mismo celular o en la PC y escribir el código aquí.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-600">
+              Si no llegó el código, revisa spam o solicita uno nuevo cuando el temporizador termine.
+            </p>
+          )}
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <button type="submit" disabled={submitting} className="btn-primary w-full">
-            {submitting ? 'Enviando…' : 'Enviar enlace'}
+            {submitting ? (phase === 'email' ? 'Enviando…' : 'Verificando…') : phase === 'email' ? 'Enviar código' : 'Confirmar código'}
           </button>
           <button
             type="button"
             className="btn-ghost w-full text-sm"
             disabled={cooldown > 0 || submitting}
-            onClick={() => void sendMagicLink()}
+            onClick={() => void sendCode()}
           >
-            {cooldown > 0 ? `Reenviar enlace (${cooldown}s)` : 'Reenviar enlace'}
+            {cooldown > 0 ? `Reenviar código (${cooldown}s)` : 'Reenviar código'}
           </button>
+          {phase === 'code' && (
+            <button type="button" className="btn-ghost w-full text-sm" onClick={() => setPhase('email')}>
+              Cambiar correo
+            </button>
+          )}
         </form>
 
         {isSupported && (
           <div className="pt-2 border-t border-slate-100">
-            <p className="text-xs text-slate-500">
-              Tu dispositivo soporta passkeys/WebAuthn. Esta opción se habilitará como acceso preferente
-              después del primer ingreso por enlace mágico.
+            <p className="text-xs text-slate-500 mb-2">
+              Si ya registraste una passkey en este dispositivo, puedes ingresar sin esperar el correo.
             </p>
+            <button type="button" disabled={submitting} className="btn-secondary w-full" onClick={() => void handlePasskey()}>
+              Continuar con passkey
+            </button>
           </div>
         )}
 
         <p className="text-xs text-slate-500 text-center">
-          Si el enlace abre una página de confirmación, pulsa <strong>Confirmar acceso</strong>. Si el
-          enlace ya fue usado o caducó, solicita uno nuevo.
+          Si tu correo todavía muestra un enlace en lugar del código, úsalo solo como compatibilidad temporal
+          mientras se termina de alinear la plantilla del proveedor.
         </p>
       </div>
     </div>

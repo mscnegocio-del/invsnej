@@ -1,13 +1,55 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useEffect, useState } from 'react'
+import { listPasskeys } from '../lib/passkeysApi'
+import { useWebAuthn } from '../hooks/useWebAuthn'
 
 export function Home() {
   const { canEdit, isAdmin } = useAuth()
+  const { isSupported } = useWebAuthn()
+  const [passkeyCount, setPasskeyCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      try {
+        const items = await listPasskeys()
+        if (!cancelled) setPasskeyCount(items.filter((p) => !p.revoked_at).length)
+      } catch {
+        if (!cancelled) setPasskeyCount(null)
+      }
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <div>
       <h1 className="page-title">Sistema de inventario</h1>
       <p className="page-subtitle">Gestiona el inventario patrimonial escaneando códigos de barras o buscando por filtros.</p>
+
+      <div className="mt-6">
+        <Link
+          to="/security"
+          className="card flex flex-col gap-2 p-5 hover:shadow-md hover:border-indigo-200 transition-all duration-200"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🔐</span>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Seguridad de acceso</h2>
+              <p className="text-sm text-slate-600">
+                {passkeyCount && passkeyCount > 0
+                  ? `Tienes ${passkeyCount} passkey${passkeyCount > 1 ? 's' : ''} registrada${passkeyCount > 1 ? 's' : ''}.`
+                  : isSupported
+                    ? 'Activa una passkey para ingresar con huella, PIN o biometría.'
+                    : 'Gestiona tu método de acceso y revisa el estado de tus passkeys.'}
+              </p>
+            </div>
+          </div>
+        </Link>
+      </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {canEdit && (

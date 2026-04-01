@@ -35,12 +35,12 @@ export function AuthCallback() {
       }
 
       setMessage(
-        'No se encontró un enlace válido para completar el acceso. Solicita un nuevo enlace desde el inicio de sesión.',
+        'No se encontró un enlace válido. Si estás usando el nuevo flujo por código, vuelve al inicio de sesión y solicita un código de acceso.',
       )
     } catch (e) {
       console.error(e)
       setMessage(
-        'No se pudo confirmar el acceso. Si el enlace ya fue usado, lo abrió otro navegador o caducó, solicita uno nuevo.',
+        'No se pudo confirmar el acceso. Si el enlace ya fue usado, caducó o lo abrió otro navegador, vuelve al login y solicita un código nuevo.',
       )
     } finally {
       setLoading(false)
@@ -52,8 +52,8 @@ export function AuthCallback() {
       <div className="w-full max-w-md card p-6 space-y-4 text-center">
         <h1 className="text-lg font-semibold text-slate-900">Confirmar inicio de sesión</h1>
         <p className="text-sm text-slate-600">
-          Pulsa el botón para completar el acceso en este dispositivo. Esto ayuda a evitar que filtros o
-          herramientas del correo consuman el enlace antes que tú.
+          Esta pantalla queda como compatibilidad transitoria para enlaces heredados. El método principal de
+          acceso ahora es el código de 6 dígitos enviado al correo.
         </p>
         {message && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{message}</p>}
         <button type="button" className="btn-primary w-full" disabled={loading} onClick={() => void confirmar()}>
