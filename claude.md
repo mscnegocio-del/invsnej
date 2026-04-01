@@ -25,9 +25,10 @@ App web de inventario patrimonial para móvil. Permite escanear códigos de barr
 
 ## Autenticación recomendada (marzo 2026)
 
-- **Opción base (recomendada)**: Supabase Auth con OTP por correo (magic link o código OTP), priorizando simplicidad de adopción en móvil y menor fricción operativa.
-- **Evolución posible**: passkeys/WebAuthn como mejora futura para reducir dependencia de correo y aumentar seguridad de inicio de sesión.
-- **Estado esperado en tareas futuras**: tratar este bloque como guía de arquitectura; no asumir que OTP, passkeys o controles avanzados ya están implementados.
+- **Modelo recomendado**: primer acceso con magic link por correo, priorizando simplicidad de adopción en móvil y menor fricción operativa.
+- **Accesos siguientes (preferente)**: passkeys/WebAuthn para reducir dependencia del correo y mejorar la seguridad y la rapidez del inicio de sesión.
+- **Fallback**: magic link por correo cuando passkeys/WebAuthn no estén disponibles o no puedan usarse.
+- **Estado esperado en tareas futuras**: tratar este bloque como guía de arquitectura; no asumir que magic link, passkeys/WebAuthn o controles avanzados ya están implementados.
 
 ### Checklist de seguridad mínima
 

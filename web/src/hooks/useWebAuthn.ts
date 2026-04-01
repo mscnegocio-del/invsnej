@@ -3,8 +3,8 @@ import { useCallback, useEffect, useState } from 'react'
 export type WebAuthnResult = 'ok' | 'fallback'
 
 /**
- * Detección de soporte local. El flujo completo de passkeys requiere backend;
- * aquí se deja listo el hook para no bloquear la UI si el dispositivo no soporta.
+ * Detección de soporte local. El flujo completo de passkeys requiere enrolamiento
+ * y verificación backend; por ahora este hook solo informa compatibilidad del dispositivo.
  */
 export function useWebAuthn() {
   const [isSupported, setIsSupported] = useState(false)

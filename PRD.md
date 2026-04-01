@@ -12,19 +12,20 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 
 - Proteger el acceso al sistema de inventario para evitar uso no autorizado.
 - Garantizar trazabilidad básica de accesos y eventos de seguridad relevantes.
-- Mantener una experiencia móvil simple, con inicio de sesión rápido vía OTP.
-- Preparar la evolución futura hacia autenticación resistente a phishing (passkeys).
+- Mantener una experiencia móvil simple, con primer acceso rápido vía magic link.
+- Adoptar autenticación resistente a phishing con passkeys/WebAuthn para accesos recurrentes.
 
 ### 2.2 Alcance (autenticación y seguridad)
 
-- Autenticación por OTP enviado por correo electrónico (magic link o código de un solo uso).
+- Autenticación inicial por correo electrónico usando magic link.
+- Registro y uso de passkeys/WebAuthn para accesos posteriores.
+- Magic link como mecanismo de recuperación y fallback cuando passkeys no esté disponible.
 - Protección de rutas y acciones críticas (crear, editar, eliminar, exportar) solo para usuarios autenticados.
 - Gestión de sesión en frontend con renovación controlada y cierre de sesión manual.
 - Registro de eventos mínimos de seguridad (login exitoso/fallido, intentos bloqueados, logout).
 
 ### 2.3 Fuera de alcance (versión actual)
 
-- Implementación de passkeys/WebAuthn en producción (queda como mejora futura).
 - Integración SSO empresarial (Google Workspace, Azure AD, etc.).
 - Roles avanzados por área (RBAC granular); en esta etapa se prioriza acceso autenticado básico.
 
@@ -112,15 +113,16 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | ID   | Requisito | Prioridad |
 |------|-----------|-----------|
 | RF-41 | Mostrar pantalla de login antes de acceder al sistema | Alta |
-| RF-42 | Login por OTP vía correo (enlace mágico o código de un solo uso) | Alta |
-| RF-43 | Validar OTP con expiración corta (ej. 5-10 minutos) | Alta |
-| RF-44 | Permitir reenvío de OTP con cooldown visible para el usuario | Alta |
+| RF-42 | Permitir primer acceso por correo usando magic link | Alta |
+| RF-43 | Tras primer acceso exitoso, invitar a registrar una passkey/WebAuthn en el mismo dispositivo | Alta |
+| RF-44 | Permitir siguientes accesos con passkey/WebAuthn cuando el dispositivo/navegador lo soporte | Alta |
 | RF-45 | Proteger rutas privadas: Home, Scan, Registro, Search, Detail, Editar | Alta |
 | RF-46 | Cerrar sesión explícitamente desde interfaz y limpiar estado local sensible | Alta |
 | RF-47 | Bloquear temporalmente intentos excesivos por usuario/IP y mostrar mensaje claro | Alta |
 | RF-48 | Registrar eventos de seguridad básicos (login ok, login fallido, bloqueo) | Media |
-| RF-49 | UX de error no técnica: mensajes claros para OTP expirado, inválido o ya usado | Alta |
-| RF-50 | Definir passkeys (WebAuthn) como fase futura compatible con el flujo actual | Media |
+| RF-49 | Ofrecer magic link como fallback cuando la passkey no exista, falle o no esté disponible en el dispositivo | Alta |
+| RF-50 | UX de error no técnica: mensajes claros para enlace expirado, passkey no disponible o autenticación cancelada | Alta |
+| RF-51 | Permitir registrar o volver a registrar passkey desde una sesión autenticada | Media |
 
 ---
 
@@ -139,10 +141,10 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | RNF-09 | Exportación en bloques 1000 (límite Supabase) |
 | RNF-10 | Resolución automática de ubicaciones antiguas (ID → nombre) |
 | RNF-11 | Sesiones autenticadas con expiración y renovación controlada |
-| RNF-12 | Rate limiting para OTP y login para reducir abuso |
+| RNF-12 | Rate limiting para magic link y login para reducir abuso |
 | RNF-13 | Mensajes de autenticación claros en español y orientados a acción |
 | RNF-14 | Auditoría mínima de accesos y eventos de seguridad |
-| RNF-15 | Arquitectura compatible con passkeys sin reescribir flujo principal |
+| RNF-15 | Arquitectura compatible con passkeys/WebAuthn como método principal recurrente sin reescribir flujo principal |
 | RNF-16 | Operar sin dominio propio: usar dominio provisto por plataforma (Vercel) |
 | RNF-17 | Cookies/sesión seguras bajo HTTPS en entorno productivo |
 
@@ -206,12 +208,15 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 - Resultados paginados muestran máximo 20 items
 - Click resultado navega a detalle con todos los datos
 
-### Autenticación (OTP)
+### Autenticación (magic link + passkeys)
 
 - **Dado** que ingreso un correo válido en login
 - **Cuando** solicito acceso
-- **Entonces** recibo OTP (enlace o código) y puedo iniciar sesión si está vigente
-- **Y** al expirar o usar OTP inválido se muestra error claro con opción de reintento
+- **Entonces** recibo un magic link y puedo iniciar sesión si el enlace está vigente
+- **Y** tras el primer acceso exitoso se me solicita registrar una passkey/WebAuthn para futuros ingresos
+- **Y** en accesos posteriores puedo autenticarme con passkey sin depender del correo
+- **Y** si la passkey no está disponible o falla, puedo usar magic link como fallback
+- **Y** si el enlace expira o la autenticación se cancela se muestra error claro con opción de reintento
 - **Y** tras múltiples intentos fallidos se bloquea temporalmente el acceso y se informa el tiempo de espera
 - **Y** al iniciar sesión se habilita acceso a rutas protegidas
 
@@ -264,7 +269,7 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 - Ubicación antigua como ID se resuelve en visualización (no en BD)
 - Sin dominio propio en esta fase: se usa subdominio de plataforma para despliegue.
 - Al no tener dominio propio, no se implementan políticas avanzadas de correo corporativo (SPF/DKIM/DMARC personalizadas) en esta etapa.
-- Passkeys se documenta como evolución futura; no es requisito de salida de la versión actual.
+- La adopción de passkeys/WebAuthn depende del soporte del dispositivo, navegador y gestor de credenciales del usuario.
 
 ---
 
@@ -273,7 +278,9 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | Métrica | Definición | Meta inicial |
 |---------|------------|--------------|
 | Tasa de login exitoso | % de inicios de sesión exitosos sobre intentos totales | >= 90% |
-| Tiempo medio de login OTP | Tiempo desde solicitud OTP hasta sesión activa | <= 60 segundos |
-| OTP expirado/inválido | % de intentos fallidos por OTP vencido o incorrecto | <= 10% |
+| Tiempo medio de primer login | Tiempo desde solicitud de magic link hasta sesión activa | <= 60 segundos |
+| Adopción de passkeys | % de usuarios que registran passkey tras primer acceso exitoso | >= 70% |
+| Tasa de login con passkey | % de accesos recurrentes completados con passkey sobre accesos recurrentes totales | >= 60% |
+| Magic link expirado/fallido | % de intentos fallidos por enlace vencido o inválido | <= 10% |
 | Intentos bloqueados | Cantidad de bloqueos temporales por abuso en ventana definida | Monitoreado; tendencia estable o a la baja |
 | Reintento exitoso tras error | % de usuarios que corrigen y logran login tras un fallo inicial | >= 70% |

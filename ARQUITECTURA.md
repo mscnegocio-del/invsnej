@@ -253,13 +253,13 @@ CREATE INDEX IF NOT EXISTS idx_bienes_ubicacion
 
 ### Estado actual del proyecto
 - Actualmente la app opera sin un módulo de autenticación de usuarios finalizado en producción.
-- Lo siguiente define la **implementación recomendada inmediata** y la **evolución por fases**.
+- Lo siguiente define la **arquitectura recomendada para la etapa base** y una **evolución posterior sugerida**, sin asumir que esas fases ya estén cerradas o implementadas.
 
 ### 11.1 Implementación recomendada inmediata (Fase 1)
-- **Supabase Auth con OTP por correo** (`magic link` o código de un solo uso).
+- **Supabase Auth con `magic link` por correo** como mecanismo base de acceso.
 - Flujo recomendado:
   - Usuario ingresa correo institucional.
-  - Supabase envía enlace mágico o código OTP.
+  - Supabase envía un enlace mágico al correo del usuario.
   - Frontend valida sesión con `@supabase/supabase-js` y opera con token de usuario.
 - Ventajas para este contexto (Vercel + sin dominio propio):
   - Menor complejidad operativa que OAuth social.
@@ -267,21 +267,24 @@ CREATE INDEX IF NOT EXISTS idx_bienes_ubicacion
   - Permite activar control de acceso real en base de datos con RLS.
 
 ### 11.2 Evolución recomendada (Fase 2)
-- **Passkeys / WebAuthn** como mejora futura de seguridad y UX.
-- Objetivo: reducir fricción de login y fortalecer resistencia a phishing.
-- Estado: **propuesta**, no asumida como implementada.
+- **Passkeys / WebAuthn** como evolución recomendada de autenticación y como vía preferente una vez incorporadas.
+- Objetivo:
+  - Reducir fricción de acceso en móvil.
+  - Mejorar resistencia a phishing y elevar la seguridad del inicio de sesión.
+- En esta etapa, `magic link` debe mantenerse como **fallback operativo** para recuperación, compatibilidad y transición gradual.
+- Estado: **propuesta arquitectónica**, no asumida como implementada ni cerrada.
 
 ### 11.3 Google OAuth sin dominio propio: limitaciones prácticas
 - Puede no ser viable o puede retrasar salida en este contexto porque:
   - Requiere configurar correctamente pantalla de consentimiento, orígenes autorizados y redirect URIs.
   - En modo externo, Google puede exigir verificación adicional según alcance/branding/políticas.
   - Cambios de URL por previews o ajustes de despliegue en Vercel elevan mantenimiento de callbacks.
-- Por esto, para etapa inicial se recomienda OTP por correo y dejar OAuth social como fase posterior.
+- Por esto, para etapa inicial se recomienda `magic link` por correo y dejar OAuth social como fase posterior si el contexto operativo lo justifica.
 
 ### 11.4 Controles de seguridad obligatorios (mínimo)
 - **RLS habilitado** en tablas sensibles (`bienes`, `trabajadores`, `ubicaciones`) con políticas por rol/usuario.
 - **Nunca exponer `service_role` en frontend**; usar solo `anon key` en cliente.
-- **Rate limiting** en autenticación y operaciones sensibles (login OTP, búsquedas intensivas, escrituras repetidas).
+- **Rate limiting** en autenticación y operaciones sensibles (`magic link`, passkeys/WebAuthn cuando existan, búsquedas intensivas, escrituras repetidas).
 - **Auditoría**:
   - Registrar eventos críticos (inicio de sesión, altas, ediciones, eliminaciones, intentos denegados).
   - Conservar trazabilidad mínima: usuario, acción, timestamp, entidad afectada.
