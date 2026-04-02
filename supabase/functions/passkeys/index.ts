@@ -37,7 +37,7 @@ type ChallengeRow = {
   used_at: string | null
 }
 
-const ALLOWED_HOSTS = new Set(['invsnej.vercel.app', 'localhost', '127.0.0.1'])
+const DEFAULT_ALLOWED_HOSTS = ['invsnej.vercel.app', 'www.invsnej.vercel.app', 'localhost', '127.0.0.1']
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -46,9 +46,21 @@ function json(body: unknown, status = 200) {
   })
 }
 
+function isOriginHostAllowed(hostname: string): boolean {
+  const extra = Deno.env.get('PASSKEY_EXTRA_HOSTS')?.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean) ?? []
+  const base = new Set([...DEFAULT_ALLOWED_HOSTS.map((h) => h.toLowerCase()), ...extra])
+  const h = hostname.toLowerCase()
+  if (base.has(h)) return true
+  // Previews de Vercel (*.vercel.app) y otros subdominios del mismo proyecto
+  if (h.endsWith('.vercel.app')) return true
+  return false
+}
+
 function normalizeOrigin(origin: string) {
   const url = new URL(origin)
-  if (!ALLOWED_HOSTS.has(url.hostname)) throw new Error('Origen no permitido')
+  if (!isOriginHostAllowed(url.hostname)) {
+    throw new Error('Origen no permitido. Usa el dominio de la app o configura PASSKEY_EXTRA_HOSTS en la función.')
+  }
   return {
     origin: url.origin,
     rpID: url.hostname,
@@ -71,18 +83,16 @@ async function requireUser(req: Request, supabaseUrl: string, anonKey: string) {
   return { user, error: null }
 }
 
-async function findUserByEmail(admin: ReturnType<typeof createClient>, email: string) {
-  const lower = email.trim().toLowerCase()
-  let page = 1
-  while (page <= 5) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
-    if (error) throw error
-    const found = data.users.find((u) => (u.email ?? '').toLowerCase() === lower)
-    if (found) return found
-    if (data.users.length < 200) break
-    page += 1
-  }
-  return null
+type AuthUserStub = { id: string; email?: string }
+
+/** Evita auth.admin.listUsers (falla con confirmation_token NULL en algunos proyectos). */
+async function findUserByEmail(admin: ReturnType<typeof createClient>, email: string): Promise<AuthUserStub | null> {
+  const { data, error } = await admin.rpc('auth_user_id_by_email', { p_email: email.trim() })
+  if (error) throw error
+  const rows = (Array.isArray(data) ? data : data ? [data] : []) as { id: string; email: string | null }[]
+  const row = rows[0]
+  if (!row?.id) return null
+  return { id: row.id, email: row.email ?? undefined }
 }
 
 Deno.serve(async (req) => {
@@ -189,7 +199,8 @@ Deno.serve(async (req) => {
           expectedChallenge: challenge.challenge,
           expectedOrigin: origin,
           expectedRPID: rpID,
-          requireUserVerification: true,
+          // preferred en muchos móviles/Windows; true dejaba fallos silenciosos o "colgados" tras el diálogo
+          requireUserVerification: false,
         })
         if (!verification.verified || !verification.registrationInfo) {
           return json({ error: 'No se pudo verificar la passkey.' }, 400)
@@ -284,7 +295,7 @@ Deno.serve(async (req) => {
           expectedChallenge: challenge.challenge,
           expectedOrigin: origin,
           expectedRPID: rpID,
-          requireUserVerification: true,
+          requireUserVerification: false,
           credential: {
             id: passkey.credential_id,
             publicKey: isoBase64URL.toBuffer(passkey.public_key),

@@ -23,8 +23,8 @@ async function invokePasskeys<T>(body: Record<string, unknown>): Promise<T> {
 }
 
 export async function listPasskeys(): Promise<UserPasskey[]> {
-  const data = await invokePasskeys<{ passkeys: UserPasskey[] }>({ action: 'list' satisfies PasskeysAction })
-  return data.passkeys ?? []
+  const data = await invokePasskeys<{ passkeys?: UserPasskey[] }>({ action: 'list' satisfies PasskeysAction })
+  return data?.passkeys ?? []
 }
 
 export async function startPasskeyRegistration(origin: string) {
