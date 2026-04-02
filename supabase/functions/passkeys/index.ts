@@ -315,21 +315,26 @@ Deno.serve(async (req) => {
 
         await admin.from('auth_webauthn_challenges').update({ used_at: new Date().toISOString() }).eq('id', challenge.id)
 
+        // Mismo correo que en auth.users (mayúsculas/espacios); generateLink + verifyOtp fallan si no coincide.
+        const canonicalEmail = (authUser.email ?? email).trim()
         const redirectTo = `${origin}/auth/callback`
         const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
           type: 'magiclink',
-          email,
+          email: canonicalEmail,
           options: { redirectTo },
         })
         if (linkErr) return json({ error: linkErr.message }, 400)
 
         const emailOtp = linkData.properties.email_otp
         const verificationType = linkData.properties.verification_type
+        const hashedToken = linkData.properties.hashed_token
         if (!emailOtp) return json({ error: 'No se pudo generar el token de sesión fallback.' }, 500)
 
         return json({
           email_otp: emailOtp,
           verification_type: verificationType,
+          hashed_token: hashedToken,
+          auth_email: canonicalEmail,
         })
       }
     }

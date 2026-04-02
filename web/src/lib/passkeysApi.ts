@@ -60,7 +60,12 @@ export async function finishPasskeyAuthentication(
   origin: string,
   response: Record<string, unknown>,
 ) {
-  return invokePasskeys<{ email_otp: string; verification_type: string }>({
+  return invokePasskeys<{
+    email_otp: string
+    verification_type: string
+    hashed_token?: string
+    auth_email?: string
+  }>({
     action: 'finish_authentication' satisfies PasskeysAction,
     email,
     origin,

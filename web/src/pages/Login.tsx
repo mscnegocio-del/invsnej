@@ -116,7 +116,13 @@ export function Login() {
       }
     } catch (e) {
       console.error(e)
-      setError('No se pudo completar el acceso con passkey. Usa el código por correo como fallback.')
+      const raw = e instanceof Error ? e.message : ''
+      const detail = raw ? mapAuthError(raw) : ''
+      setError(
+        detail
+          ? `Acceso con passkey: ${detail} Si sigue fallando, usa el código por correo.`
+          : 'No se pudo completar el acceso con passkey. Usa el código por correo como fallback.',
+      )
     } finally {
       setSubmitting(false)
     }

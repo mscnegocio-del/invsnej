@@ -61,18 +61,36 @@ export function useWebAuthn() {
   const authenticate = useCallback(
     async (email: string, origin: string): Promise<WebAuthnResult> => {
       if (!isSupported) return 'unsupported'
+      const normalized = email.trim().toLowerCase()
       try {
-        const { options } = await startPasskeyAuthentication(email, origin)
+        const { options } = await startPasskeyAuthentication(normalized, origin)
         const response = (await startAuthentication({
           optionsJSON: options as unknown as Parameters<typeof startAuthentication>[0]['optionsJSON'],
         })) as unknown as Record<string, unknown>
 
-        const { email_otp, verification_type } = await finishPasskeyAuthentication(email, origin, response)
-        const { error } = await supabase.auth.verifyOtp({
-          email,
+        const { email_otp, verification_type, hashed_token, auth_email } =
+          await finishPasskeyAuthentication(normalized, origin, response)
+        const emailForVerify = (auth_email ?? normalized).trim()
+
+        const vt = (verification_type as 'magiclink' | 'email') ?? 'magiclink'
+        let { error } = await supabase.auth.verifyOtp({
+          email: emailForVerify,
           token: email_otp,
-          type: (verification_type as 'magiclink' | 'email') ?? 'magiclink',
+          type: vt,
         })
+        if (error && vt !== 'email') {
+          ;({ error } = await supabase.auth.verifyOtp({
+            email: emailForVerify,
+            token: email_otp,
+            type: 'email',
+          }))
+        }
+        if (error && hashed_token) {
+          ;({ error } = await supabase.auth.verifyOtp({
+            type: 'magiclink',
+            token_hash: hashed_token,
+          }))
+        }
         if (error) throw error
         return 'ok'
       } catch (error) {
