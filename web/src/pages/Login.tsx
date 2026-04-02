@@ -10,6 +10,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: 'Credenciales inválidas.',
 }
 
+/** Supabase suele enviar 6 u 8 dígitos en {{ .Token }} según el proyecto. */
+const EMAIL_OTP_MIN_LENGTH = 6
+const EMAIL_OTP_MAX_LENGTH = 8
+
 function mapAuthError(message: string): string {
   const lower = message.toLowerCase()
   if (lower.includes('rate') || lower.includes('limit')) return ERROR_MESSAGES.over_email_send_rate_limit
@@ -72,7 +76,11 @@ export function Login() {
     const trimmed = email.trim()
     const token = code.trim()
     if (!trimmed || !token) {
-      setError('Ingresa el código de 6 dígitos que recibiste por correo.')
+      setError('Ingresa el código que recibiste por correo.')
+      return
+    }
+    if (token.length < EMAIL_OTP_MIN_LENGTH || token.length > EMAIL_OTP_MAX_LENGTH) {
+      setError(`El código debe tener entre ${EMAIL_OTP_MIN_LENGTH} y ${EMAIL_OTP_MAX_LENGTH} dígitos.`)
       return
     }
     setSubmitting(true)
@@ -119,7 +127,9 @@ export function Login() {
       <div className="w-full max-w-md card p-6 space-y-6">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Inventario patrimonial</h1>
-          <p className="text-sm text-slate-600 mt-1">Ingresa con tu correo. Recibirás un código de 6 dígitos para iniciar sesión.</p>
+          <p className="text-sm text-slate-600 mt-1">
+            Ingresa con tu correo. Recibirás un código numérico para iniciar sesión (suele ser de 6 u 8 dígitos).
+          </p>
         </div>
 
         <form onSubmit={phase === 'email' ? handleSendCode : handleVerifyCode} className="space-y-4">
@@ -140,7 +150,7 @@ export function Login() {
           {phase === 'code' && (
             <div>
               <label className="label" htmlFor="login-code">
-                Código de 6 dígitos
+                Código del correo
               </label>
               <input
                 id="login-code"
@@ -148,10 +158,12 @@ export function Login() {
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 value={code}
-                onChange={(ev) => setCode(ev.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(ev) =>
+                  setCode(ev.target.value.replace(/\D/g, '').slice(0, EMAIL_OTP_MAX_LENGTH))
+                }
                 className="input tracking-[0.35em] font-mono"
-                placeholder="000000"
-                maxLength={6}
+                placeholder="00000000"
+                maxLength={EMAIL_OTP_MAX_LENGTH}
               />
             </div>
           )}

@@ -53,7 +53,7 @@ export function AuthCallback() {
         <h1 className="text-lg font-semibold text-slate-900">Confirmar inicio de sesión</h1>
         <p className="text-sm text-slate-600">
           Esta pantalla queda como compatibilidad transitoria para enlaces heredados. El método principal de
-          acceso ahora es el código de 6 dígitos enviado al correo.
+          acceso ahora es el código numérico enviado al correo.
         </p>
         {message && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{message}</p>}
         <button type="button" className="btn-primary w-full" disabled={loading} onClick={() => void confirmar()}>

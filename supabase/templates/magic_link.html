@@ -1,0 +1,16 @@
+<!--
+  Plantilla "Magic link" para signInWithOtp + verifyOtp (type: 'email').
+  Hosted: Dashboard → Authentication → Email Templates → Magic link (pegar cuerpo y asunto sugerido abajo).
+  Local: enlazar en supabase/config.toml → [auth.email.template.magic_link] content_path.
+-->
+<h2>Código de acceso</h2>
+<p>Usa este código numérico en la app de inventario patrimonial (suele tener 6 u 8 dígitos):</p>
+<p style="font-size: 1.5rem; font-weight: 700; letter-spacing: 0.25em; font-family: ui-monospace, monospace">
+  {{ .Token }}
+</p>
+<p>El código caduca en pocos minutos. Si no solicitaste este acceso, ignora este mensaje.</p>
+<hr style="border: none; border-top: 1px solid #e2e8f0; margin: 1.5rem 0" />
+<p style="font-size: 0.875rem; color: #64748b">
+  Alternativa por compatibilidad (enlace único):
+  <a href="{{ .ConfirmationURL }}">Iniciar sesión con enlace</a>
+</p>
