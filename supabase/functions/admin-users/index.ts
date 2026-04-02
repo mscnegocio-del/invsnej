@@ -55,7 +55,8 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === 'GET') {
-    const { data: list, error: listErr } = await admin.auth.admin.listUsers({ perPage: 1000 })
+    // GoTrue exige page en la query; sin page algunos proyectos responden 400.
+    const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
     if (listErr) {
       return new Response(JSON.stringify({ error: listErr.message }), {
         status: 400,
@@ -63,7 +64,16 @@ Deno.serve(async (req) => {
       })
     }
     const ids = list.users.map((u) => u.id)
-    const { data: perfiles } = await admin.from('perfiles').select('id, app_role, nombre, activo').in('id', ids)
+    const { data: perfiles, error: perfilErr } =
+      ids.length === 0
+        ? { data: [] as { id: string; app_role: string; nombre: string | null; activo: boolean }[], error: null }
+        : await admin.from('perfiles').select('id, app_role, nombre, activo').in('id', ids)
+    if (perfilErr) {
+      return new Response(JSON.stringify({ error: perfilErr.message }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     const map = new Map((perfiles ?? []).map((p) => [p.id as string, p]))
     const users = list.users.map((u) => {
       const p = map.get(u.id)

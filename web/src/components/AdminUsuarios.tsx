@@ -22,7 +22,11 @@ export function AdminUsuarios() {
       setRows(data)
     } catch (e) {
       console.error(e)
-      setError('No se pudo cargar la lista de usuarios. Verifica la función Edge «admin-users» y tu rol.')
+      setError(
+        e instanceof Error && e.message
+          ? e.message
+          : 'No se pudo cargar la lista de usuarios. Verifica la función Edge «admin-users» y tu rol.',
+      )
     } finally {
       setLoading(false)
     }
