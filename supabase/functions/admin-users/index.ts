@@ -55,15 +55,17 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === 'GET') {
-    // GoTrue exige page en la query; sin page algunos proyectos responden 400.
-    const { data: list, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-    if (listErr) {
-      return new Response(JSON.stringify({ error: listErr.message }), {
+    // No usar auth.admin.listUsers: con confirmation_token NULL en auth.users GoTrue puede devolver
+    // "Database error finding users" (bug de scan en GoTrue). Listamos vía RPC con columnas mínimas.
+    const { data: authRows, error: rpcErr } = await admin.rpc('admin_list_auth_users')
+    if (rpcErr) {
+      return new Response(JSON.stringify({ error: rpcErr.message }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    const ids = list.users.map((u) => u.id)
+    const listUsers = (authRows ?? []) as { id: string; email: string | undefined; created_at: string }[]
+    const ids = listUsers.map((u) => u.id)
     const { data: perfiles, error: perfilErr } =
       ids.length === 0
         ? { data: [] as { id: string; app_role: string; nombre: string | null; activo: boolean }[], error: null }
@@ -75,11 +77,11 @@ Deno.serve(async (req) => {
       })
     }
     const map = new Map((perfiles ?? []).map((p) => [p.id as string, p]))
-    const users = list.users.map((u) => {
+    const users = listUsers.map((u) => {
       const p = map.get(u.id)
       return {
         id: u.id,
-        email: u.email,
+        email: u.email ?? null,
         created_at: u.created_at,
         app_role: (p?.app_role as string) ?? 'consulta',
         nombre: p?.nombre ?? null,
