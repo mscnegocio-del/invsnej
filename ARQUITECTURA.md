@@ -249,42 +249,31 @@ CREATE INDEX IF NOT EXISTS idx_bienes_ubicacion
 
 ---
 
-## 11. Autenticación y seguridad (actualizado: marzo 2026)
+## 11. Autenticación y seguridad (actualizado: abril 2026)
 
 ### Estado actual del proyecto
-- Actualmente la app opera sin un módulo de autenticación de usuarios finalizado en producción.
-- Lo siguiente define la **arquitectura recomendada para la etapa base** y una **evolución posterior sugerida**, sin asumir que esas fases ya estén cerradas o implementadas.
+- **Autenticación desplegada:** login con **código OTP por correo** (`/login`), **passkeys/WebAuthn** vía Edge Function Supabase `passkeys` (`@simplewebauthn/server` + `@simplewebauthn/browser`), gestión en `/security`, sesión con `@supabase/supabase-js`, `AuthGuard` / `RoleGuard` / `AuthenticatedShell`.
+- **Fallback:** si no hay passkey o falla WebAuthn, el usuario sigue pudiendo entrar con **OTP por correo**.
+- Tablas de soporte: `user_passkeys`, `auth_webauthn_challenges`; RPC `auth_user_id_by_email` para la Edge; secreto `PASSKEY_EXTRA_HOSTS` para dominios fuera de `*.vercel.app`.
 
-### 11.1 Implementación recomendada inmediata (Fase 1)
-- **Supabase Auth con `magic link` por correo** como mecanismo base de acceso.
-- Flujo recomendado:
-  - Usuario ingresa correo institucional.
-  - Supabase envía un enlace mágico al correo del usuario.
-  - Frontend valida sesión con `@supabase/supabase-js` y opera con token de usuario.
-- Ventajas para este contexto (Vercel + sin dominio propio):
-  - Menor complejidad operativa que OAuth social.
-  - No exige configurar app OAuth de terceros para salir a producción inicial.
-  - Permite activar control de acceso real en base de datos con RLS.
+### 11.1 Implementación base (en producción)
+- **Supabase Auth** con **OTP por correo** como mecanismo principal sin contraseña en cliente.
+- Flujo:
+  - Usuario ingresa correo → `signInWithOtp` → recibe código → `verifyOtp` → sesión.
+  - Opcional: **Continuar con passkey** tras indicar el mismo correo (autenticación WebAuthn + creación de sesión en servidor).
+- `/auth/callback` atiende redirects de Auth (p. ej. plantillas legacy con enlaces mágicos si siguen habilitadas).
 
-### 11.2 Evolución recomendada (Fase 2)
-- **Passkeys / WebAuthn** como evolución recomendada de autenticación y como vía preferente una vez incorporadas.
-- Objetivo:
-  - Reducir fricción de acceso en móvil.
-  - Mejorar resistencia a phishing y elevar la seguridad del inicio de sesión.
-- En esta etapa, `magic link` debe mantenerse como **fallback operativo** para recuperación, compatibilidad y transición gradual.
-- Estado: **propuesta arquitectónica**, no asumida como implementada ni cerrada.
+### 11.2 Passkeys / WebAuthn (en producción)
+- Registro y uso con la Edge `passkeys`; validación de `Origin`/`rpID` y hosts permitidos (incl. `PASSKEY_EXTRA_HOSTS`).
+- Objetivos cumplidos en diseño: menos fricción en accesos recurrentes, mayor resistencia a phishing frente solo a correo.
 
 ### 11.3 Google OAuth sin dominio propio: limitaciones prácticas
-- Puede no ser viable o puede retrasar salida en este contexto porque:
-  - Requiere configurar correctamente pantalla de consentimiento, orígenes autorizados y redirect URIs.
-  - En modo externo, Google puede exigir verificación adicional según alcance/branding/políticas.
-  - Cambios de URL por previews o ajustes de despliegue en Vercel elevan mantenimiento de callbacks.
-- Por esto, para etapa inicial se recomienda `magic link` por correo y dejar OAuth social como fase posterior si el contexto operativo lo justifica.
+- Sigue siendo opción futura si el contexto lo justifica (consentimiento, redirects, previews en Vercel). No es requisito del despliegue actual.
 
-### 11.4 Controles de seguridad obligatorios (mínimo)
-- **RLS habilitado** en tablas sensibles (`bienes`, `trabajadores`, `ubicaciones`) con políticas por rol/usuario.
+### 11.4 Controles de seguridad obligatorios (mínimo y mejora continua)
+- **RLS habilitado** en tablas sensibles con políticas por rol/usuario.
 - **Nunca exponer `service_role` en frontend**; usar solo `anon key` en cliente.
-- **Rate limiting** en autenticación y operaciones sensibles (`magic link`, passkeys/WebAuthn cuando existan, búsquedas intensivas, escrituras repetidas).
+- **Rate limiting** en autenticación y operaciones sensibles (OTP, passkeys, búsquedas intensivas, escrituras repetidas) — reforzar donde falte.
 - **Auditoría**:
   - Registrar eventos críticos (inicio de sesión, altas, ediciones, eliminaciones, intentos denegados).
   - Conservar trazabilidad mínima: usuario, acción, timestamp, entidad afectada.

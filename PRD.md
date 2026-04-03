@@ -12,14 +12,15 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 
 - Proteger el acceso al sistema de inventario para evitar uso no autorizado.
 - Garantizar trazabilidad básica de accesos y eventos de seguridad relevantes.
-- Mantener una experiencia móvil simple, con primer acceso rápido vía magic link.
+- Mantener una experiencia móvil simple, con primer acceso rápido vía **código OTP** por correo.
 - Adoptar autenticación resistente a phishing con passkeys/WebAuthn para accesos recurrentes.
 
 ### 2.2 Alcance (autenticación y seguridad)
 
-- Autenticación inicial por correo electrónico usando magic link.
+- **Implementado (2026):** primer acceso con **código OTP** enviado al correo (`signInWithOtp`); registro y login con **passkeys/WebAuthn** vía Edge Function `passkeys`; fallback con OTP si passkeys no están disponibles o fallan.
+- Autenticación por correo (flujo sin contraseña persistente en cliente).
 - Registro y uso de passkeys/WebAuthn para accesos posteriores.
-- Magic link como mecanismo de recuperación y fallback cuando passkeys no esté disponible.
+- Código por correo / enlaces como mecanismo de recuperación y fallback cuando passkeys no esté disponible.
 - Protección de rutas y acciones críticas (crear, editar, eliminar, exportar) solo para usuarios autenticados.
 - Gestión de sesión en frontend con renovación controlada y cierre de sesión manual.
 - Registro de eventos mínimos de seguridad (login exitoso/fallido, intentos bloqueados, logout).
@@ -113,14 +114,14 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | ID   | Requisito | Prioridad |
 |------|-----------|-----------|
 | RF-41 | Mostrar pantalla de login antes de acceder al sistema | Alta |
-| RF-42 | Permitir primer acceso por correo usando magic link | Alta |
+| RF-42 | Permitir primer acceso por correo (OTP o enlace; producto usa **OTP** como flujo principal) | Alta |
 | RF-43 | Tras primer acceso exitoso, invitar a registrar una passkey/WebAuthn en el mismo dispositivo | Alta |
 | RF-44 | Permitir siguientes accesos con passkey/WebAuthn cuando el dispositivo/navegador lo soporte | Alta |
 | RF-45 | Proteger rutas privadas: Home, Scan, Registro, Search, Detail, Editar | Alta |
 | RF-46 | Cerrar sesión explícitamente desde interfaz y limpiar estado local sensible | Alta |
 | RF-47 | Bloquear temporalmente intentos excesivos por usuario/IP y mostrar mensaje claro | Alta |
 | RF-48 | Registrar eventos de seguridad básicos (login ok, login fallido, bloqueo) | Media |
-| RF-49 | Ofrecer magic link como fallback cuando la passkey no exista, falle o no esté disponible en el dispositivo | Alta |
+| RF-49 | Ofrecer **OTP por correo** (u otro fallback sin passkey) cuando la passkey no exista, falle o no esté disponible en el dispositivo | Alta |
 | RF-50 | UX de error no técnica: mensajes claros para enlace expirado, passkey no disponible o autenticación cancelada | Alta |
 | RF-51 | Permitir registrar o volver a registrar passkey desde una sesión autenticada | Media |
 
@@ -141,7 +142,7 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | RNF-09 | Exportación en bloques 1000 (límite Supabase) |
 | RNF-10 | Resolución automática de ubicaciones antiguas (ID → nombre) |
 | RNF-11 | Sesiones autenticadas con expiración y renovación controlada |
-| RNF-12 | Rate limiting para magic link y login para reducir abuso |
+| RNF-12 | Rate limiting para envío de códigos/correo de login y sesiones para reducir abuso |
 | RNF-13 | Mensajes de autenticación claros en español y orientados a acción |
 | RNF-14 | Auditoría mínima de accesos y eventos de seguridad |
 | RNF-15 | Arquitectura compatible con passkeys/WebAuthn como método principal recurrente sin reescribir flujo principal |
@@ -208,14 +209,14 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 - Resultados paginados muestran máximo 20 items
 - Click resultado navega a detalle con todos los datos
 
-### Autenticación (magic link + passkeys)
+### Autenticación (OTP por correo + passkeys)
 
 - **Dado** que ingreso un correo válido en login
 - **Cuando** solicito acceso
-- **Entonces** recibo un magic link y puedo iniciar sesión si el enlace está vigente
-- **Y** tras el primer acceso exitoso se me solicita registrar una passkey/WebAuthn para futuros ingresos
-- **Y** en accesos posteriores puedo autenticarme con passkey sin depender del correo
-- **Y** si la passkey no está disponible o falla, puedo usar magic link como fallback
+- **Entonces** recibo un **código OTP** por correo y puedo iniciar sesión al introducirlo mientras esté vigente
+- **Y** puedo registrar y usar **passkeys/WebAuthn** desde `/login` y gestionarlas en `/security`
+- **Y** en accesos posteriores puedo autenticarme con passkey sin depender del correo (si hay credencial registrada)
+- **Y** si la passkey no está disponible o falla, puedo usar **OTP por correo** como fallback
 - **Y** si el enlace expira o la autenticación se cancela se muestra error claro con opción de reintento
 - **Y** tras múltiples intentos fallidos se bloquea temporalmente el acceso y se informa el tiempo de espera
 - **Y** al iniciar sesión se habilita acceso a rutas protegidas
@@ -278,7 +279,7 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | Métrica | Definición | Meta inicial |
 |---------|------------|--------------|
 | Tasa de login exitoso | % de inicios de sesión exitosos sobre intentos totales | >= 90% |
-| Tiempo medio de primer login | Tiempo desde solicitud de magic link hasta sesión activa | <= 60 segundos |
+| Tiempo medio de primer login | Tiempo desde solicitud de código/correo hasta sesión activa | <= 60 segundos |
 | Adopción de passkeys | % de usuarios que registran passkey tras primer acceso exitoso | >= 70% |
 | Tasa de login con passkey | % de accesos recurrentes completados con passkey sobre accesos recurrentes totales | >= 60% |
 | Magic link expirado/fallido | % de intentos fallidos por enlace vencido o inválido | <= 10% |

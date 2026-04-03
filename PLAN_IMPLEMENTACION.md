@@ -2,7 +2,7 @@
 
 Sistema de inventario web con escaneo de barras, validación de duplicados, CRUD, búsqueda y exportación flexible.
 
-**Última revisión del documento:** marzo 2026
+**Última revisión del documento:** abril 2026
 
 ---
 
@@ -20,7 +20,7 @@ Sistema de inventario web con escaneo de barras, validación de duplicados, CRUD
 - Carga Excel SIGA: columna **usuario**, barra de progreso y mensaje de éxito en `Admin`.
 - Catálogo maestro (`CatalogContext`): **TTL 1 minuto** (no 15) para ver cambios más rápido entre dispositivos.
 
-🔄 **Fase 16 (autenticación y seguridad)**: **parcialmente avanzada en frontend** — existen `AuthContext`, `/login`, flujo de acceso por correo, hook WebAuthn, `AuthGuard`, `RoleGuard` (admin / operador / consulta) y rutas protegidas. **Pendiente validar en producción**: alinear el primer acceso por `magic link`, el registro/uso posterior de `passkeys/WebAuthn`, RLS exhaustivo en todas las tablas, MFA admin si se mantiene como refuerzo para cuentas privilegiadas, rate limiting/lockout robustos y auditoría de accesos según criterios de la propia Fase 16.
+🔄 **Fase 16 (autenticación y seguridad)**: **implementado en app + backend** — login con **OTP por correo** (`/login`), **passkeys/WebAuthn** (Edge Function `passkeys`, páginas `Login` y `Security`, `passkeysApi` / `useWebAuthn`), RPC `auth_user_id_by_email`, tablas `user_passkeys` y `auth_webauthn_challenges`, `AuthGuard` / `RoleGuard` / `AuthenticatedShell`. **Pendiente mejora continua**: RLS exhaustivo alineado a roles, rate limiting/lockout robustos, auditoría de accesos y MFA admin si aplica.
 
 ### Estado histórico (Fase 12)
 
@@ -381,17 +381,17 @@ Exportación
 
 ---
 
-## Fase 16: Autenticación y seguridad externa (marzo 2026, sin dominio propio) (NUEVO)
+## Fase 16: Autenticación y seguridad externa (abril 2026, sin dominio propio) (NUEVO)
 
 Fortalece la seguridad de acceso usando Supabase Auth y controles en aplicación/API, considerando un entorno donde no se dispone de dominio propio para correo corporativo ni configuración avanzada de autenticación federada.
 
-**Estado en código (marzo 2026):** ya existen rutas `/login` y `/auth/callback`, `AuthGuard`, `Login` con flujo de acceso por correo, integración WebAuthn en hook, y `RoleGuard` para `admin` / `operador` / `consulta`. El documento asume como objetivo un modelo donde el **primer acceso y el fallback** se resuelven por `magic link`, mientras que el **método preferente posterior** sea `passkeys/WebAuthn`; esa política aún debe cerrarse y validarse extremo a extremo en producción. Lo que sigue siendo crítico es **cerrar el círculo en Supabase**: políticas RLS por rol, cierre de datos sensibles sin sesión, y controles de abuso (rate limit / lockout) según tabla inferior.
+**Estado en código (abril 2026):** desplegado en producción: **OTP por correo** (`/login`, `signInWithOtp` / `verifyOtp`), **passkeys/WebAuthn** (Edge Function `passkeys`, `passkeysApi`, `useWebAuthn`, `/security`), tablas `user_passkeys` y `auth_webauthn_challenges`, RPC `auth_user_id_by_email`, `AuthGuard` / `RoleGuard` / `AuthenticatedShell`, `/auth/callback` para redirects de Auth. Pendiente mejora continua: rate limit/lockout robustos, auditoría de autenticación exhaustiva, reautenticación fuerte admin.
 
-### 16.1 — Fase mínima: magic link + RLS (obligatoria)
+### 16.1 — Fase mínima: acceso por correo + RLS (obligatoria)
 
 | Estado | # | Tarea | Descripción | Prioridad |
 |---|---|-------|-------------|-----------|
-| [~] | 16.1.1 | Habilitar acceso por magic link | Existe login por correo en frontend, pero `Login.tsx` aún conserva UX/código heredado de OTP; falta alinear completamente el flujo a `magic link` como primer acceso y fallback | Alta |
+| [x] | 16.1.1 | Habilitar acceso por correo (OTP) | Flujo principal: código OTP por correo en `Login.tsx`; magic link queda como vía legacy en callback si el proyecto lo mantiene en plantillas | Alta |
 | [ ] | 16.1.2 | Restringir altas públicas | Desactivar sign-up abierto y permitir solo usuarios autorizados por admin | Alta |
 | [x] | 16.1.3 | RLS en tablas críticas | Aplicar políticas RLS en `bienes`, `trabajadores`, `ubicaciones`, `sedes`, `siga_bienes` | Alta |
 | [~] | 16.1.4 | Roles base en metadata | Existen roles en `perfiles` y guards en frontend; falta cerrar estrategia final de `app_role` en metadata/claims alineada con RLS | Alta |
@@ -403,7 +403,7 @@ Fortalece la seguridad de acceso usando Supabase Auth y controles en aplicación
 | Estado | # | Tarea | Descripción | Prioridad |
 |---|---|-------|-------------|-----------|
 | [ ] | 16.2.1 | Refuerzo para cuentas admin | Exigir reautenticación fuerte para `app_role=admin` (passkey preferente; MFA adicional si se mantiene necesario) | Alta |
-| [ ] | 16.2.2 | Rate limiting de acceso por correo | Limitar solicitudes de magic link y reintentos por IP y por email (ej. ventana de 15 min) | Alta |
+| [ ] | 16.2.2 | Rate limiting de acceso por correo | Limitar solicitudes de OTP/códigos y reintentos por IP y por email (ej. ventana de 15 min) | Alta |
 | [ ] | 16.2.3 | Lockout temporal | Bloquear temporalmente cuenta/IP tras N intentos fallidos consecutivos | Alta |
 | [ ] | 16.2.4 | Alertas de seguridad | Notificar intentos sospechosos y bloqueos (email admin / panel) | Media |
 | [ ] | 16.2.5 | Hardening de sesiones | Reducir TTL de sesión en admin y forzar reautenticación para acciones críticas | Media |
@@ -412,22 +412,22 @@ Fortalece la seguridad de acceso usando Supabase Auth y controles en aplicación
 
 | Estado | # | Tarea | Descripción | Prioridad |
 |---|---|-------|-------------|-----------|
-| [ ] | 16.3.1 | Habilitar passkeys progresivo | Permitir registrar passkey después del primer acceso por magic link, como método preferente por usuario/dispositivo | Media |
-| [~] | 16.3.2 | Flujo híbrido de fallback | Existe `useWebAuthn` y botón de verificación del dispositivo, pero hoy retorna fallback fijo; falta implementar el flujo real passkey -> magic link | Alta |
-| [ ] | 16.3.3 | Gestión de credenciales | Pantalla para ver/revocar passkeys registradas por dispositivo | Media |
-| [ ] | 16.3.4 | Política por rol | Requerir acceso fuerte para `admin` (passkey preferente) y mantener passkey opcional/progresiva para `operador` | Media |
+| [x] | 16.3.1 | Habilitar passkeys progresivo | Tras sesión OTP, registro de passkey vía Edge `passkeys`; login con «Continuar con passkey» | Media |
+| [x] | 16.3.2 | Flujo híbrido de fallback | Passkey primero cuando aplica; si no hay credencial o falla → OTP por correo | Alta |
+| [x] | 16.3.3 | Gestión de credenciales | `/security`: listar, registrar otra, revocar passkeys | Media |
+| [~] | 16.3.4 | Política por rol | Requerir acceso fuerte para `admin` (passkey preferente) — evaluar según riesgo operativo | Media |
 
 ### Criterios de aceptación (Fase 16)
 
 - [x] Usuario sin sesión no puede leer inventario por API: RLS activa y políticas `auth.uid() IS NOT NULL` + `is_session_active()` en tablas críticas (`bienes`, `trabajadores`, `ubicaciones`, `sedes`, `siga_bienes`, `bien_historial`)
 - [x] Usuario `operador` no accede a funciones admin en frontend: ruta `/admin` protegida por `RoleGuard` (rol `admin`)
-- [~] El acceso por correo funciona en frontend (`/login` + `AuthContext` + `AuthGuard`); pendiente confirmar en producción que el flujo principal/fallback quede alineado específicamente a `magic link` y con latencia objetivo aceptable
+- [x] El acceso por correo funciona (`/login` + OTP); passkeys en producción con fallback OTP
 - [ ] Cuentas admin requieren acceso reforzado y no pueden omitir la política definida para reautenticación fuerte
 - [ ] Rate limit y lockout bloquean ataques de fuerza bruta (verificado con pruebas controladas)
 - [~] Eventos de seguridad: existe `bien_historial` para cambios de bienes; pendiente auditoría completa de autenticación (login fallido, lockout, etc.)
-- [~] Passkeys/WebAuthn: existe base en frontend (`useWebAuthn`), pendiente completar política de enrolamiento y fallback a `magic link` en producción
+- [x] Passkeys/WebAuthn: Edge `passkeys`, enrolamiento y login verificados en producción; fallback OTP
 
-### Verificación MCP (marzo 2026)
+### Verificación MCP (abril 2026)
 
 Consultas ejecutadas en Supabase vía MCP para validar estado real de Fase 16:
 
@@ -443,11 +443,11 @@ Consultas ejecutadas en Supabase vía MCP para validar estado real de Fase 16:
 
 | Riesgo | Impacto | Mitigación recomendada |
 |--------|---------|------------------------|
-| Entrega tardía del magic link por proveedor de correo | Alto (bloqueo operativo) | Proveedor transaccional confiable, reintento, expiración razonable, canal alterno controlado para cuentas críticas |
+| Entrega tardía del correo (OTP/enlace) por proveedor | Alto (bloqueo operativo) | Proveedor transaccional confiable, reintento, expiración razonable, canal alterno controlado para cuentas críticas |
 | Configuración RLS incompleta | Crítico (fuga o manipulación de datos) | Pruebas por rol, revisión de políticas SQL, validación en staging antes de producción |
-| Fricción operativa en el primer enrolamiento de passkeys | Medio | Mantener `magic link` como primer acceso/fallback, guiar el alta por dispositivo y desplegar gradualmente |
+| Fricción operativa en el primer enrolamiento de passkeys | Medio | Mantener **OTP** como primer acceso/fallback, guiar el alta por dispositivo y desplegar gradualmente |
 | Falsos positivos en rate limit/lockout | Medio | Umbrales progresivos, whitelist operativa por sede/IP confiable, canal de desbloqueo |
-| Soporte desigual de passkeys en dispositivos antiguos | Medio | Mantener fallback por `magic link` y despliegue gradual por grupos piloto |
+| Soporte desigual de passkeys en dispositivos antiguos | Medio | Mantener fallback por **OTP** y despliegue gradual por grupos piloto |
 | Dependencia de servicios externos (Auth/email) | Alto | Monitoreo, alertas, runbook de contingencia y cuentas break-glass controladas |
 
 ---
