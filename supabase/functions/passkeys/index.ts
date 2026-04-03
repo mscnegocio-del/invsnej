@@ -245,10 +245,11 @@ Deno.serve(async (req) => {
         if (passkeyErr) return json({ error: passkeyErr.message }, 400)
         if (!passkeys || passkeys.length === 0) return json({ error: 'No hay passkeys registradas para este correo.' }, 404)
 
+        // v13+: id debe ser base64url string; toBuffer() rompe isBase64URL (input.replace is not a function).
         const options = await generateAuthenticationOptions({
           rpID,
           allowCredentials: passkeys.map((item) => ({
-            id: isoBase64URL.toBuffer(item.credential_id as string),
+            id: String(item.credential_id ?? ''),
             transports: ((item.transports ?? []) as string[] | null) ?? undefined,
           })),
           userVerification: 'preferred',
