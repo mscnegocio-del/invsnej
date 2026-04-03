@@ -302,7 +302,7 @@ export function Search() {
       <h1 className="page-title">Buscar bienes</h1>
       <p className="page-subtitle">Filtra por código, responsable o ubicación y navega al detalle del bien.</p>
 
-      <form onSubmit={handleSubmit} className="mt-6 card p-6 space-y-4 max-w-xl">
+      <form onSubmit={handleSubmit} className="mt-6 card p-6 space-y-4 max-w-xl mx-auto w-full">
         <div>
           <label className="label" htmlFor="search-codigo">
             Código patrimonial
@@ -321,6 +321,7 @@ export function Search() {
               onClick={() => setShowScanModal(true)}
               className="btn-secondary shrink-0 px-4"
               title="Buscar por escaneo de código de barras"
+              aria-label="Buscar por escaneo de código de barras"
             >
               📷
             </button>
@@ -426,7 +427,7 @@ export function Search() {
             </div>
           </div>
 
-          <ul className="space-y-0 divide-y divide-slate-200 card overflow-hidden">
+          <ul className="lg:hidden space-y-0 divide-y divide-slate-200 card overflow-hidden">
             {resultados.map((b) => (
               <li
                 key={b.id}
@@ -451,6 +452,62 @@ export function Search() {
               </li>
             ))}
           </ul>
+
+          <div className="hidden lg:block card overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-slate-700">
+                  <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                    Código
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold min-w-[12rem]">
+                    Nombre
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold min-w-[10rem]">
+                    Ubicación
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                    Responsable
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                    Sede
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultados.map((b) => {
+                  const go = () => navigate(`/bienes/${b.id}`)
+                  const nombreResp = findResponsableNombre(b.id_trabajador)
+                  return (
+                    <tr
+                      key={b.id}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`Ver bien ${b.codigo_patrimonial ?? b.id}`}
+                      onClick={go}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          go()
+                        }
+                      }}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
+                    >
+                      <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap align-top">
+                        {b.codigo_patrimonial}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700 align-top">{b.nombre_mueble_equipo || 'Sin nombre'}</td>
+                      <td className="px-4 py-3 text-slate-600 align-top">
+                        {findUbicacionNombre(b.ubicacion) || 'Sin ubicación'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 align-top">{nombreResp ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600 align-top">{findSedeNombre(b.sede_id) ?? '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
 
           <div className="flex gap-3 mt-4">
             <button
@@ -481,7 +538,7 @@ export function Search() {
         <p className="mt-8 text-slate-500 text-center py-8">No se encontraron bienes con esos filtros.</p>
       )}
 
-      <section className="mt-10 card p-6 space-y-3">
+      <section className="mt-10 card p-6 space-y-3 max-w-xl mx-auto w-full lg:max-w-none">
         <h2 className="text-lg font-semibold text-slate-900">Descargar todos los bienes</h2>
         <p className="text-sm text-slate-600">
           Exporta el inventario completo en bloques de hasta 1000 registros (límite de Supabase) hasta cubrir

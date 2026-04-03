@@ -93,7 +93,7 @@ export function Scan() {
         Escanea el código de barras o escribe el código manualmente para registrar el bien.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 card p-6 space-y-4 max-w-xl">
+      <form onSubmit={handleSubmit} className="mt-6 card p-6 space-y-4 max-w-xl mx-auto w-full">
         <div>
           <label className="label" htmlFor="scan-codigo">
             Código patrimonial

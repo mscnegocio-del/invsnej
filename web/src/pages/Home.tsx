@@ -30,10 +30,10 @@ export function Home() {
       <h1 className="page-title">Sistema de inventario</h1>
       <p className="page-subtitle">Gestiona el inventario patrimonial escaneando códigos de barras o buscando por filtros.</p>
 
-      <div className="mt-6">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link
           to="/security"
-          className="card flex flex-col gap-2 p-5 hover:shadow-md hover:border-indigo-200 transition-all duration-200"
+          className="card flex flex-col gap-2 p-5 hover:shadow-md hover:border-indigo-200 transition-all duration-200 sm:col-span-2 lg:col-span-3"
         >
           <div className="flex items-center gap-3">
             <span className="text-3xl">🔐</span>
@@ -49,9 +49,7 @@ export function Home() {
             </div>
           </div>
         </Link>
-      </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {canEdit && (
           <Link
             to="/scan"
@@ -70,7 +68,7 @@ export function Home() {
         <Link
           to="/search"
           className={`card flex flex-col p-6 hover:shadow-md hover:border-teal-200 transition-all duration-200 group ${
-            !canEdit ? 'sm:col-span-2' : ''
+            !canEdit ? 'sm:col-span-2 lg:col-span-3' : ''
           }`}
         >
           <span className="text-4xl mb-3">🔍</span>
@@ -85,7 +83,7 @@ export function Home() {
         {isAdmin && (
           <Link
             to="/admin"
-            className="card flex flex-col p-6 hover:shadow-md hover:border-amber-200 transition-all duration-200 group sm:col-span-2"
+            className="card flex flex-col p-6 hover:shadow-md hover:border-amber-200 transition-all duration-200 group sm:col-span-2 lg:col-span-1"
           >
             <span className="text-4xl mb-3">⚙️</span>
             <h2 className="text-lg font-semibold text-slate-900 group-hover:text-amber-600 transition-colors">

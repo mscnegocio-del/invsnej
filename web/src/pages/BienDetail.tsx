@@ -166,7 +166,7 @@ export function BienDetail() {
   }
 
   return (
-    <div>
+    <div className="mx-auto w-full lg:max-w-4xl">
       <h1 className="page-title">Detalle de bien</h1>
 
       {loading && (

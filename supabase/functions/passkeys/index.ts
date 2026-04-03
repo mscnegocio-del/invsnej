@@ -59,7 +59,9 @@ function isOriginHostAllowed(hostname: string): boolean {
 function normalizeOrigin(origin: string) {
   const url = new URL(origin)
   if (!isOriginHostAllowed(url.hostname)) {
-    throw new Error('Origen no permitido. Usa el dominio de la app o configura PASSKEY_EXTRA_HOSTS en la función.')
+    throw new Error(
+      `Origen no permitido (${url.hostname}). En Supabase → Edge Functions → passkeys → Secrets añade PASSKEY_EXTRA_HOSTS con ese host (o lista separada por comas).`,
+    )
   }
   return {
     origin: url.origin,
