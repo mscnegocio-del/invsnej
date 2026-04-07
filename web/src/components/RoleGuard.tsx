@@ -23,7 +23,8 @@ export function RoleGuard({ roles, children, fallback }: Props) {
     )
   }
 
-  if (!perfil?.activo || !roles.includes(perfil.app_role)) {
+  const sessionOk = Boolean(perfil && perfil.activo && perfil.acceso_estado === 'activo')
+  if (!sessionOk || !perfil || !roles.includes(perfil.app_role)) {
     return fallback ?? <Navigate to="/" replace />
   }
 

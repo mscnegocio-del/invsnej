@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { useWebAuthn } from '../hooks/useWebAuthn'
@@ -10,14 +11,31 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: 'Credenciales inválidas.',
 }
 
+/** Mensaje genérico al solicitar código (evita filtrar si el correo existe en el sistema). */
+const OTP_SOLICITUD_GENERICA =
+  'Si tu correo está autorizado, recibirás un código en breve. Si aún no tienes acceso, pide una invitación al administrador.'
+
 /** Supabase suele enviar 6 u 8 dígitos en {{ .Token }} según el proyecto. */
 const EMAIL_OTP_MIN_LENGTH = 6
 const EMAIL_OTP_MAX_LENGTH = 8
 
-function mapAuthError(message: string): string {
+const turnstileSiteKey = (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)?.trim() || ''
+
+function mapAuthErrorSendCode(message: string): string {
+  const lower = message.toLowerCase()
+  if (lower.includes('rate') || lower.includes('too many') || lower.includes('over_email')) {
+    return ERROR_MESSAGES.over_email_send_rate_limit
+  }
+  return OTP_SOLICITUD_GENERICA
+}
+
+function mapAuthErrorVerify(message: string): string {
   const lower = message.toLowerCase()
   if (lower.includes('rate') || lower.includes('limit')) return ERROR_MESSAGES.over_email_send_rate_limit
-  return message || 'No se pudo completar el inicio de sesión.'
+  if (lower.includes('expired') || lower.includes('invalid') || lower.includes('token')) {
+    return 'El código no es válido o expiró. Solicita uno nuevo e inténtalo de nuevo.'
+  }
+  return message || 'No se pudo verificar el código.'
 }
 
 export function Login() {
@@ -32,6 +50,17 @@ export function Login() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cooldown, setCooldown] = useState(0)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileInstance | null>(null)
+
+  const resetCaptcha = useCallback(() => {
+    setCaptchaToken(null)
+    try {
+      turnstileRef.current?.reset()
+    } catch {
+      /* noop */
+    }
+  }, [])
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -50,15 +79,24 @@ export function Login() {
       setError('Ingresa tu correo institucional.')
       return
     }
+    if (turnstileSiteKey && !captchaToken) {
+      setError('Completa la verificación anti-robots antes de enviar el código.')
+      return
+    }
     setSubmitting(true)
     const redirectTo = `${window.location.origin}/auth/callback`
     const { error: supaError } = await supabase.auth.signInWithOtp({
       email: trimmed,
-      options: { emailRedirectTo: redirectTo },
+      options: {
+        emailRedirectTo: redirectTo,
+        shouldCreateUser: false,
+        ...(captchaToken ? { captchaToken } : {}),
+      },
     })
     setSubmitting(false)
+    resetCaptcha()
     if (supaError) {
-      setError(mapAuthError(supaError.message))
+      setError(mapAuthErrorSendCode(supaError.message))
       return
     }
     setPhase('code')
@@ -84,14 +122,18 @@ export function Login() {
       return
     }
     setSubmitting(true)
+    const verifyOpts: { redirectTo?: string; captchaToken?: string } = {}
+    if (turnstileSiteKey && captchaToken) verifyOpts.captchaToken = captchaToken
     const { error: supaError } = await supabase.auth.verifyOtp({
       email: trimmed,
       token,
       type: 'email',
+      options: Object.keys(verifyOpts).length ? verifyOpts : undefined,
     })
     setSubmitting(false)
+    resetCaptcha()
     if (supaError) {
-      setError(mapAuthError(supaError.message))
+      setError(mapAuthErrorVerify(supaError.message))
       return
     }
   }
@@ -117,7 +159,7 @@ export function Login() {
     } catch (e) {
       console.error(e)
       const raw = e instanceof Error ? e.message : ''
-      const detail = raw ? mapAuthError(raw) : ''
+      const detail = raw ? mapAuthErrorSendCode(raw) : ''
       setError(
         detail
           ? `Acceso con passkey: ${detail} Si sigue fallando, usa el código por correo.`
@@ -134,7 +176,8 @@ export function Login() {
         <div>
           <h1 className="text-xl font-bold text-slate-900">Inventario patrimonial</h1>
           <p className="text-sm text-slate-600 mt-1">
-            Ingresa con tu correo. Recibirás un código numérico para iniciar sesión (suele ser de 6 u 8 dígitos).
+            Ingresa con tu correo. Recibirás un código numérico para iniciar sesión (suele ser de 6 u 8 dígitos). El
+            acceso requiere invitación previa.
           </p>
         </div>
 
@@ -173,6 +216,18 @@ export function Login() {
               />
             </div>
           )}
+          {turnstileSiteKey && (
+            <div className="flex justify-center min-h-[65px]">
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={turnstileSiteKey}
+                onSuccess={(tok) => setCaptchaToken(tok)}
+                onExpire={() => setCaptchaToken(null)}
+                onError={() => setCaptchaToken(null)}
+                options={{ theme: 'auto', size: 'normal' }}
+              />
+            </div>
+          )}
 
           {phase === 'email' ? (
             <p className="text-sm text-slate-600">
@@ -181,10 +236,17 @@ export function Login() {
           ) : (
             <p className="text-sm text-slate-600">
               Si no llegó el código, revisa spam o solicita uno nuevo cuando el temporizador termine.
+              {turnstileSiteKey ? ' Tras reenviar, completa de nuevo la verificación anti-robots.' : ''}
             </p>
           )}
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-          <button type="submit" disabled={submitting} className="btn-primary w-full">
+          <button
+            type="submit"
+            disabled={
+              submitting || (Boolean(turnstileSiteKey) && !captchaToken)
+            }
+            className="btn-primary w-full"
+          >
             {submitting ? (phase === 'email' ? 'Enviando…' : 'Verificando…') : phase === 'email' ? 'Enviar código' : 'Confirmar código'}
           </button>
           <button
@@ -196,7 +258,15 @@ export function Login() {
             {cooldown > 0 ? `Reenviar código (${cooldown}s)` : 'Reenviar código'}
           </button>
           {phase === 'code' && (
-            <button type="button" className="btn-ghost w-full text-sm" onClick={() => setPhase('email')}>
+            <button
+              type="button"
+              className="btn-ghost w-full text-sm"
+              onClick={() => {
+                setPhase('email')
+                setCode('')
+                resetCaptcha()
+              }}
+            >
               Cambiar correo
             </button>
           )}

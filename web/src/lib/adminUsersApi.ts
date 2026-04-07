@@ -1,6 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from './supabaseClient'
-import type { AdminUserRow, AppRole } from '../types'
+import type { AccesoEstado, AdminUserRow, AppRole } from '../types'
 
 type ListResponse = { users: AdminUserRow[] }
 
@@ -37,7 +37,7 @@ export async function inviteUser(email: string, app_role: AppRole): Promise<void
 
 export async function updateUserProfile(
   user_id: string,
-  patch: { app_role?: AppRole; activo?: boolean },
+  patch: { app_role?: AppRole; activo?: boolean; acceso_estado?: AccesoEstado },
 ): Promise<void> {
   const { error } = await supabase.functions.invoke('admin-users', {
     method: 'PATCH',

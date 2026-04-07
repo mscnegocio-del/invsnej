@@ -13,6 +13,7 @@ App web de inventario patrimonial para móvil. Permite escanear códigos de barr
 - Supabase (`@supabase/supabase-js`)
 - **Edge Functions (Supabase):** `passkeys` (WebAuthn/passkeys + `@simplewebauthn/server`), `admin-users` (admin)
 - **@simplewebauthn/browser** en el cliente (`useWebAuthn`, `Login`, `Security`)
+- **@marsidev/react-turnstile** — CAPTCHA en `/login` si `VITE_TURNSTILE_SITE_KEY` está definida y CAPTCHA está activo en Supabase Auth
 - **Quagga2** para fallback de escaneo (cuando BarcodeDetector no está disponible)
 - BarcodeDetector API (nativa en navegadores soportados)
 - Deploy frontend: **Vercel**
@@ -33,10 +34,13 @@ App web de inventario patrimonial para móvil. Permite escanear códigos de barr
 - `001_auth_perfiles_rls.sql` — perfiles/roles y RLS
 - `002_admin_list_auth_users_rpc.sql` — RPC para admin (listado usuarios sin `listUsers` roto)
 - `003_auth_user_id_by_email_rpc.sql` — RPC `public.auth_user_id_by_email` (solo `service_role`) para la Edge `passkeys` (buscar usuario por email sin `auth.admin.listUsers`)
+- `004_acceso_estado.sql` — columna `perfiles.acceso_estado` (`pendiente` | `activo` | `rechazado`); RLS vía `is_session_active()` solo con `acceso_estado = 'activo'` y `activo = true`; nuevos usuarios en `pendiente` hasta que un admin apruebe
 
 ## Autenticación (implementado)
 
-- **Login (`/login`):** correo → **código OTP** enviado por correo (`signInWithOtp` + `verifyOtp` tipo `email`). Opción **Continuar con passkey** si el dispositivo soporta WebAuthn y hay passkeys registradas.
+- **Altas:** desactivar **Allow new users to sign up** en Supabase (solo usuarios existentes / invitados). El cliente usa `signInWithOtp` con **`shouldCreateUser: false`**.
+- **Aprobación:** invitación (`admin-users` POST) deja el perfil en **`pendiente`**; el admin **Aprueba** / **Rechaza** / **Suspende** / **Reactiva** en `/admin`. Sin aprobación, `AuthGuard` muestra mensaje de pendiente y no hay acceso a datos (RLS).
+- **Login (`/login`):** correo → **código OTP** (`signInWithOtp` + `verifyOtp` tipo `email`) con **CAPTCHA Turnstile** si hay `VITE_TURNSTILE_SITE_KEY`. Opción **Continuar con passkey** si el dispositivo soporta WebAuthn y hay passkeys registradas.
 - **Passkeys:** registro y uso vía Edge Function `passkeys` (`start_registration` / `finish_registration` con sesión; `start_authentication` / `finish_authentication` con email + origen). Tras WebAuthn en login, la función crea sesión con `generateLink` + `verifyOtp` (correo canónico desde `auth.users`).
 - **Seguridad (`/security`):** listar passkeys, registrar otra, revocar (requiere sesión).
 - **Callback:** `/auth/callback` para redirects de Auth (p. ej. enlaces mágicos legacy).
@@ -45,6 +49,8 @@ App web de inventario patrimonial para móvil. Permite escanear códigos de barr
 ### Auth (Supabase Dashboard)
 
 - **Site URL** y **Redirect URLs** deben incluir la URL de producción/preview y `…/auth/callback`.
+- **User signups:** desactivados (solo invitación / usuarios ya creados).
+- **CAPTCHA:** Authentication → Bot and Abuse Protection → activar protección, elegir **Turnstile** (o hCaptcha), pegar **secret** del proveedor. En el front, variable **`VITE_TURNSTILE_SITE_KEY`** (site key pública). Dominios permitidos en Cloudflare deben incluir producción y `localhost` para desarrollo.
 - Edge `passkeys`: **`verify_jwt: false`** (la función valida sesión con anon + JWT en rutas autenticadas; login por passkey no lleva sesión al inicio).
 
 ### Orígenes permitidos (Passkeys)
@@ -106,8 +112,9 @@ web/src/
 
 ## Flujo de acceso
 
-1. **`/login`:** correo → enviar código → introducir OTP; o **Continuar con passkey** (mismo correo).
-2. **Sesión autenticada** → navegación con `Layout`; **Seguridad** para gestionar passkeys.
+1. **`/login`:** correo → CAPTCHA (si aplica) → enviar código → introducir OTP (`shouldCreateUser: false`); o **Continuar con passkey** (mismo correo).
+2. **Invitación** → usuario en **pendiente** hasta aprobación en `/admin`.
+3. **Sesión aprobada** → navegación con `Layout`; **Seguridad** para gestionar passkeys.
 
 ## Rendimiento (1900+ registros)
 
@@ -124,7 +131,7 @@ web/src/
 ## Convenciones
 
 - Componentes funcionales + hooks
-- Variables de entorno: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- Variables de entorno: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, opcional `VITE_TURNSTILE_SITE_KEY` (requerida si CAPTCHA está activo en el proyecto Supabase)
 - Idioma de la UI: español
 - Input de ubicación: nombre (string), no ID, resolviendo desde catálogo
 

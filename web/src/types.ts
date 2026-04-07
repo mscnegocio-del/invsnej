@@ -1,10 +1,13 @@
 export type AppRole = 'admin' | 'operador' | 'consulta'
 
+export type AccesoEstado = 'pendiente' | 'activo' | 'rechazado'
+
 export type Perfil = {
   id: string
   app_role: AppRole
   nombre: string | null
   activo: boolean
+  acceso_estado: AccesoEstado
 }
 
 export type UserPasskey = {
@@ -93,4 +96,5 @@ export type AdminUserRow = {
   app_role: AppRole
   nombre: string | null
   activo: boolean
+  acceso_estado: AccesoEstado
 }

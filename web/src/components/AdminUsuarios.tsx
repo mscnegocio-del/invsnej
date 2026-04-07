@@ -1,9 +1,31 @@
 import { useCallback, useEffect, useState } from 'react'
 import { inviteUser, listAdminUsers, updateUserProfile } from '../lib/adminUsersApi'
 import { useAuth } from '../context/AuthContext'
-import type { AdminUserRow, AppRole } from '../types'
+import type { AccesoEstado, AdminUserRow, AppRole } from '../types'
 
 const ROLES: AppRole[] = ['admin', 'operador', 'consulta']
+
+function estadoLabel(e: AccesoEstado): string {
+  switch (e) {
+    case 'pendiente':
+      return 'Pendiente'
+    case 'activo':
+      return 'Activo'
+    case 'rechazado':
+      return 'Rechazado'
+  }
+}
+
+function estadoBadgeClass(e: AccesoEstado): string {
+  switch (e) {
+    case 'pendiente':
+      return 'bg-amber-100 text-amber-900'
+    case 'activo':
+      return 'bg-emerald-100 text-emerald-900'
+    case 'rechazado':
+      return 'bg-slate-200 text-slate-800'
+  }
+}
 
 export function AdminUsuarios() {
   const { user, refreshPerfil } = useAuth()
@@ -13,6 +35,7 @@ export function AdminUsuarios() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<AppRole>('operador')
   const [inviteBusy, setInviteBusy] = useState(false)
+  const [rowBusy, setRowBusy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -58,6 +81,7 @@ export function AdminUsuarios() {
   }
 
   const handleRoleChange = async (row: AdminUserRow, app_role: AppRole) => {
+    setRowBusy(row.id)
     try {
       await updateUserProfile(row.id, { app_role })
       await load()
@@ -65,23 +89,30 @@ export function AdminUsuarios() {
     } catch (e) {
       console.error(e)
       setError('No se pudo actualizar el rol.')
+    } finally {
+      setRowBusy(null)
     }
   }
 
-  const handleActivo = async (row: AdminUserRow, activo: boolean) => {
+  const setAcceso = async (row: AdminUserRow, acceso_estado: AccesoEstado) => {
+    setRowBusy(row.id)
     try {
-      await updateUserProfile(row.id, { activo })
+      await updateUserProfile(row.id, { acceso_estado })
       await load()
       if (row.id === user?.id) await refreshPerfil()
     } catch (e) {
       console.error(e)
-      setError('No se pudo actualizar el estado.')
+      setError('No se pudo actualizar el estado de acceso.')
+    } finally {
+      setRowBusy(null)
     }
   }
 
   return (
     <div className="space-y-6">
-      <p className="page-subtitle">Invita usuarios por correo y asigna roles. Solo administradores.</p>
+      <p className="page-subtitle">
+        Invita usuarios por correo. Quedarán en estado pendiente hasta que apruebes el acceso y confirmes el rol.
+      </p>
 
       <section className="card p-6 max-w-xl space-y-4">
         <h2 className="text-base font-semibold text-slate-900">Invitar usuario</h2>
@@ -111,7 +142,7 @@ export function AdminUsuarios() {
 
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 max-w-xl">{error}</p>}
 
-      <section className="card overflow-hidden max-w-3xl">
+      <section className="card overflow-hidden max-w-4xl">
         <div className="px-4 py-3 border-b border-slate-100">
           <h2 className="text-base font-semibold text-slate-900">Usuarios</h2>
         </div>
@@ -127,7 +158,8 @@ export function AdminUsuarios() {
                 <tr>
                   <th className="text-left px-4 py-2 font-medium">Correo</th>
                   <th className="text-left px-4 py-2 font-medium">Rol</th>
-                  <th className="text-left px-4 py-2 font-medium">Activo</th>
+                  <th className="text-left px-4 py-2 font-medium">Estado</th>
+                  <th className="text-left px-4 py-2 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -138,6 +170,7 @@ export function AdminUsuarios() {
                       <select
                         value={row.app_role}
                         onChange={(e) => void handleRoleChange(row, e.target.value as AppRole)}
+                        disabled={rowBusy === row.id}
                         className="input py-1.5 text-sm min-w-[8rem]"
                       >
                         {ROLES.map((r) => (
@@ -148,15 +181,55 @@ export function AdminUsuarios() {
                       </select>
                     </td>
                     <td className="px-4 py-2">
-                      <label className="inline-flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={row.activo}
-                          onChange={(e) => void handleActivo(row, e.target.checked)}
-                          disabled={row.id === user?.id}
-                        />
-                        <span className="text-xs text-slate-600">{row.activo ? 'Sí' : 'No'}</span>
-                      </label>
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${estadoBadgeClass(row.acceso_estado)}`}
+                      >
+                        {estadoLabel(row.acceso_estado)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex flex-wrap gap-2">
+                        {row.acceso_estado === 'pendiente' && (
+                          <>
+                            <button
+                              type="button"
+                              className="btn-primary text-xs py-1.5 px-2"
+                              disabled={rowBusy === row.id}
+                              onClick={() => void setAcceso(row, 'activo')}
+                            >
+                              Aprobar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary text-xs py-1.5 px-2"
+                              disabled={rowBusy === row.id}
+                              onClick={() => void setAcceso(row, 'rechazado')}
+                            >
+                              Rechazar
+                            </button>
+                          </>
+                        )}
+                        {row.acceso_estado === 'activo' && row.id !== user?.id && (
+                          <button
+                            type="button"
+                            className="btn-secondary text-xs py-1.5 px-2"
+                            disabled={rowBusy === row.id}
+                            onClick={() => void setAcceso(row, 'rechazado')}
+                          >
+                            Suspender
+                          </button>
+                        )}
+                        {row.acceso_estado === 'rechazado' && (
+                          <button
+                            type="button"
+                            className="btn-primary text-xs py-1.5 px-2"
+                            disabled={rowBusy === row.id}
+                            onClick={() => void setAcceso(row, 'activo')}
+                          >
+                            Reactivar
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

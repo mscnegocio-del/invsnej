@@ -36,7 +36,41 @@ export function AuthGuard() {
     )
   }
 
-  if (!perfil.activo) {
+  if (perfil.acceso_estado === 'pendiente') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full card p-6 text-center space-y-3">
+          <h1 className="text-lg font-semibold text-slate-900">Acceso pendiente de aprobación</h1>
+          <p className="text-sm text-slate-600">
+            Tu cuenta está registrada pero un administrador aún debe aprobar tu acceso al inventario. Vuelve a
+            intentar más tarde o contacta al administrador.
+          </p>
+          <button type="button" className="btn-primary w-full" onClick={() => void signOut()}>
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (perfil.acceso_estado === 'rechazado') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="max-w-md w-full card p-6 text-center space-y-3">
+          <h1 className="text-lg font-semibold text-slate-900">Acceso no autorizado</h1>
+          <p className="text-sm text-slate-600">
+            Tu solicitud de acceso no fue aprobada o fue revocada. Si crees que es un error, contacta al
+            administrador.
+          </p>
+          <button type="button" className="btn-secondary w-full" onClick={() => void signOut()}>
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!perfil.activo || perfil.acceso_estado !== 'activo') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="max-w-md w-full card p-6 text-center space-y-3">

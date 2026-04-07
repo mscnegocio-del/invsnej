@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabaseClient'
-import type { AppRole, Perfil } from '../types'
+import type { AccesoEstado, AppRole, Perfil } from '../types'
 
 type AuthContextValue = {
   user: User | null
@@ -22,11 +22,19 @@ function mapPerfil(row: Record<string, unknown> | null): Perfil | null {
   const role = row.app_role as string
   const app_role: AppRole =
     role === 'admin' || role === 'operador' || role === 'consulta' ? role : 'consulta'
+  const rawEstado = row.acceso_estado as string | undefined
+  const acceso_estado: AccesoEstado =
+    rawEstado === 'pendiente' || rawEstado === 'activo' || rawEstado === 'rechazado'
+      ? rawEstado
+      : Boolean(row.activo)
+        ? 'activo'
+        : 'pendiente'
   return {
     id: String(row.id),
     app_role,
     nombre: (row.nombre as string | null) ?? null,
     activo: Boolean(row.activo),
+    acceso_estado,
   }
 }
 
@@ -38,7 +46,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authReady, setAuthReady] = useState(false)
 
   const fetchPerfil = useCallback(async (userId: string) => {
-    const { data, error } = await supabase.from('perfiles').select('id, app_role, nombre, activo').eq('id', userId).maybeSingle()
+    const { data, error } = await supabase
+      .from('perfiles')
+      .select('id, app_role, nombre, activo, acceso_estado')
+      .eq('id', userId)
+      .maybeSingle()
     if (error) {
       console.error('[Auth] perfiles', error)
       setPerfil(null)
@@ -106,8 +118,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPerfil(null)
   }, [])
 
-  const canEdit = Boolean(perfil?.activo && (perfil.app_role === 'admin' || perfil.app_role === 'operador'))
-  const isAdmin = Boolean(perfil?.activo && perfil.app_role === 'admin')
+  const sessionOk = Boolean(perfil && perfil.activo && perfil.acceso_estado === 'activo')
+  const canEdit = Boolean(
+    sessionOk && perfil && (perfil.app_role === 'admin' || perfil.app_role === 'operador'),
+  )
+  const isAdmin = Boolean(sessionOk && perfil && perfil.app_role === 'admin')
 
   const value = useMemo<AuthContextValue>(
     () => ({

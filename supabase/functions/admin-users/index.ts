@@ -46,8 +46,17 @@ Deno.serve(async (req) => {
 
   const admin = createClient(supabaseUrl, serviceKey)
 
-  const { data: perfil } = await admin.from('perfiles').select('app_role, activo').eq('id', user.id).maybeSingle()
-  if (!perfil || perfil.app_role !== 'admin' || !perfil.activo) {
+  const { data: perfil } = await admin
+    .from('perfiles')
+    .select('app_role, activo, acceso_estado')
+    .eq('id', user.id)
+    .maybeSingle()
+  const accesoOk =
+    perfil &&
+    perfil.app_role === 'admin' &&
+    perfil.activo === true &&
+    (perfil as { acceso_estado?: string }).acceso_estado === 'activo'
+  if (!accesoOk) {
     return new Response(JSON.stringify({ error: 'Sin permiso' }), {
       status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -68,8 +77,17 @@ Deno.serve(async (req) => {
     const ids = listUsers.map((u) => u.id)
     const { data: perfiles, error: perfilErr } =
       ids.length === 0
-        ? { data: [] as { id: string; app_role: string; nombre: string | null; activo: boolean }[], error: null }
-        : await admin.from('perfiles').select('id, app_role, nombre, activo').in('id', ids)
+        ? {
+            data: [] as {
+              id: string
+              app_role: string
+              nombre: string | null
+              activo: boolean
+              acceso_estado: string
+            }[],
+            error: null,
+          }
+        : await admin.from('perfiles').select('id, app_role, nombre, activo, acceso_estado').in('id', ids)
     if (perfilErr) {
       return new Response(JSON.stringify({ error: perfilErr.message }), {
         status: 400,
@@ -79,13 +97,16 @@ Deno.serve(async (req) => {
     const map = new Map((perfiles ?? []).map((p) => [p.id as string, p]))
     const users = listUsers.map((u) => {
       const p = map.get(u.id)
+      const acceso = (p as { acceso_estado?: string } | undefined)?.acceso_estado
+      const activoRow = p?.activo ?? false
       return {
         id: u.id,
         email: u.email ?? null,
         created_at: u.created_at,
         app_role: (p?.app_role as string) ?? 'consulta',
         nombre: p?.nombre ?? null,
-        activo: p?.activo ?? true,
+        activo: activoRow,
+        acceso_estado: (typeof acceso === 'string' ? acceso : 'pendiente') as 'pendiente' | 'activo' | 'rechazado',
       }
     })
     return new Response(JSON.stringify({ users }), {
@@ -116,7 +137,14 @@ Deno.serve(async (req) => {
       })
     }
     if (data.user) {
-      await admin.from('perfiles').update({ app_role }).eq('id', data.user.id)
+      await admin
+        .from('perfiles')
+        .update({
+          app_role,
+          acceso_estado: 'pendiente',
+          activo: false,
+        })
+        .eq('id', data.user.id)
     }
     return new Response(JSON.stringify({ ok: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -124,7 +152,12 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === 'PATCH') {
-    const body = (await req.json()) as { user_id?: string; app_role?: string; activo?: boolean }
+    const body = (await req.json()) as {
+      user_id?: string
+      app_role?: string
+      activo?: boolean
+      acceso_estado?: string
+    }
     const user_id = body.user_id
     if (!user_id) {
       return new Response(JSON.stringify({ error: 'Falta user_id' }), {
@@ -132,15 +165,33 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    if (user_id === user.id && body.activo === false) {
-      return new Response(JSON.stringify({ error: 'No puedes desactivar tu propia cuenta' }), {
+    const estados = ['pendiente', 'activo', 'rechazado'] as const
+    const selfBlock =
+      user_id === user.id &&
+      (body.activo === false ||
+        body.acceso_estado === 'rechazado' ||
+        body.acceso_estado === 'pendiente')
+    if (selfBlock) {
+      return new Response(JSON.stringify({ error: 'No puedes restringir tu propia cuenta' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (body.acceso_estado !== undefined && !estados.includes(body.acceso_estado as (typeof estados)[number])) {
+      return new Response(JSON.stringify({ error: 'acceso_estado inválido' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
     const patch: Record<string, unknown> = {}
     if (body.app_role !== undefined) patch.app_role = body.app_role
-    if (body.activo !== undefined) patch.activo = body.activo
+    if (body.acceso_estado !== undefined) {
+      patch.acceso_estado = body.acceso_estado
+      patch.activo = body.acceso_estado === 'activo'
+    } else if (body.activo !== undefined) {
+      patch.activo = body.activo
+      patch.acceso_estado = body.activo ? 'activo' : 'rechazado'
+    }
     const { error } = await admin.from('perfiles').update(patch).eq('id', user_id)
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
