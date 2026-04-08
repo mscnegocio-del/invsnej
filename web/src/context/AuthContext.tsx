@@ -46,11 +46,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authReady, setAuthReady] = useState(false)
 
   const fetchPerfil = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
+    const PERFIL_TIMEOUT_MS = 15_000
+    const base = supabase
       .from('perfiles')
       .select('id, app_role, nombre, activo, acceso_estado')
       .eq('id', userId)
-      .maybeSingle()
+    const withTimeout =
+      typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+        ? base.abortSignal(AbortSignal.timeout(PERFIL_TIMEOUT_MS))
+        : base
+    const { data, error } = await withTimeout.maybeSingle()
     if (error) {
       console.error('[Auth] perfiles', error)
       setPerfil(null)
@@ -67,16 +72,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true
 
     /**
-     * Carga inicial: getSession + perfil. onAuthStateChange también emite INITIAL_SESSION
-     * con la misma sesión; si ahí volvemos a await fetchPerfil, duplicamos latencia en cada recarga.
-     * Los demás eventos (login, logout, refresh) sí deben actualizar sesión y perfil.
+     * Una sola vía para hidratar sesión al recargar (F5): Supabase emite INITIAL_SESSION al suscribirse.
+     * Antes: init() + listener ignorando INITIAL_SESSION; en React Strict Mode el primer init podía
+     * terminar con mounted=false y el finally no hacía setLoading(false), dejando la UI colgada.
      */
-    async function init() {
+    async function applySessionFromAuth(event: AuthChangeEvent, s: Session | null) {
       try {
-        setLoading(true)
-        const {
-          data: { session: s },
-        } = await supabase.auth.getSession()
+        if (event === 'TOKEN_REFRESHED') {
+          if (mounted) {
+            setSession(s)
+            setUser(s?.user ?? null)
+          }
+          return
+        }
         if (!mounted) return
         setSession(s)
         setUser(s?.user ?? null)
@@ -86,8 +94,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setPerfil(null)
         }
       } catch (e) {
-        console.error('[Auth] init', e)
-        setPerfil(null)
+        console.error('[Auth] applySessionFromAuth', e)
+        if (mounted) setPerfil(null)
       } finally {
         if (mounted) {
           setAuthReady(true)
@@ -96,32 +104,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    void init()
-
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, s) => {
-      if (event === 'INITIAL_SESSION') {
-        return
-      }
-      setSession(s)
-      setUser(s?.user ?? null)
-      if (event === 'TOKEN_REFRESHED') {
-        if (mounted) {
-          setAuthReady(true)
-          setLoading(false)
-        }
-        return
-      }
-      if (s?.user) {
-        await fetchPerfil(s.user.id)
-      } else {
-        setPerfil(null)
-      }
-      if (mounted) {
-        setAuthReady(true)
-        setLoading(false)
-      }
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, s) => {
+      void applySessionFromAuth(event, s)
     })
 
     return () => {
