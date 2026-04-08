@@ -302,240 +302,245 @@ export function Search() {
       <h1 className="page-title">Buscar bienes</h1>
       <p className="page-subtitle">Filtra por código, responsable o ubicación y navega al detalle del bien.</p>
 
-      <form onSubmit={handleSubmit} className="mt-6 card p-6 space-y-4 max-w-xl mx-auto w-full">
-        <div>
-          <label className="label" htmlFor="search-codigo">
-            Código patrimonial
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="search-codigo"
-              type="text"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              placeholder="Ej. código exacto"
-              className="input flex-1"
+      <div className="mt-6 lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start">
+        <div className="lg:col-span-2">
+          <form onSubmit={handleSubmit} className="card p-6 space-y-4 w-full">
+            <div>
+              <label className="label" htmlFor="search-codigo">
+                Código patrimonial
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="search-codigo"
+                  type="text"
+                  value={codigo}
+                  onChange={(e) => setCodigo(e.target.value)}
+                  placeholder="Ej. código exacto"
+                  className="input flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowScanModal(true)}
+                  className="btn-secondary shrink-0 px-4"
+                  title="Buscar por escaneo de código de barras"
+                  aria-label="Buscar por escaneo de código de barras"
+                >
+                  📷
+                </button>
+              </div>
+            </div>
+
+            <TrabajadorSearchableSelect
+              value={idTrabajador}
+              onChange={(v) => setIdTrabajador(v === null ? '' : v)}
+              label="Responsable"
+              allowAll
             />
-            <button
-              type="button"
-              onClick={() => setShowScanModal(true)}
-              className="btn-secondary shrink-0 px-4"
-              title="Buscar por escaneo de código de barras"
-              aria-label="Buscar por escaneo de código de barras"
-            >
-              📷
+
+            <div>
+              <label className="label" htmlFor="search-ubicacion">
+                Ubicación (contiene)
+              </label>
+              <input
+                id="search-ubicacion"
+                type="text"
+                value={textoUbicacion}
+                onChange={(e) => setTextoUbicacion(e.target.value)}
+                placeholder="Texto parcial de ubicación"
+                className="input"
+              />
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={todasLasSedes}
+                onChange={(e) => setTodasLasSedes(e.target.checked)}
+                className="size-4 rounded border-slate-300"
+              />
+              Buscar en todas las sedes
+              {!todasLasSedes && sedeActiva && (
+                <span className="text-slate-500">({sedeActiva.nombre})</span>
+              )}
+            </label>
+
+            <button type="submit" disabled={loading} className="btn-primary w-full">
+              {loading ? (
+                <>
+                  <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Buscando...
+                </>
+              ) : (
+                'Buscar'
+              )}
             </button>
-          </div>
+          </form>
         </div>
 
-        <TrabajadorSearchableSelect
-          value={idTrabajador}
-          onChange={(v) => setIdTrabajador(v === null ? '' : v)}
-          label="Responsable"
-          allowAll
-        />
+        <div className="mt-6 lg:mt-0 lg:col-span-3">
+          {error && (
+            <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</p>
+          )}
+          {!loading && resultados.length > 0 && (
+            <section>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold text-slate-900">Resultados</h2>
+                  <p className="text-sm text-slate-600">
+                    Página {page + 1}
+                    {totalPages ? ` de ${totalPages}` : ''}
+                    {total !== null ? ` · ${total} bienes` : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <button
+                    type="button"
+                    onClick={handleCopyResultados}
+                    className="btn-ghost px-2"
+                    title="Copiar resumen de resultados para compartir"
+                  >
+                    📋 Copiar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadResultadosJson}
+                    className="btn-ghost px-2"
+                    title="Descargar resultados en JSON"
+                  >
+                    🧾 JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadResultadosCsv}
+                    className="btn-ghost px-2"
+                    title="Descargar resultados en Excel (CSV)"
+                  >
+                    📑 Excel
+                  </button>
+                  {copied && (
+                    <span className="text-xs text-teal-700">Copiado</span>
+                  )}
+                </div>
+              </div>
 
-        <div>
-          <label className="label" htmlFor="search-ubicacion">
-            Ubicación (contiene)
-          </label>
-          <input
-            id="search-ubicacion"
-            type="text"
-            value={textoUbicacion}
-            onChange={(e) => setTextoUbicacion(e.target.value)}
-            placeholder="Texto parcial de ubicación"
-            className="input"
-          />
+              <ul className="lg:hidden space-y-0 divide-y divide-slate-200 card overflow-hidden">
+                {resultados.map((b) => (
+                  <li
+                    key={b.id}
+                    onClick={() => navigate(`/bienes/${b.id}`)}
+                    className="px-4 py-4 hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <div className="font-semibold text-slate-900">{b.codigo_patrimonial}</div>
+                    <div className="text-slate-600">{b.nombre_mueble_equipo || 'Sin nombre'}</div>
+                    <div className="text-sm text-slate-500 mt-0.5">
+                      {findUbicacionNombre(b.ubicacion) || 'Sin ubicación'}
+                      {(() => {
+                        const nombre = findResponsableNombre(b.id_trabajador)
+                        if (!nombre) return ''
+                        return ` · Responsable ${nombre}`
+                      })()}
+                      {(() => {
+                        const sede = findSedeNombre(b.sede_id)
+                        if (!sede) return ''
+                        return ` · ${sede}`
+                      })()}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="hidden lg:block card overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-700">
+                      <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                        Código
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-semibold min-w-[12rem]">
+                        Nombre
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-semibold min-w-[10rem]">
+                        Ubicación
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                        Responsable
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                        Sede
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultados.map((b) => {
+                      const go = () => navigate(`/bienes/${b.id}`)
+                      const nombreResp = findResponsableNombre(b.id_trabajador)
+                      return (
+                        <tr
+                          key={b.id}
+                          tabIndex={0}
+                          role="link"
+                          aria-label={`Ver bien ${b.codigo_patrimonial ?? b.id}`}
+                          onClick={go}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              go()
+                            }
+                          }}
+                          className="border-b border-slate-100 last:border-0 hover:bg-slate-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
+                        >
+                          <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap align-top">
+                            {b.codigo_patrimonial}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 align-top">{b.nombre_mueble_equipo || 'Sin nombre'}</td>
+                          <td className="px-4 py-3 text-slate-600 align-top">
+                            {findUbicacionNombre(b.ubicacion) || 'Sin ubicación'}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 align-top">{nombreResp ?? '—'}</td>
+                          <td className="px-4 py-3 text-slate-600 align-top">{findSedeNombre(b.sede_id) ?? '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={handlePrevPage}
+                  disabled={loading || page === 0}
+                  className="btn-secondary flex-1"
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextPage}
+                  disabled={loading || (totalPages !== null && page + 1 >= totalPages)}
+                  className="btn-primary flex-1"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </section>
+          )}
+
+          {!loading && !error && resultados.length === 0 && total === null && (
+            <p className="text-slate-500 text-center py-8">Realiza una búsqueda para ver resultados.</p>
+          )}
+
+          {!loading && !error && resultados.length === 0 && total === 0 && (
+            <p className="text-slate-500 text-center py-8">No se encontraron bienes con esos filtros.</p>
+          )}
         </div>
-
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={todasLasSedes}
-            onChange={(e) => setTodasLasSedes(e.target.checked)}
-            className="size-4 rounded border-slate-300"
-          />
-          Buscar en todas las sedes
-          {!todasLasSedes && sedeActiva && (
-            <span className="text-slate-500">({sedeActiva.nombre})</span>
-          )}
-        </label>
-
-        <button type="submit" disabled={loading} className="btn-primary w-full">
-          {loading ? (
-            <>
-              <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              Buscando...
-            </>
-          ) : (
-            'Buscar'
-          )}
-        </button>
-      </form>
+      </div>
 
       {showScanModal && (
         <BarcodeScanModal
           onDetected={handleCodeScanned}
           onClose={() => setShowScanModal(false)}
         />
-      )}
-
-      {error && (
-        <p className="mt-4 rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</p>
-      )}
-
-      {!loading && resultados.length > 0 && (
-        <section className="mt-8">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-slate-900">Resultados</h2>
-              <p className="text-sm text-slate-600">
-                Página {page + 1}
-                {totalPages ? ` de ${totalPages}` : ''}
-                {total !== null ? ` · ${total} bienes` : ''}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <button
-                type="button"
-                onClick={handleCopyResultados}
-                className="btn-ghost px-2"
-                title="Copiar resumen de resultados para compartir"
-              >
-                📋 Copiar
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadResultadosJson}
-                className="btn-ghost px-2"
-                title="Descargar resultados en JSON"
-              >
-                🧾 JSON
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadResultadosCsv}
-                className="btn-ghost px-2"
-                title="Descargar resultados en Excel (CSV)"
-              >
-                📑 Excel
-              </button>
-              {copied && (
-                <span className="text-xs text-teal-700">Copiado</span>
-              )}
-            </div>
-          </div>
-
-          <ul className="lg:hidden space-y-0 divide-y divide-slate-200 card overflow-hidden">
-            {resultados.map((b) => (
-              <li
-                key={b.id}
-                onClick={() => navigate(`/bienes/${b.id}`)}
-                className="px-4 py-4 hover:bg-slate-50 cursor-pointer transition-colors"
-              >
-                <div className="font-semibold text-slate-900">{b.codigo_patrimonial}</div>
-                <div className="text-slate-600">{b.nombre_mueble_equipo || 'Sin nombre'}</div>
-                <div className="text-sm text-slate-500 mt-0.5">
-                  {findUbicacionNombre(b.ubicacion) || 'Sin ubicación'}
-                  {(() => {
-                    const nombre = findResponsableNombre(b.id_trabajador)
-                    if (!nombre) return ''
-                    return ` · Responsable ${nombre}`
-                  })()}
-                  {(() => {
-                    const sede = findSedeNombre(b.sede_id)
-                    if (!sede) return ''
-                    return ` · ${sede}`
-                  })()}
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <div className="hidden lg:block card overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-700">
-                  <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
-                    Código
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-semibold min-w-[12rem]">
-                    Nombre
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-semibold min-w-[10rem]">
-                    Ubicación
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
-                    Responsable
-                  </th>
-                  <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
-                    Sede
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {resultados.map((b) => {
-                  const go = () => navigate(`/bienes/${b.id}`)
-                  const nombreResp = findResponsableNombre(b.id_trabajador)
-                  return (
-                    <tr
-                      key={b.id}
-                      tabIndex={0}
-                      role="link"
-                      aria-label={`Ver bien ${b.codigo_patrimonial ?? b.id}`}
-                      onClick={go}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          go()
-                        }
-                      }}
-                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
-                    >
-                      <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap align-top">
-                        {b.codigo_patrimonial}
-                      </td>
-                      <td className="px-4 py-3 text-slate-700 align-top">{b.nombre_mueble_equipo || 'Sin nombre'}</td>
-                      <td className="px-4 py-3 text-slate-600 align-top">
-                        {findUbicacionNombre(b.ubicacion) || 'Sin ubicación'}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 align-top">{nombreResp ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600 align-top">{findSedeNombre(b.sede_id) ?? '—'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex gap-3 mt-4">
-            <button
-              type="button"
-              onClick={handlePrevPage}
-              disabled={loading || page === 0}
-              className="btn-secondary flex-1"
-            >
-              Anterior
-            </button>
-            <button
-              type="button"
-              onClick={handleNextPage}
-              disabled={loading || (totalPages !== null && page + 1 >= totalPages)}
-              className="btn-primary flex-1"
-            >
-              Siguiente
-            </button>
-          </div>
-        </section>
-      )}
-
-      {!loading && !error && resultados.length === 0 && total === null && (
-        <p className="mt-8 text-slate-500 text-center py-8">Realiza una búsqueda para ver resultados.</p>
-      )}
-
-      {!loading && !error && resultados.length === 0 && total === 0 && (
-        <p className="mt-8 text-slate-500 text-center py-8">No se encontraron bienes con esos filtros.</p>
       )}
 
       <section className="mt-10 card p-6 space-y-3 max-w-xl mx-auto w-full lg:max-w-none">
