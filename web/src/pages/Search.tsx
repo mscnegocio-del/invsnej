@@ -404,8 +404,8 @@ export function Search() {
         también admite varios términos por coma o línea — se busca cualquiera), responsable o ubicación.
       </p>
 
-      <div className="mt-6 lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start">
-        <div className="lg:col-span-2 lg:sticky lg:top-24">
+      <div className="mt-6 lg:grid lg:grid-cols-10 lg:gap-6 lg:items-start">
+        <div className="lg:col-span-2 lg:sticky lg:top-24 min-w-0">
           <form onSubmit={handleSubmit} className="card p-6 space-y-4 w-full">
             <div>
               <label className="label" htmlFor="search-codigo">
@@ -548,7 +548,7 @@ export function Search() {
           </form>
         </div>
 
-        <div className="mt-6 lg:mt-0 lg:col-span-3 lg:min-h-[28rem]">
+        <div className="mt-6 lg:mt-0 lg:col-span-8 lg:min-h-[28rem] min-w-0">
           {error && (
             <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm mb-4">{error}</p>
           )}
