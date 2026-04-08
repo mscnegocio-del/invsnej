@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabaseClient'
 import type { AccesoEstado, AppRole, Perfil } from '../types'
 
@@ -26,7 +26,7 @@ function mapPerfil(row: Record<string, unknown> | null): Perfil | null {
   const acceso_estado: AccesoEstado =
     rawEstado === 'pendiente' || rawEstado === 'activo' || rawEstado === 'rechazado'
       ? rawEstado
-      : Boolean(row.activo)
+      : row.activo
         ? 'activo'
         : 'pendiente'
   return {
@@ -66,37 +66,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
+    /**
+     * Carga inicial: getSession + perfil. onAuthStateChange también emite INITIAL_SESSION
+     * con la misma sesión; si ahí volvemos a await fetchPerfil, duplicamos latencia en cada recarga.
+     * Los demás eventos (login, logout, refresh) sí deben actualizar sesión y perfil.
+     */
     async function init() {
-      setLoading(true)
-      const {
-        data: { session: s },
-      } = await supabase.auth.getSession()
-      if (!mounted) return
-      setSession(s)
-      setUser(s?.user ?? null)
-      if (s?.user) {
-        await fetchPerfil(s.user.id)
-      } else {
+      try {
+        setLoading(true)
+        const {
+          data: { session: s },
+        } = await supabase.auth.getSession()
+        if (!mounted) return
+        setSession(s)
+        setUser(s?.user ?? null)
+        if (s?.user) {
+          await fetchPerfil(s.user.id)
+        } else {
+          setPerfil(null)
+        }
+      } catch (e) {
+        console.error('[Auth] init', e)
         setPerfil(null)
+      } finally {
+        if (mounted) {
+          setAuthReady(true)
+          setLoading(false)
+        }
       }
-      setAuthReady(true)
-      setLoading(false)
     }
 
     void init()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, s) => {
+    } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, s) => {
+      if (event === 'INITIAL_SESSION') {
+        return
+      }
       setSession(s)
       setUser(s?.user ?? null)
+      if (event === 'TOKEN_REFRESHED') {
+        if (mounted) {
+          setAuthReady(true)
+          setLoading(false)
+        }
+        return
+      }
       if (s?.user) {
         await fetchPerfil(s.user.id)
       } else {
         setPerfil(null)
       }
-      setAuthReady(true)
-      setLoading(false)
+      if (mounted) {
+        setAuthReady(true)
+        setLoading(false)
+      }
     })
 
     return () => {
