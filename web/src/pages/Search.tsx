@@ -303,7 +303,7 @@ export function Search() {
       <p className="page-subtitle">Filtra por código, responsable o ubicación y navega al detalle del bien.</p>
 
       <div className="mt-6 lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 lg:sticky lg:top-24">
           <form onSubmit={handleSubmit} className="card p-6 space-y-4 w-full">
             <div>
               <label className="label" htmlFor="search-codigo">
@@ -377,13 +377,13 @@ export function Search() {
           </form>
         </div>
 
-        <div className="mt-6 lg:mt-0 lg:col-span-3">
+        <div className="mt-6 lg:mt-0 lg:col-span-3 lg:min-h-[28rem]">
           {error && (
-            <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</p>
+            <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm mb-4">{error}</p>
           )}
           {!loading && resultados.length > 0 && (
             <section>
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
                 <div className="flex items-center gap-3">
                   <h2 className="text-lg font-semibold text-slate-900">Resultados</h2>
                   <p className="text-sm text-slate-600">
@@ -527,11 +527,11 @@ export function Search() {
           )}
 
           {!loading && !error && resultados.length === 0 && total === null && (
-            <p className="text-slate-500 text-center py-8">Realiza una búsqueda para ver resultados.</p>
+            <p className="text-slate-500 text-center py-10">Realiza una búsqueda para ver resultados.</p>
           )}
 
           {!loading && !error && resultados.length === 0 && total === 0 && (
-            <p className="text-slate-500 text-center py-8">No se encontraron bienes con esos filtros.</p>
+            <p className="text-slate-500 text-center py-10">No se encontraron bienes con esos filtros.</p>
           )}
         </div>
       </div>
