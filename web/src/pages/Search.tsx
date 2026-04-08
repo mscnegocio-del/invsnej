@@ -33,6 +33,8 @@ export function Search() {
   const [codigo, setCodigo] = useState('')
   const [idTrabajador, setIdTrabajador] = useState<number | ''>('')
   const [textoUbicacion, setTextoUbicacion] = useState('')
+  const [textoMarca, setTextoMarca] = useState('')
+  const [textoModelo, setTextoModelo] = useState('')
   /** Términos elegidos desde sugerencias (OR con el texto libre del input) */
   const [nombreChips, setNombreChips] = useState<string[]>([])
   const [nombreDraft, setNombreDraft] = useState('')
@@ -142,8 +144,6 @@ export function Search() {
 
   type RowWithExtras = BienResumen & {
     responsableNombre?: string | null
-    marca?: string | null
-    modelo?: string | null
     serie?: string | null
     orden_compra?: string | null
     valor?: number | null
@@ -214,6 +214,14 @@ export function Search() {
 
     if (textoUbicacion.trim()) {
       query = query.ilike('ubicacion', `%${textoUbicacion.trim()}%`)
+    }
+
+    if (textoMarca.trim()) {
+      query = query.ilike('marca', `%${escapeIlikeTerm(textoMarca.trim())}%`)
+    }
+
+    if (textoModelo.trim()) {
+      query = query.ilike('modelo', `%${escapeIlikeTerm(textoModelo.trim())}%`)
     }
 
     const terminosNombre = terminosNombreMueble()
@@ -400,8 +408,8 @@ export function Search() {
     <div>
       <h1 className="page-title">Buscar bienes</h1>
       <p className="page-subtitle">
-        Filtra por código, nombre o modelo (sugerencias al escribir; puedes añadir varias etiquetas; el texto libre
-        también admite varios términos por coma o línea — se busca cualquiera), responsable o ubicación.
+        Filtra por código, nombre del bien (sugerencias al escribir; varias etiquetas; texto libre con coma o línea —
+        se busca cualquiera), marca o modelo (campos SIGA, contiene), responsable o ubicación.
       </p>
 
       <div className="mt-6 lg:grid lg:grid-cols-10 lg:gap-6 lg:items-start">
@@ -522,6 +530,34 @@ export function Search() {
               />
             </div>
 
+            <div>
+              <label className="label" htmlFor="search-marca">
+                Marca (contiene)
+              </label>
+              <input
+                id="search-marca"
+                type="text"
+                value={textoMarca}
+                onChange={(e) => setTextoMarca(e.target.value)}
+                placeholder="Texto parcial de marca"
+                className="input"
+              />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="search-modelo-siga">
+                Modelo SIGA (contiene)
+              </label>
+              <input
+                id="search-modelo-siga"
+                type="text"
+                value={textoModelo}
+                onChange={(e) => setTextoModelo(e.target.value)}
+                placeholder="Texto parcial de modelo"
+                className="input"
+              />
+            </div>
+
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -603,6 +639,9 @@ export function Search() {
                   >
                     <div className="font-semibold text-slate-900">{b.codigo_patrimonial}</div>
                     <div className="text-slate-600">{b.nombre_mueble_equipo || 'Sin nombre'}</div>
+                    <div className="text-sm text-slate-600 mt-1">
+                      Marca: {b.marca?.trim() || '—'} · Modelo: {b.modelo?.trim() || '—'}
+                    </div>
                     <div className="text-sm text-slate-500 mt-0.5">
                       {findUbicacionNombre(b.ubicacion) || 'Sin ubicación'}
                       {(() => {
@@ -629,6 +668,12 @@ export function Search() {
                       </th>
                       <th scope="col" className="px-4 py-3 font-semibold min-w-[12rem]">
                         Nombre
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-semibold min-w-[8rem]">
+                        Marca
+                      </th>
+                      <th scope="col" className="px-4 py-3 font-semibold min-w-[8rem]">
+                        Modelo
                       </th>
                       <th scope="col" className="px-4 py-3 font-semibold min-w-[10rem]">
                         Ubicación
@@ -664,6 +709,8 @@ export function Search() {
                             {b.codigo_patrimonial}
                           </td>
                           <td className="px-4 py-3 text-slate-700 align-top">{b.nombre_mueble_equipo || 'Sin nombre'}</td>
+                          <td className="px-4 py-3 text-slate-600 align-top">{b.marca?.trim() || '—'}</td>
+                          <td className="px-4 py-3 text-slate-600 align-top">{b.modelo?.trim() || '—'}</td>
                           <td className="px-4 py-3 text-slate-600 align-top">
                             {findUbicacionNombre(b.ubicacion) || 'Sin ubicación'}
                           </td>

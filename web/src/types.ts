@@ -47,6 +47,8 @@ export type BienResumen = {
   id_trabajador: number | null
   ubicacion: string | null
   sede_id?: number | null
+  marca?: string | null
+  modelo?: string | null
 }
 
 export type SigaDatos = {
