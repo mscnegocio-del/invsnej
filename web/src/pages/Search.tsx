@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { BarcodeScanModal } from '../components/BarcodeScanModal'
@@ -8,6 +8,10 @@ import { useCatalogs } from '../context/CatalogContext'
 import { useSede } from '../context/SedeContext'
 import type { BienResumen } from '../types'
 const PAGE_SIZE = 20
+const NOMBRE_SUGGEST_DEBOUNCE_MS = 300
+const NOMBRE_SUGGEST_MIN_CHARS = 2
+const NOMBRE_SUGGEST_FETCH_LIMIT = 40
+const NOMBRE_SUGGEST_SHOW = 18
 
 /** Términos separados por coma o salto de línea; OR sobre nombre_mueble_equipo */
 function parseNombreTerminos(raw: string): string[] {
@@ -29,7 +33,14 @@ export function Search() {
   const [codigo, setCodigo] = useState('')
   const [idTrabajador, setIdTrabajador] = useState<number | ''>('')
   const [textoUbicacion, setTextoUbicacion] = useState('')
-  const [textoNombreModelo, setTextoNombreModelo] = useState('')
+  /** Términos elegidos desde sugerencias (OR con el texto libre del input) */
+  const [nombreChips, setNombreChips] = useState<string[]>([])
+  const [nombreDraft, setNombreDraft] = useState('')
+  const [nombreSugerencias, setNombreSugerencias] = useState<string[]>([])
+  const [nombreSuggestOpen, setNombreSuggestOpen] = useState(false)
+  const [nombreSuggestLoading, setNombreSuggestLoading] = useState(false)
+  const nombreSuggestReq = useRef(0)
+
   const [showScanModal, setShowScanModal] = useState(false)
   const [todasLasSedes, setTodasLasSedes] = useState(false)
 
@@ -60,6 +71,73 @@ export function Search() {
   const findSedeNombre = (sedeId: number | null | undefined) => {
     if (!sedeId) return null
     return sedes.find((s) => s.id === sedeId)?.nombre ?? `Sede ${sedeId}`
+  }
+
+  useEffect(() => {
+    const q = nombreDraft.trim()
+    if (q.length < NOMBRE_SUGGEST_MIN_CHARS) {
+      nombreSuggestReq.current += 1
+      setNombreSugerencias([])
+      setNombreSuggestOpen(false)
+      setNombreSuggestLoading(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      const reqId = ++nombreSuggestReq.current
+      setNombreSuggestLoading(true)
+      ;(async () => {
+        let qy = supabase
+          .from('bienes')
+          .select('nombre_mueble_equipo')
+          .is('eliminado_at', null)
+          .ilike('nombre_mueble_equipo', `%${escapeIlikeTerm(q)}%`)
+          .order('nombre_mueble_equipo', { ascending: true })
+          .limit(NOMBRE_SUGGEST_FETCH_LIMIT)
+
+        if (sedeActiva && !todasLasSedes) {
+          qy = qy.eq('sede_id', sedeActiva.id)
+        }
+
+        const { data, error } = await qy
+        if (nombreSuggestReq.current !== reqId) return
+        setNombreSuggestLoading(false)
+        if (error) {
+          console.error(error)
+          setNombreSugerencias([])
+          setNombreSuggestOpen(false)
+          return
+        }
+        const rows = (data ?? []) as { nombre_mueble_equipo: string | null }[]
+        const uniq = [
+          ...new Set(rows.map((r) => r.nombre_mueble_equipo).filter((n): n is string => Boolean(n?.trim()))),
+        ]
+        const sinChips = uniq.filter((n) => !nombreChips.includes(n)).slice(0, NOMBRE_SUGGEST_SHOW)
+        setNombreSugerencias(sinChips)
+        setNombreSuggestOpen(sinChips.length > 0)
+      })()
+    }, NOMBRE_SUGGEST_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [nombreDraft, sedeActiva, todasLasSedes, nombreChips])
+
+  const agregarNombreChip = (texto: string) => {
+    const t = texto.trim()
+    if (!t || nombreChips.includes(t)) return
+    setNombreChips((prev) => [...prev, t])
+    setNombreDraft('')
+    setNombreSugerencias([])
+    setNombreSuggestOpen(false)
+  }
+
+  const quitarNombreChip = (texto: string) => {
+    setNombreChips((prev) => prev.filter((c) => c !== texto))
+  }
+
+  /** Términos finales para la query: chips + texto libre (comas/saltos) */
+  function terminosNombreMueble(): string[] {
+    const manual = parseNombreTerminos(nombreDraft)
+    return [...new Set([...nombreChips, ...manual])]
   }
 
   type RowWithExtras = BienResumen & {
@@ -138,7 +216,7 @@ export function Search() {
       query = query.ilike('ubicacion', `%${textoUbicacion.trim()}%`)
     }
 
-    const terminosNombre = parseNombreTerminos(textoNombreModelo)
+    const terminosNombre = terminosNombreMueble()
     if (terminosNombre.length === 1) {
       query = query.ilike('nombre_mueble_equipo', `%${escapeIlikeTerm(terminosNombre[0])}%`)
     } else if (terminosNombre.length > 1) {
@@ -322,8 +400,8 @@ export function Search() {
     <div>
       <h1 className="page-title">Buscar bienes</h1>
       <p className="page-subtitle">
-        Filtra por código, nombre o modelo del bien (varios términos separados por coma o línea: se busca cualquiera),
-        responsable o ubicación.
+        Filtra por código, nombre o modelo (sugerencias al escribir; puedes añadir varias etiquetas; el texto libre
+        también admite varios términos por coma o línea — se busca cualquiera), responsable o ubicación.
       </p>
 
       <div className="mt-6 lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start">
@@ -361,19 +439,73 @@ export function Search() {
               allowAll
             />
 
-            <div>
+            <div className="relative">
               <label className="label" htmlFor="search-nombre-modelo">
-                Nombre / modelo del bien (contiene)
+                Nombre / modelo del bien
               </label>
-              <textarea
-                id="search-nombre-modelo"
-                value={textoNombreModelo}
-                onChange={(e) => setTextoNombreModelo(e.target.value)}
-                placeholder={'Un término por línea o separados por coma.\nEj. grabadora\nteclado'}
-                rows={3}
-                className="input min-h-[5rem] py-2 resize-y"
-              />
-              <p className="text-xs text-slate-500 mt-1">Varios términos: se listan bienes que coincidan con cualquiera.</p>
+              {nombreChips.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {nombreChips.map((c) => (
+                    <span
+                      key={c}
+                      className="inline-flex items-center gap-1 rounded-full bg-teal-50 text-teal-900 text-sm px-3 py-1 border border-teal-200"
+                    >
+                      {c}
+                      <button
+                        type="button"
+                        onClick={() => quitarNombreChip(c)}
+                        className="rounded-full hover:bg-teal-100 px-1 leading-none"
+                        aria-label={`Quitar ${c}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="relative">
+                <input
+                  id="search-nombre-modelo"
+                  type="text"
+                  value={nombreDraft}
+                  onChange={(e) => setNombreDraft(e.target.value)}
+                  onFocus={() => {
+                    if (nombreSugerencias.length > 0) setNombreSuggestOpen(true)
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => setNombreSuggestOpen(false), 200)
+                  }}
+                  placeholder="Escribe al menos 2 letras para ver sugerencias…"
+                  autoComplete="off"
+                  className="input pr-10"
+                />
+                {nombreSuggestLoading && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 size-4 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+                )}
+              </div>
+              {nombreSuggestOpen && nombreSugerencias.length > 0 && (
+                <ul
+                  className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+                  role="listbox"
+                >
+                  {nombreSugerencias.map((s) => (
+                    <li key={s} role="option">
+                      <button
+                        type="button"
+                        className="w-full px-4 py-2 text-left text-sm text-slate-800 hover:bg-slate-50"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => agregarNombreChip(s)}
+                      >
+                        {s}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-xs text-slate-500 mt-1">
+                Sugerencias según la sede marcada arriba (&quot;Buscar en todas las sedes&quot;). Puedes añadir más
+                términos libres (coma o línea) en el mismo campo antes de buscar.
+              </p>
             </div>
 
             <div>
