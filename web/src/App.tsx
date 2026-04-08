@@ -13,6 +13,7 @@ import { Admin } from './pages/Admin'
 import { Login } from './pages/Login'
 import { AuthCallback } from './pages/AuthCallback'
 import { Security } from './pages/Security'
+import { Trabajadores } from './pages/Trabajadores'
 
 function App() {
   return (
@@ -55,6 +56,14 @@ function App() {
               element={
                 <RoleGuard roles={['admin']}>
                   <Admin />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="/trabajadores"
+              element={
+                <RoleGuard roles={['admin']}>
+                  <Trabajadores />
                 </RoleGuard>
               }
             />

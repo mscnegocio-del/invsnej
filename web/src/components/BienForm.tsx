@@ -330,18 +330,6 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       />
 
       <div>
-        <label className="label" htmlFor="form-tipo">Tipo de mueble o equipo</label>
-        <input
-          id="form-tipo"
-          type="text"
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value)}
-          placeholder="Ej. Mueble, Equipo de cómputo, Silla..."
-          className="input"
-        />
-      </div>
-
-      <div>
         <label className="label" htmlFor="form-estado">Estado *</label>
         <select
           id="form-estado"

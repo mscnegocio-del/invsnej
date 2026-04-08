@@ -9,6 +9,18 @@ import { useSede } from '../context/SedeContext'
 import type { BienResumen } from '../types'
 const PAGE_SIZE = 20
 
+/** Términos separados por coma o salto de línea; OR sobre nombre_mueble_equipo */
+function parseNombreTerminos(raw: string): string[] {
+  return raw
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+function escapeIlikeTerm(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+}
+
 export function Search() {
   const navigate = useNavigate()
   const { trabajadores, ubicaciones, sedes } = useCatalogs()
@@ -17,6 +29,7 @@ export function Search() {
   const [codigo, setCodigo] = useState('')
   const [idTrabajador, setIdTrabajador] = useState<number | ''>('')
   const [textoUbicacion, setTextoUbicacion] = useState('')
+  const [textoNombreModelo, setTextoNombreModelo] = useState('')
   const [showScanModal, setShowScanModal] = useState(false)
   const [todasLasSedes, setTodasLasSedes] = useState(false)
 
@@ -123,6 +136,14 @@ export function Search() {
 
     if (textoUbicacion.trim()) {
       query = query.ilike('ubicacion', `%${textoUbicacion.trim()}%`)
+    }
+
+    const terminosNombre = parseNombreTerminos(textoNombreModelo)
+    if (terminosNombre.length === 1) {
+      query = query.ilike('nombre_mueble_equipo', `%${escapeIlikeTerm(terminosNombre[0])}%`)
+    } else if (terminosNombre.length > 1) {
+      const orStr = terminosNombre.map((t) => `nombre_mueble_equipo.ilike.%${escapeIlikeTerm(t)}%`).join(',')
+      query = query.or(orStr)
     }
 
     const from = page * PAGE_SIZE
@@ -300,7 +321,10 @@ export function Search() {
   return (
     <div>
       <h1 className="page-title">Buscar bienes</h1>
-      <p className="page-subtitle">Filtra por código, responsable o ubicación y navega al detalle del bien.</p>
+      <p className="page-subtitle">
+        Filtra por código, nombre o modelo del bien (varios términos separados por coma o línea: se busca cualquiera),
+        responsable o ubicación.
+      </p>
 
       <div className="mt-6 lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start">
         <div className="lg:col-span-2 lg:sticky lg:top-24">
@@ -336,6 +360,21 @@ export function Search() {
               label="Responsable"
               allowAll
             />
+
+            <div>
+              <label className="label" htmlFor="search-nombre-modelo">
+                Nombre / modelo del bien (contiene)
+              </label>
+              <textarea
+                id="search-nombre-modelo"
+                value={textoNombreModelo}
+                onChange={(e) => setTextoNombreModelo(e.target.value)}
+                placeholder={'Un término por línea o separados por coma.\nEj. grabadora\nteclado'}
+                rows={3}
+                className="input min-h-[5rem] py-2 resize-y"
+              />
+              <p className="text-xs text-slate-500 mt-1">Varios términos: se listan bienes que coincidan con cualquiera.</p>
+            </div>
 
             <div>
               <label className="label" htmlFor="search-ubicacion">

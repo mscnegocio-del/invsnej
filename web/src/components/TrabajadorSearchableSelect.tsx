@@ -71,7 +71,7 @@ export function TrabajadorSearchableSelect({
 
     const { data, error: insertError } = await supabase
       .from('trabajadores')
-      .insert({ nombre: queryNorm })
+      .insert({ nombre: queryNorm, sede_id: null, cargo: null })
       .select('id')
       .maybeSingle()
 
@@ -141,7 +141,8 @@ export function TrabajadorSearchableSelect({
                   value === t.id ? 'bg-teal-50 text-teal-700' : 'text-slate-700'
                 }`}
               >
-                {t.nombre}
+                <span className="block">{t.nombre}</span>
+                {t.cargo ? <span className="block text-xs text-slate-500">{t.cargo}</span> : null}
               </button>
             </li>
           ))}

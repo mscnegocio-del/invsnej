@@ -53,7 +53,6 @@ export function BienDetail() {
         id: number
         codigo_patrimonial: string
         nombre_mueble_equipo: string
-        tipo_mueble_equipo: string | null
         estado: string
         id_trabajador: number | null
         ubicacion: string | null
@@ -65,6 +64,7 @@ export function BienDetail() {
         orden_compra: string | null
         valor: number | null
         creado_por_email: string | null
+        tipo_mueble_equipo: string | null
       }
       let trabajadorNombre: string | null = null
 
@@ -205,7 +205,6 @@ export function BienDetail() {
             {[
               { term: 'Código patrimonial', value: bien.codigo_patrimonial },
               { term: 'Nombre / modelo', value: bien.nombre_mueble_equipo },
-              { term: 'Tipo', value: bien.tipo_mueble_equipo || '—' },
               { term: 'Estado', value: bien.estado },
               { term: 'Responsable', value: bien.trabajador_nombre || 'Sin responsable asignado' },
               { term: 'Ubicación', value: ubicacionNombre || 'Sin ubicación registrada' },

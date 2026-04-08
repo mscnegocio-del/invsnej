@@ -76,23 +76,35 @@ export function Home() {
             Buscar bienes
           </h2>
           <p className="text-slate-600 text-sm mt-1">
-            Filtra por código, responsable o ubicación
+            Filtra por código, nombre del bien, responsable o ubicación
           </p>
         </Link>
 
         {isAdmin && (
-          <Link
-            to="/admin"
-            className="card flex flex-col p-6 hover:shadow-md hover:border-amber-200 transition-all duration-200 group sm:col-span-2 lg:col-span-1"
-          >
-            <span className="text-4xl mb-3">⚙️</span>
-            <h2 className="text-lg font-semibold text-slate-900 group-hover:text-amber-600 transition-colors">
-              Administración
-            </h2>
-            <p className="text-slate-600 text-sm mt-1">
-              Carga SIGA PJ y gestión de usuarios
-            </p>
-          </Link>
+          <>
+            <Link
+              to="/trabajadores"
+              className="card flex flex-col p-6 hover:shadow-md hover:border-teal-200 transition-all duration-200 group"
+            >
+              <span className="text-4xl mb-3">👥</span>
+              <h2 className="text-lg font-semibold text-slate-900 group-hover:text-teal-600 transition-colors">
+                Trabajadores
+              </h2>
+              <p className="text-slate-600 text-sm mt-1">Responsables: cargo, sede y catálogo</p>
+            </Link>
+            <Link
+              to="/admin"
+              className="card flex flex-col p-6 hover:shadow-md hover:border-amber-200 transition-all duration-200 group sm:col-span-2 lg:col-span-1"
+            >
+              <span className="text-4xl mb-3">⚙️</span>
+              <h2 className="text-lg font-semibold text-slate-900 group-hover:text-amber-600 transition-colors">
+                Administración
+              </h2>
+              <p className="text-slate-600 text-sm mt-1">
+                Carga SIGA PJ y gestión de usuarios
+              </p>
+            </Link>
+          </>
         )}
       </div>
     </div>

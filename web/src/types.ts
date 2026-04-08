@@ -24,6 +24,8 @@ export type UserPasskey = {
 export type Trabajador = {
   id: number
   nombre: string
+  sede_id: number | null
+  cargo: string | null
 }
 
 export type Ubicacion = {

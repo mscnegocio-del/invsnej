@@ -7,6 +7,7 @@ const navItemsAll: { to: string; label: string; icon: string; roles: AppRole[] }
   { to: '/', label: 'Inicio', icon: '🏠', roles: ['admin', 'operador', 'consulta'] },
   { to: '/scan', label: 'Escanear', icon: '📷', roles: ['admin', 'operador'] },
   { to: '/search', label: 'Buscar', icon: '🔍', roles: ['admin', 'operador', 'consulta'] },
+  { to: '/trabajadores', label: 'Trabajadores', icon: '👥', roles: ['admin'] },
 ]
 
 export function Layout() {

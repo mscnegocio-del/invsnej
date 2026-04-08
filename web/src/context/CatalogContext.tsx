@@ -14,7 +14,7 @@ type CatalogContextValue = {
 
 const CatalogContext = createContext<CatalogContextValue | undefined>(undefined)
 
-const CACHE_KEY = 'invweb_catalogs_v1'
+const CACHE_KEY = 'invweb_catalogs_v2'
 const CACHE_TTL_MS = 1 * 60 * 1000 // 1 minuto
 
 type CachePayload = {
@@ -82,7 +82,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       }
 
       const [trabajadoresRes, ubicacionesRes, sedesRes] = await Promise.all([
-        supabase.from('trabajadores').select('id, nombre').order('nombre', { ascending: true }),
+        supabase.from('trabajadores').select('id, nombre, sede_id, cargo').order('nombre', { ascending: true }),
         supabase.from('ubicaciones').select('id, nombre').order('nombre', { ascending: true }),
         supabase.from('sedes').select('id, nombre, codigo').order('nombre', { ascending: true }),
       ])
