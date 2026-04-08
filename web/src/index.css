@@ -62,11 +62,11 @@
   .page-subtitle {
     @apply text-slate-600 mt-1;
   }
-  /* Shell: ancho escalonado móvil → escritorio (Layout, header, barra inferior) */
+  /* Shell / main: ancho de viewport con padding lateral responsive */
   .layout-shell {
-    @apply w-full max-w-2xl md:max-w-4xl lg:max-w-6xl mx-auto px-4;
+    @apply w-full max-w-none px-4 sm:px-6 lg:px-8;
   }
   .layout-main {
-    @apply flex-1 w-full max-w-2xl md:max-w-4xl lg:max-w-6xl mx-auto px-4 py-6 sm:py-8 pb-24 md:pb-8;
+    @apply flex-1 w-full max-w-none px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 md:pb-8;
   }
 }
