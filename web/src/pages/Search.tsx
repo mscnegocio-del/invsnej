@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ScanLine, Copy, FileJson, FileSpreadsheet, ChevronLeft, ChevronRight,
-  Loader2, X, Search as SearchIcon,
+  Loader2, X, Search as SearchIcon, MoreHorizontal, Eye, Tag, User, MapPin,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { BarcodeScanModal } from '../components/BarcodeScanModal'
 import { TrabajadorSearchableSelect } from '../components/TrabajadorSearchableSelect'
+import { QuickEditBienDialog } from '../components/QuickEditBienDialog'
 import { useCatalogs } from '../context/CatalogContext'
 import { useSede } from '../context/SedeContext'
 import { Button } from '../components/ui/button'
@@ -19,6 +20,10 @@ import { Alert, AlertDescription } from '../components/ui/alert'
 import { Skeleton } from '../components/ui/skeleton'
 import { Separator } from '../components/ui/separator'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu'
 import { cn } from '../lib/utils'
 import type { BienResumen } from '../types'
 
@@ -75,6 +80,12 @@ export function Search() {
   const [exportingAll, setExportingAll] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  type QuickEditTarget = {
+    bien: BienResumen
+    campo: 'estado' | 'responsable' | 'ubicacion'
+  } | null
+  const [quickEdit, setQuickEdit] = useState<QuickEditTarget>(null)
+
   const findResponsableNombre = (idTrab: number | null) =>
     idTrab ? (trabajadores.find((tr) => tr.id === idTrab)?.nombre ?? null) : null
 
@@ -87,6 +98,12 @@ export function Search() {
 
   const findSedeNombre = (sedeId: number | null | undefined) =>
     sedeId ? (sedes.find((s) => s.id === sedeId)?.nombre ?? `Sede ${sedeId}`) : null
+
+  const handleQuickEditSaved = (bienId: number, updates: Partial<BienResumen>) => {
+    setResultados((prev) =>
+      prev.map((b) => (b.id === bienId ? { ...b, ...updates } : b))
+    )
+  }
 
   useEffect(() => {
     const q = nombreDraft.trim()
@@ -445,21 +462,46 @@ export function Search() {
               {/* Lista móvil */}
               <div className="lg:hidden divide-y divide-border border border-border rounded-2xl overflow-hidden bg-card">
                 {resultados.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => navigate(`/bienes/${b.id}`)}
-                    className="w-full text-left px-4 py-4 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="font-semibold text-foreground text-sm">{b.codigo_patrimonial}</div>
-                      {b.estado && <Badge variant={estadoBadgeVariant(b.estado)} className="shrink-0 text-xs">{b.estado}</Badge>}
+                  <div key={b.id} className="flex items-stretch hover:bg-muted/50 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/bienes/${b.id}`)}
+                      className="flex-1 text-left px-4 py-4"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="font-semibold text-foreground text-sm">{b.codigo_patrimonial}</div>
+                        {b.estado && <Badge variant={estadoBadgeVariant(b.estado)} className="shrink-0 text-xs">{b.estado}</Badge>}
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-0.5">{b.nombre_mueble_equipo || 'Sin nombre'}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {[findUbicacionNombre(b.ubicacion), findResponsableNombre(b.id_trabajador), findSedeNombre(b.sede_id)].filter(Boolean).join(' · ')}
+                      </div>
+                    </button>
+                    <div className="flex items-center pr-2" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => navigate(`/bienes/${b.id}`)}>
+                            <Eye className="h-4 w-4 mr-2" /> Ver detalle
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setQuickEdit({ bien: b, campo: 'estado' })}>
+                            <Tag className="h-4 w-4 mr-2" /> Editar estado
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setQuickEdit({ bien: b, campo: 'responsable' })}>
+                            <User className="h-4 w-4 mr-2" /> Editar responsable
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setQuickEdit({ bien: b, campo: 'ubicacion' })}>
+                            <MapPin className="h-4 w-4 mr-2" /> Editar ubicación
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-0.5">{b.nombre_mueble_equipo || 'Sin nombre'}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {[findUbicacionNombre(b.ubicacion), findResponsableNombre(b.id_trabajador), findSedeNombre(b.sede_id)].filter(Boolean).join(' · ')}
-                    </div>
-                  </button>
+                  </div>
                 ))}
               </div>
 
@@ -475,6 +517,7 @@ export function Search() {
                       <TableHead className="min-w-[10rem]">Ubicación</TableHead>
                       <TableHead>Responsable</TableHead>
                       <TableHead>Sede</TableHead>
+                      <TableHead className="w-10 text-right" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -502,6 +545,30 @@ export function Search() {
                           <TableCell className="align-top text-sm text-muted-foreground">{findUbicacionNombre(b.ubicacion) || '—'}</TableCell>
                           <TableCell className="align-top text-sm text-muted-foreground">{nombreResp ?? '—'}</TableCell>
                           <TableCell className="align-top text-sm text-muted-foreground">{findSedeNombre(b.sede_id) ?? '—'}</TableCell>
+                          <TableCell className="align-top" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => navigate(`/bienes/${b.id}`)}>
+                                  <Eye className="h-4 w-4 mr-2" /> Ver detalle
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => setQuickEdit({ bien: b, campo: 'estado' })}>
+                                  <Tag className="h-4 w-4 mr-2" /> Editar estado
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setQuickEdit({ bien: b, campo: 'responsable' })}>
+                                  <User className="h-4 w-4 mr-2" /> Editar responsable
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setQuickEdit({ bien: b, campo: 'ubicacion' })}>
+                                  <MapPin className="h-4 w-4 mr-2" /> Editar ubicación
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
                         </TableRow>
                       )
                     })}
@@ -565,6 +632,12 @@ export function Search() {
           </div>
         </CardContent>
       </Card>
+
+      <QuickEditBienDialog
+        target={quickEdit}
+        onClose={() => setQuickEdit(null)}
+        onSaved={handleQuickEditSaved}
+      />
     </div>
   )
 
