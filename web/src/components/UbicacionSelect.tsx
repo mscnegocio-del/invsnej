@@ -1,5 +1,12 @@
-import type { ChangeEvent } from 'react'
 import { useCatalogs } from '../context/CatalogContext'
+import { Label } from './ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
 
 type Props = {
   value: number | null
@@ -11,36 +18,32 @@ type Props = {
 export function UbicacionSelect({ value, onChange, label = 'Ubicación', required }: Props) {
   const { ubicaciones, loading, error } = useCatalogs()
 
-  const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const v = event.target.value
-    onChange(v ? Number(v) : null)
-  }
-
   return (
-    <div>
-      <label className="label" htmlFor="ubicacion-select">
+    <div className="space-y-1.5">
+      <Label htmlFor="ubicacion-select">
         {label}
         {required ? ' *' : ''}
-      </label>
-      <select
-        id="ubicacion-select"
-        value={value ?? ''}
-        onChange={handleChange}
+      </Label>
+      <Select
+        value={value != null ? String(value) : ''}
+        onValueChange={(v) => onChange(v ? Number(v) : null)}
         disabled={loading || !!error}
-        required={required}
-        className={`input ${error ? 'input-error' : ''}`}
       >
-        <option value="">{loading ? 'Cargando ubicaciones...' : 'Seleccione una ubicación'}</option>
-        {ubicaciones.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.nombre}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id="ubicacion-select">
+          <SelectValue
+            placeholder={loading ? 'Cargando ubicaciones…' : 'Seleccione una ubicación'}
+          />
+        </SelectTrigger>
+        <SelectContent>
+          {ubicaciones.map((u) => (
+            <SelectItem key={u.id} value={String(u.id)}>
+              {u.nombre}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       {error && (
-        <small className="mt-1 block text-red-600 text-sm">
-          Error cargando ubicaciones: {error}
-        </small>
+        <p className="text-xs text-destructive">Error cargando ubicaciones: {error}</p>
       )}
     </div>
   )

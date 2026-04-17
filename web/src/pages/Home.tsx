@@ -1,8 +1,21 @@
 import { Link } from 'react-router-dom'
+import { ScanLine, Search, Users, Settings, ShieldCheck, Fingerprint } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { listPasskeys } from '../lib/passkeysApi'
 import { useWebAuthn } from '../hooks/useWebAuthn'
+import { Card, CardContent } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
+import { cn } from '../lib/utils'
+
+type NavCard = {
+  to: string
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  description: string
+  accent: 'teal' | 'amber' | 'indigo'
+  wide?: boolean
+}
 
 export function Home() {
   const { canEdit, isAdmin } = useAuth()
@@ -20,92 +33,96 @@ export function Home() {
       }
     }
     void run()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
+
+  const cards: NavCard[] = [
+    {
+      to: '/security',
+      icon: ShieldCheck,
+      title: 'Seguridad de acceso',
+      description: passkeyCount && passkeyCount > 0
+        ? `Tienes ${passkeyCount} passkey${passkeyCount > 1 ? 's' : ''} activa${passkeyCount > 1 ? 's' : ''}.`
+        : isSupported
+          ? 'Activa una passkey para acceso biométrico.'
+          : 'Gestiona tu método de acceso.',
+      accent: 'indigo',
+      wide: true,
+    },
+    ...(canEdit ? [{
+      to: '/scan',
+      icon: ScanLine,
+      title: 'Registrar bien',
+      description: 'Escanea o escribe el código para registrar un activo.',
+      accent: 'teal' as const,
+    }] : []),
+    {
+      to: '/search',
+      icon: Search,
+      title: 'Buscar bienes',
+      description: 'Filtra por código, nombre, responsable o ubicación.',
+      accent: 'teal',
+      wide: !canEdit,
+    },
+    ...(isAdmin ? [
+      { to: '/trabajadores', icon: Users, title: 'Trabajadores', description: 'Gestiona responsables, cargos y sedes.', accent: 'teal' as const },
+      { to: '/admin', icon: Settings, title: 'Administración', description: 'Carga SIGA PJ y gestión de usuarios.', accent: 'amber' as const },
+    ] : []),
+  ]
+
+  const accentClasses = {
+    teal: 'group-hover:border-primary/40 group-hover:shadow-primary/10',
+    amber: 'group-hover:border-amber-400/40 group-hover:shadow-amber-500/10',
+    indigo: 'group-hover:border-indigo-400/40 group-hover:shadow-indigo-500/10',
+  }
+
+  const iconBgClasses = {
+    teal: 'bg-primary/10 text-primary',
+    amber: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+    indigo: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
+  }
 
   return (
     <div>
       <h1 className="page-title">Sistema de inventario</h1>
-      <p className="page-subtitle">Gestiona el inventario patrimonial escaneando códigos de barras o buscando por filtros.</p>
+      <p className="page-subtitle">
+        Gestiona el inventario patrimonial escaneando códigos o buscando por filtros.
+      </p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link
-          to="/security"
-          className="card flex flex-col gap-2 p-5 hover:shadow-md hover:border-indigo-200 transition-all duration-200 sm:col-span-2 lg:col-span-3"
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🔐</span>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Seguridad de acceso</h2>
-              <p className="text-sm text-slate-600">
-                {passkeyCount && passkeyCount > 0
-                  ? `Tienes ${passkeyCount} passkey${passkeyCount > 1 ? 's' : ''} registrada${passkeyCount > 1 ? 's' : ''}.`
-                  : isSupported
-                    ? 'Activa una passkey para ingresar con huella, PIN o biometría.'
-                    : 'Gestiona tu método de acceso y revisa el estado de tus passkeys.'}
-              </p>
-            </div>
-          </div>
-        </Link>
-
-        {canEdit && (
+        {cards.map((card) => (
           <Link
-            to="/scan"
-            className="card flex flex-col p-6 hover:shadow-md hover:border-teal-200 transition-all duration-200 group"
+            key={card.to}
+            to={card.to}
+            className={cn(
+              'group block',
+              card.wide && 'sm:col-span-2 lg:col-span-3',
+            )}
           >
-            <span className="text-4xl mb-3">📷</span>
-            <h2 className="text-lg font-semibold text-slate-900 group-hover:text-teal-600 transition-colors">
-              Registrar bien
-            </h2>
-            <p className="text-slate-600 text-sm mt-1">
-              Abre la cámara para escanear o escribir el código manualmente
-            </p>
+            <Card className={cn(
+              'h-full transition-all duration-200 hover:shadow-md',
+              accentClasses[card.accent],
+            )}>
+              <CardContent className="p-6 flex items-start gap-4">
+                <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl', iconBgClasses[card.accent])}>
+                  <card.icon className="h-6 w-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-semibold text-foreground">{card.title}</h2>
+                    {card.to === '/security' && passkeyCount !== null && passkeyCount > 0 && (
+                      <Badge variant="success" className="text-xs">{passkeyCount} activa{passkeyCount > 1 ? 's' : ''}</Badge>
+                    )}
+                    {card.to === '/security' && isSupported && (passkeyCount === 0 || passkeyCount === null) && (
+                      <Fingerprint className="h-4 w-4 text-indigo-500 opacity-60" />
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5">{card.description}</p>
+                </div>
+              </CardContent>
+            </Card>
           </Link>
-        )}
-
-        <Link
-          to="/search"
-          className={`card flex flex-col p-6 hover:shadow-md hover:border-teal-200 transition-all duration-200 group ${
-            !canEdit ? 'sm:col-span-2 lg:col-span-3' : ''
-          }`}
-        >
-          <span className="text-4xl mb-3">🔍</span>
-          <h2 className="text-lg font-semibold text-slate-900 group-hover:text-teal-600 transition-colors">
-            Buscar bienes
-          </h2>
-          <p className="text-slate-600 text-sm mt-1">
-            Filtra por código, nombre del bien, responsable o ubicación
-          </p>
-        </Link>
-
-        {isAdmin && (
-          <>
-            <Link
-              to="/trabajadores"
-              className="card flex flex-col p-6 hover:shadow-md hover:border-teal-200 transition-all duration-200 group"
-            >
-              <span className="text-4xl mb-3">👥</span>
-              <h2 className="text-lg font-semibold text-slate-900 group-hover:text-teal-600 transition-colors">
-                Trabajadores
-              </h2>
-              <p className="text-slate-600 text-sm mt-1">Responsables: cargo, sede y catálogo</p>
-            </Link>
-            <Link
-              to="/admin"
-              className="card flex flex-col p-6 hover:shadow-md hover:border-amber-200 transition-all duration-200 group sm:col-span-2 lg:col-span-1"
-            >
-              <span className="text-4xl mb-3">⚙️</span>
-              <h2 className="text-lg font-semibold text-slate-900 group-hover:text-amber-600 transition-colors">
-                Administración
-              </h2>
-              <p className="text-slate-600 text-sm mt-1">
-                Carga SIGA PJ y gestión de usuarios
-              </p>
-            </Link>
-          </>
-        )}
+        ))}
       </div>
     </div>
   )

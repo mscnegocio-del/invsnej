@@ -1,9 +1,48 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Loader2, Pencil, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useCatalogs } from '../context/CatalogContext'
 import { useAuth } from '../context/AuthContext'
 import type { BienDetalle, BienHistorial } from '../types'
+import { Card, CardContent } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
+import { Alert, AlertDescription } from '../components/ui/alert'
+import { Separator } from '../components/ui/separator'
+import { Skeleton } from '../components/ui/skeleton'
+import { Avatar, AvatarFallback } from '../components/ui/avatar'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog'
+
+type EstadoVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
+
+function estadoBadgeVariant(estado: string): EstadoVariant {
+  switch (estado.toLowerCase()) {
+    case 'nuevo': return 'success'
+    case 'bueno': return 'default'
+    case 'regular': return 'warning'
+    case 'malo':
+    case 'muy malo': return 'destructive'
+    default: return 'secondary'
+  }
+}
+
+const ETIQUETA_CAMPO: Record<string, string> = {
+  estado: 'Estado',
+  responsable: 'Responsable',
+  ubicacion: 'Ubicación',
+  creacion: 'Alta',
+  eliminacion: 'Baja',
+}
 
 export function BienDetail() {
   const { id } = useParams()
@@ -15,10 +54,10 @@ export function BienDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   useEffect(() => {
     if (!id) return
-
     let cancelled = false
 
     async function fetchBien() {
@@ -66,23 +105,22 @@ export function BienDetail() {
         creado_por_email: string | null
         tipo_mueble_equipo: string | null
       }
-      let trabajadorNombre: string | null = null
 
+      let trabajadorNombre: string | null = null
       if (raw.id_trabajador) {
-        const { data: trabajador, error: trabajadorError } = await supabase
+        const { data: trabajador, error: tErr } = await supabase
           .from('trabajadores')
           .select('nombre')
           .eq('id', raw.id_trabajador)
           .maybeSingle()
-
-        if (!cancelled && !trabajadorError && trabajador) {
+        if (!cancelled && !tErr && trabajador) {
           trabajadorNombre = trabajador.nombre as string
         }
       }
 
       if (cancelled) return
 
-      const detalle: BienDetalle = {
+      setBien({
         id: raw.id,
         codigo_patrimonial: raw.codigo_patrimonial,
         nombre_mueble_equipo: raw.nombre_mueble_equipo,
@@ -99,11 +137,8 @@ export function BienDetail() {
         orden_compra: raw.orden_compra,
         valor: raw.valor,
         creado_por_email: raw.creado_por_email,
-      }
+      })
 
-      setBien(detalle)
-
-      // Cargar historial del bien
       const { data: historialData } = await supabase
         .from('bien_historial')
         .select('id, bien_id, campo, valor_antes, valor_despues, fecha, usuario_email, accion')
@@ -111,28 +146,16 @@ export function BienDetail() {
         .order('fecha', { ascending: false })
         .limit(30)
 
-      if (!cancelled) {
-        setHistorial((historialData ?? []) as BienHistorial[])
-      }
-
+      if (!cancelled) setHistorial((historialData ?? []) as BienHistorial[])
       setLoading(false)
     }
 
     fetchBien()
-
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [id])
 
-  const handleDelete = async () => {
+  const ejecutarDelete = async () => {
     if (!id || !bien) return
-
-    const confirmar = window.confirm(
-      `¿Seguro que deseas eliminar el bien con código ${bien.codigo_patrimonial}? Quedará marcado como eliminado (solo administradores).`,
-    )
-    if (!confirmar) return
-
     setDeleting(true)
     const { error: histErr } = await supabase.from('bien_historial').insert({
       bien_id: bien.id,
@@ -149,170 +172,196 @@ export function BienDetail() {
       setError('No se pudo registrar la eliminación. Intenta nuevamente.')
       return
     }
-
     const { error: supaError } = await supabase
       .from('bienes')
       .update({ eliminado_at: new Date().toISOString() })
       .eq('id', id)
     setDeleting(false)
-
     if (supaError) {
       console.error(supaError)
       setError('No se pudo eliminar el bien. Intenta nuevamente.')
       return
     }
-
     navigate('/', { replace: true })
   }
 
+  const sedeNombre = bien?.sede_id
+    ? (sedes.find((s) => s.id === bien.sede_id)?.nombre ?? `Sede ${bien.sede_id}`)
+    : null
+
+  const ubicacionNombre = (() => {
+    if (!bien?.ubicacion) return null
+    const asNum = Number(bien.ubicacion)
+    if (!Number.isNaN(asNum)) return ubicaciones.find((u) => u.id === asNum)?.nombre ?? bien.ubicacion
+    return bien.ubicacion
+  })()
+
   return (
-    <div className="mx-auto w-full lg:max-w-4xl">
+    <div className="mx-auto w-full lg:max-w-4xl space-y-6">
       <h1 className="page-title">Detalle de bien</h1>
 
       {loading && (
-        <p className="mt-6 flex items-center gap-2 text-slate-600">
-          <span className="size-4 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
-          Cargando información del bien...
-        </p>
+        <Card>
+          <CardContent className="p-6 space-y-3">
+            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-5 w-full" />)}
+          </CardContent>
+        </Card>
       )}
 
       {error && !loading && (
-        <p className="mt-6 rounded-xl bg-red-50 text-red-700 px-4 py-3">
-          {error}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      {bien && !loading && !error && (() => {
-        // Resolver sede a nombre
-        const sedeNombre = bien.sede_id
-          ? (sedes.find((s) => s.id === bien.sede_id)?.nombre ?? `Sede ${bien.sede_id}`)
-          : null
-
-        // Resolver ubicacion: puede ser un ID antiguo (número) o ya un nombre
-        const ubicacionNombre = (() => {
-          if (!bien.ubicacion) return null
-          const asNum = Number(bien.ubicacion)
-          if (!Number.isNaN(asNum)) {
-            return ubicaciones.find((u) => u.id === asNum)?.nombre ?? bien.ubicacion
-          }
-          return bien.ubicacion
-        })()
-
-        return (
+      {bien && !loading && (
         <>
-        <div className="mt-6 card overflow-hidden">
-          <dl className="divide-y divide-slate-100">
-            {[
-              { term: 'Código patrimonial', value: bien.codigo_patrimonial },
-              { term: 'Nombre / modelo', value: bien.nombre_mueble_equipo },
-              { term: 'Estado', value: bien.estado },
-              { term: 'Responsable', value: bien.trabajador_nombre || 'Sin responsable asignado' },
-              { term: 'Ubicación', value: ubicacionNombre || 'Sin ubicación registrada' },
-              { term: 'Sede', value: sedeNombre || 'Sin sede asignada' },
-              { term: 'Fecha de registro', value: bien.fecha_registro ? new Date(bien.fecha_registro).toLocaleString() : '—' },
-              { term: 'Registrado por', value: bien.creado_por_email || '—' },
-            ].map(({ term, value }) => (
-              <div key={term} className="px-6 py-4 sm:grid sm:grid-cols-2 sm:gap-4">
-                <dt className="text-sm font-medium text-slate-500">{term}</dt>
-                <dd className="mt-1 text-slate-900 sm:mt-0">{value}</dd>
-              </div>
-            ))}
-
-            {/* Campos SIGA (solo si existen) */}
-            {(bien.marca || bien.modelo || bien.serie || bien.orden_compra || bien.valor != null) && (
-              <>
-                <div className="px-6 py-3 bg-amber-50/60">
-                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Datos SIGA PJ</p>
-                </div>
+          <Card>
+            <CardContent className="p-0">
+              <dl className="divide-y divide-border">
                 {[
-                  { term: 'Marca', value: bien.marca },
-                  { term: 'Modelo', value: bien.modelo },
-                  { term: 'N° Serie', value: bien.serie },
-                  { term: 'Orden de compra', value: bien.orden_compra },
-                  { term: 'Valor', value: bien.valor != null ? `S/. ${bien.valor.toLocaleString()}` : null },
-                ]
-                  .filter(({ value }) => value != null)
-                  .map(({ term, value }) => (
-                    <div key={term} className="px-6 py-4 sm:grid sm:grid-cols-2 sm:gap-4">
-                      <dt className="text-sm font-medium text-slate-500">{term}</dt>
-                      <dd className="mt-1 text-slate-900 sm:mt-0">{value}</dd>
+                  { term: 'Código patrimonial', value: <span className="font-mono text-sm">{bien.codigo_patrimonial}</span> },
+                  { term: 'Nombre / descripción', value: bien.nombre_mueble_equipo },
+                  { term: 'Estado', value: <Badge variant={estadoBadgeVariant(bien.estado)}>{bien.estado}</Badge> },
+                  { term: 'Responsable', value: bien.trabajador_nombre || 'Sin responsable asignado' },
+                  { term: 'Ubicación', value: ubicacionNombre || 'Sin ubicación registrada' },
+                  { term: 'Sede', value: sedeNombre || 'Sin sede asignada' },
+                  { term: 'Fecha de registro', value: bien.fecha_registro ? new Date(bien.fecha_registro).toLocaleString() : '—' },
+                  { term: 'Registrado por', value: bien.creado_por_email || '—' },
+                ].map(({ term, value }) => (
+                  <div key={term} className="px-6 py-4 sm:grid sm:grid-cols-2 sm:gap-4">
+                    <dt className="text-sm font-medium text-muted-foreground">{term}</dt>
+                    <dd className="mt-1 text-foreground sm:mt-0">{value}</dd>
+                  </div>
+                ))}
+
+                {(bien.marca || bien.modelo || bien.serie || bien.orden_compra || bien.valor != null) && (
+                  <>
+                    <div className="px-6 py-3 bg-amber-50/40 dark:bg-amber-950/20">
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                        Datos SIGA PJ
+                      </p>
                     </div>
-                  ))}
-              </>
-            )}
-          </dl>
+                    {[
+                      { term: 'Marca', value: bien.marca },
+                      { term: 'Modelo', value: bien.modelo },
+                      { term: 'N° Serie', value: bien.serie },
+                      { term: 'Orden de compra', value: bien.orden_compra },
+                      { term: 'Valor', value: bien.valor != null ? `S/. ${bien.valor.toLocaleString()}` : null },
+                    ]
+                      .filter(({ value }) => value != null)
+                      .map(({ term, value }) => (
+                        <div key={term} className="px-6 py-4 sm:grid sm:grid-cols-2 sm:gap-4">
+                          <dt className="text-sm font-medium text-muted-foreground">{term}</dt>
+                          <dd className="mt-1 text-foreground sm:mt-0">{value}</dd>
+                        </div>
+                      ))}
+                  </>
+                )}
+              </dl>
 
-          <div className="px-6 py-4 bg-slate-50/50 flex flex-wrap gap-3">
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => navigate(`/bienes/${bien.id}/editar`)}
-                className="btn-primary"
-              >
-                Editar
-              </button>
-            )}
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="btn-danger"
-              >
-                {deleting ? 'Eliminando...' : 'Eliminar'}
-              </button>
-            )}
-          </div>
-        </div>
+              <Separator />
+              <div className="px-6 py-4 flex flex-wrap gap-3">
+                {canEdit && (
+                  <Button variant="secondary" onClick={() => navigate(`/bienes/${bien.id}/editar`)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                )}
+                {isAdmin && (
+                  <Button
+                    variant="destructive"
+                    disabled={deleting}
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    {deleting
+                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Eliminando…</>
+                      : <><Trash2 className="h-4 w-4 mr-2" />Eliminar</>
+                    }
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Historial de cambios */}
-        {historial.length > 0 && (
-          <div className="mt-6 card overflow-hidden">
-            <div className="px-6 py-3 border-b border-slate-100">
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
-                Historial de cambios
-              </h2>
-            </div>
-            <ul className="divide-y divide-slate-100">
-              {historial.map((h) => {
-                const etiquetaCampo: Record<string, string> = {
-                  estado: 'Estado',
-                  responsable: 'Responsable',
-                  ubicacion: 'Ubicación',
-                  creacion: 'Alta',
-                  eliminacion: 'Baja',
-                }
-                const accion = h.accion ?? 'edicion'
-                const fecha = new Date(h.fecha).toLocaleString('es-PE', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-                return (
-                  <li key={h.id} className="px-6 py-3 flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-4">
-                    <span className="text-xs text-slate-400 shrink-0 w-36">{fecha}</span>
-                    <span className="text-xs text-slate-500 shrink-0 max-w-[200px] truncate" title={h.usuario_email ?? undefined}>
-                      {h.usuario_email ?? '—'}
-                    </span>
-                    <span className="text-xs font-semibold text-slate-600 w-28 shrink-0">
-                      {accion === 'creacion' ? 'Alta' : accion === 'eliminacion' ? 'Baja' : etiquetaCampo[h.campo] ?? h.campo}
-                    </span>
-                    <span className="text-sm text-slate-700 flex-1 min-w-0">
-                      <span className="text-slate-400">{h.valor_antes ?? '—'}</span>
-                      <span className="mx-2 text-slate-300">→</span>
-                      <span className="font-medium text-slate-900">{h.valor_despues ?? '—'}</span>
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
+          {historial.length > 0 && (
+            <Card>
+              <div className="px-6 py-3 border-b border-border">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Historial de cambios
+                </h2>
+              </div>
+              <CardContent className="p-0">
+                <ul className="divide-y divide-border">
+                  {historial.map((h) => {
+                    const accion = h.accion ?? 'edicion'
+                    const fecha = new Date(h.fecha).toLocaleString('es-PE', {
+                      day: '2-digit', month: '2-digit', year: 'numeric',
+                      hour: '2-digit', minute: '2-digit',
+                    })
+                    const inicial = h.usuario_email ? h.usuario_email[0].toUpperCase() : '?'
+                    return (
+                      <li key={h.id} className="px-6 py-3 flex items-start gap-3">
+                        <Avatar className="h-7 w-7 shrink-0 mt-0.5">
+                          <AvatarFallback className="text-[10px]">{inicial}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span
+                              className="text-xs font-medium text-foreground truncate max-w-[200px]"
+                              title={h.usuario_email ?? undefined}
+                            >
+                              {h.usuario_email ?? '—'}
+                            </span>
+                            <span className="text-xs text-muted-foreground shrink-0">{fecha}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-semibold text-foreground">
+                              {accion === 'creacion' ? 'Alta'
+                                : accion === 'eliminacion' ? 'Baja'
+                                : ETIQUETA_CAMPO[h.campo] ?? h.campo}
+                            </span>
+                            {accion !== 'creacion' && accion !== 'eliminacion' && (
+                              <>
+                                {' '}
+                                <span className="text-muted-foreground/60">{h.valor_antes ?? '—'}</span>
+                                <span className="mx-1">→</span>
+                                <span className="font-medium text-foreground">{h.valor_despues ?? '—'}</span>
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
         </>
-        )
-      })()}
+      )}
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este bien?</AlertDialogTitle>
+            <AlertDialogDescription>
+              El bien con código{' '}
+              <span className="font-mono font-semibold">{bien?.codigo_patrimonial}</span>{' '}
+              quedará marcado como eliminado. Solo los administradores pueden ver bienes eliminados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void ejecutarDelete()}
+            >
+              Sí, eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

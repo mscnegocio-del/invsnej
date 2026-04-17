@@ -1,5 +1,10 @@
 import { useRef, useState, useEffect } from 'react'
+import { Camera, Flashlight, RefreshCw, ScanLine, Loader2, Pencil } from 'lucide-react'
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+import { Alert, AlertDescription } from './ui/alert'
 
 const ROTATION_KEY = 'inv-web-camera-rotation'
 
@@ -11,7 +16,7 @@ function getStoredRotation(): number {
       if ([0, 90, 180, 270].includes(n)) return n
     }
   } catch {
-    /* noop: localStorage no disponible */
+    /* noop */
   }
   return 0
 }
@@ -36,11 +41,7 @@ export function BarcodeScanner({ onDetected, hideManualInput = false }: Props) {
     toggleTorch,
     captureManual,
     capturing,
-  } = useBarcodeScanner({
-    onCode: onDetected,
-    containerRef,
-    videoRef,
-  })
+  } = useBarcodeScanner({ onCode: onDetected, containerRef, videoRef })
 
   useEffect(() => {
     try {
@@ -70,7 +71,6 @@ export function BarcodeScanner({ onDetected, hideManualInput = false }: Props) {
             style={{ transform: `rotate(${rotation}deg)` }}
           />
         )}
-        {/* Marco de área de escaneo */}
         <div
           className="absolute inset-[20%] rounded-xl border-2 border-emerald-400/80 shadow-[0_0_24px_rgba(52,211,153,0.3)] pointer-events-none"
           aria-hidden
@@ -79,70 +79,63 @@ export function BarcodeScanner({ onDetected, hideManualInput = false }: Props) {
 
       <div className="flex flex-wrap items-center gap-3">
         {!useQuagga && captureManual != null && (
-          <button
-            type="button"
-            onClick={captureManual}
-            disabled={capturing}
-            className="btn-primary"
-          >
-            {capturing ? (
-              <>
-                <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Leyendo...
-              </>
-            ) : (
-              '📸 Capturar y leer'
-            )}
-          </button>
+          <Button type="button" onClick={captureManual} disabled={capturing} className="gap-2">
+            {capturing
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Leyendo…</>
+              : <><Camera className="h-4 w-4" /> Capturar y leer</>
+            }
+          </Button>
         )}
         {hasTorch && (
-          <button
-            type="button"
-            onClick={toggleTorch}
-            className="btn-secondary"
-          >
+          <Button type="button" variant="secondary" onClick={toggleTorch} className="gap-2">
+            <Flashlight className="h-4 w-4" />
             {torchOn ? 'Apagar flash' : 'Encender flash'}
-          </button>
+          </Button>
         )}
         {!useQuagga && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={cycleRotation}
-            className="btn-ghost text-sm"
             title="Rotar vista de cámara"
+            className="gap-1.5"
           >
-            🔄 Rotar vista ({rotation}°)
-          </button>
+            <RefreshCw className="h-3.5 w-3.5" />
+            Rotar ({rotation}°)
+          </Button>
         )}
         {!hideManualInput && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setShowManualInput((v) => !v)}
-            className="btn-ghost text-sm"
             title="Si la cámara no lee bien, escribe el código a mano"
+            className="gap-1.5"
           >
-            ✏️ Escribir manualmente
-          </button>
+            <Pencil className="h-3.5 w-3.5" />
+            Escribir manualmente
+          </Button>
         )}
       </div>
 
       {!hideManualInput && showManualInput && (
-        <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <label htmlFor="manual-code" className="text-sm font-medium text-slate-700">
-            Código patrimonial
-          </label>
+        <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-4">
+          <Label htmlFor="manual-code">Código patrimonial</Label>
           <div className="flex gap-2">
-            <input
+            <Input
               id="manual-code"
               type="text"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
               placeholder="Ej: PAT-2024-00123"
-              className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
               autoComplete="off"
+              className="flex-1"
             />
-            <button
+            <Button
               type="button"
+              disabled={!manualCode.trim()}
               onClick={() => {
                 const code = manualCode.trim()
                 if (code) {
@@ -151,31 +144,32 @@ export function BarcodeScanner({ onDetected, hideManualInput = false }: Props) {
                   setShowManualInput(false)
                 }
               }}
-              disabled={!manualCode.trim()}
-              className="btn-primary shrink-0"
+              className="shrink-0 gap-2"
             >
+              <ScanLine className="h-4 w-4" />
               Continuar
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {error && (
-        <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
-          {error}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
       {!error && (
-        <div className="text-slate-600 text-sm space-y-1">
+        <div className="text-muted-foreground text-sm space-y-1">
           <p>Centra solo el código de barras en el recuadro verde.</p>
-          <p className="text-slate-500 text-xs">
-            Mantén una distancia de 15–30 cm. Si se ve borro, aleja un poco la cámara. Para códigos pequeños, aléjate hasta que se vea nítido.
+          <p className="text-xs">
+            Mantén una distancia de 15–30 cm. Si se ve borroso, aleja un poco la cámara.
+            Para códigos pequeños, aléjate hasta que se vea nítido.
           </p>
-          <p className="text-slate-500 text-xs">
+          <p className="text-xs">
             {useQuagga
               ? 'Quagga2 detecta códigos en distintos ángulos y tamaños.'
               : 'Si no se lee automático: usa «Capturar y leer». Evita reflejos; prueba sin flash en etiquetas brillantes.'}
-            {!useQuagga && rotation !== 0 && ' Usa «Rotar vista» si la imagen se ve mal.'}
+            {!useQuagga && rotation !== 0 && ' Usa «Rotar» si la imagen se ve mal.'}
           </p>
         </div>
       )}

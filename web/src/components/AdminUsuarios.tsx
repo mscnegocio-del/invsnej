@@ -1,29 +1,45 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Loader2, UserPlus } from 'lucide-react'
 import { inviteUser, listAdminUsers, updateUserProfile } from '../lib/adminUsersApi'
 import { useAuth } from '../context/AuthContext'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Badge } from './ui/badge'
+import { Card, CardHeader, CardContent, CardTitle } from './ui/card'
+import { Alert, AlertDescription } from './ui/alert'
+import { Skeleton } from './ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from './ui/table'
 import type { AccesoEstado, AdminUserRow, AppRole } from '../types'
 
 const ROLES: AppRole[] = ['admin', 'operador', 'consulta']
 
-function estadoLabel(e: AccesoEstado): string {
+function estadoVariant(e: AccesoEstado): 'warning' | 'success' | 'secondary' {
   switch (e) {
-    case 'pendiente':
-      return 'Pendiente'
-    case 'activo':
-      return 'Activo'
-    case 'rechazado':
-      return 'Rechazado'
+    case 'pendiente': return 'warning'
+    case 'activo': return 'success'
+    case 'rechazado': return 'secondary'
   }
 }
 
-function estadoBadgeClass(e: AccesoEstado): string {
+function estadoLabel(e: AccesoEstado): string {
   switch (e) {
-    case 'pendiente':
-      return 'bg-amber-100 text-amber-900'
-    case 'activo':
-      return 'bg-emerald-100 text-emerald-900'
-    case 'rechazado':
-      return 'bg-slate-200 text-slate-800'
+    case 'pendiente': return 'Pendiente'
+    case 'activo': return 'Activo'
+    case 'rechazado': return 'Rechazado'
   }
 }
 
@@ -44,27 +60,17 @@ export function AdminUsuarios() {
       const data = await listAdminUsers()
       setRows(data)
     } catch (e) {
-      console.error(e)
-      setError(
-        e instanceof Error && e.message
-          ? e.message
-          : 'No se pudo cargar la lista de usuarios. Verifica la función Edge «admin-users» y tu rol.',
-      )
+      setError(e instanceof Error && e.message ? e.message : 'No se pudo cargar la lista de usuarios.')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => {
-    void load()
-  }, [load])
+  useEffect(() => { void load() }, [load])
 
   const handleInvite = async () => {
     const email = inviteEmail.trim()
-    if (!email) {
-      setError('Ingresa un correo para invitar.')
-      return
-    }
+    if (!email) { setError('Ingresa un correo para invitar.'); return }
     setInviteBusy(true)
     setError(null)
     try {
@@ -73,7 +79,6 @@ export function AdminUsuarios() {
       await load()
       await refreshPerfil()
     } catch (e) {
-      console.error(e)
       setError(e instanceof Error ? e.message : 'No se pudo enviar la invitación.')
     } finally {
       setInviteBusy(false)
@@ -86,8 +91,7 @@ export function AdminUsuarios() {
       await updateUserProfile(row.id, { app_role })
       await load()
       if (row.id === user?.id) await refreshPerfil()
-    } catch (e) {
-      console.error(e)
+    } catch {
       setError('No se pudo actualizar el rol.')
     } finally {
       setRowBusy(null)
@@ -100,8 +104,7 @@ export function AdminUsuarios() {
       await updateUserProfile(row.id, { acceso_estado })
       await load()
       if (row.id === user?.id) await refreshPerfil()
-    } catch (e) {
-      console.error(e)
+    } catch {
       setError('No se pudo actualizar el estado de acceso.')
     } finally {
       setRowBusy(null)
@@ -111,133 +114,121 @@ export function AdminUsuarios() {
   return (
     <div className="space-y-6">
       <p className="page-subtitle">
-        Invita usuarios por correo. Quedarán en estado pendiente hasta que apruebes el acceso y confirmes el rol.
+        Invita usuarios por correo. Quedarán en estado pendiente hasta que apruebes el acceso.
       </p>
 
-      <section className="card p-6 max-w-xl space-y-4">
-        <h2 className="text-base font-semibold text-slate-900">Invitar usuario</h2>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            type="email"
-            className="input flex-1"
-            placeholder="correo@dominio.gob.pe"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-          />
-          <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as AppRole)} className="input sm:w-40">
-            {ROLES.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="btn-primary shrink-0" disabled={inviteBusy} onClick={() => void handleInvite()}>
-            {inviteBusy ? 'Enviando…' : 'Invitar'}
-          </button>
-        </div>
-        <p className="text-xs text-slate-500">
-          La invitación se envía por correo. Configura la variable APP_URL en la función Edge para el enlace de retorno.
-        </p>
-      </section>
-
-      {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 max-w-xl">{error}</p>}
-
-      <section className="card overflow-hidden max-w-4xl">
-        <div className="px-4 py-3 border-b border-slate-100">
-          <h2 className="text-base font-semibold text-slate-900">Usuarios</h2>
-        </div>
-        {loading ? (
-          <p className="p-6 text-slate-600">
-            <span className="size-4 inline-block animate-spin rounded-full border-2 border-teal-500 border-t-transparent mr-2 align-[-2px]" />
-            Cargando…
+      <Card className="max-w-xl">
+        <CardHeader>
+          <CardTitle className="text-base">Invitar usuario</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Input
+              type="email"
+              className="flex-1"
+              placeholder="correo@dominio.gob.pe"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleInvite() }}
+            />
+            <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as AppRole)}>
+              <SelectTrigger className="sm:w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => void handleInvite()} disabled={inviteBusy} className="gap-2 shrink-0">
+              {inviteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              {inviteBusy ? 'Enviando…' : 'Invitar'}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            La invitación se envía por correo. Configura APP_URL en la función Edge para el enlace.
           </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="text-left px-4 py-2 font-medium">Correo</th>
-                  <th className="text-left px-4 py-2 font-medium">Rol</th>
-                  <th className="text-left px-4 py-2 font-medium">Estado</th>
-                  <th className="text-left px-4 py-2 font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+        </CardContent>
+      </Card>
+
+      {error && (
+        <Alert variant="destructive" className="max-w-xl">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <Card className="overflow-hidden max-w-4xl">
+        <CardHeader className="border-b border-border py-3">
+          <CardTitle className="text-base">Usuarios del sistema</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-6 space-y-3">
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Correo</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="text-slate-800">
-                    <td className="px-4 py-2 font-mono text-xs">{row.email ?? '—'}</td>
-                    <td className="px-4 py-2">
-                      <select
+                  <TableRow key={row.id}>
+                    <TableCell className="font-mono text-xs">{row.email ?? '—'}</TableCell>
+                    <TableCell>
+                      <Select
                         value={row.app_role}
-                        onChange={(e) => void handleRoleChange(row, e.target.value as AppRole)}
+                        onValueChange={(v) => void handleRoleChange(row, v as AppRole)}
                         disabled={rowBusy === row.id}
-                        className="input py-1.5 text-sm min-w-[8rem]"
                       >
-                        {ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${estadoBadgeClass(row.acceso_estado)}`}
-                      >
+                        <SelectTrigger className="h-8 w-32 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={estadoVariant(row.acceso_estado)}>
                         {estadoLabel(row.acceso_estado)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="flex flex-wrap gap-2">
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1.5">
                         {row.acceso_estado === 'pendiente' && (
                           <>
-                            <button
-                              type="button"
-                              className="btn-primary text-xs py-1.5 px-2"
-                              disabled={rowBusy === row.id}
-                              onClick={() => void setAcceso(row, 'activo')}
-                            >
+                            <Button size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => void setAcceso(row, 'activo')}>
                               Aprobar
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-secondary text-xs py-1.5 px-2"
-                              disabled={rowBusy === row.id}
-                              onClick={() => void setAcceso(row, 'rechazado')}
-                            >
+                            </Button>
+                            <Button variant="secondary" size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => void setAcceso(row, 'rechazado')}>
                               Rechazar
-                            </button>
+                            </Button>
                           </>
                         )}
                         {row.acceso_estado === 'activo' && row.id !== user?.id && (
-                          <button
-                            type="button"
-                            className="btn-secondary text-xs py-1.5 px-2"
-                            disabled={rowBusy === row.id}
-                            onClick={() => void setAcceso(row, 'rechazado')}
-                          >
+                          <Button variant="secondary" size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => void setAcceso(row, 'rechazado')}>
                             Suspender
-                          </button>
+                          </Button>
                         )}
                         {row.acceso_estado === 'rechazado' && (
-                          <button
-                            type="button"
-                            className="btn-primary text-xs py-1.5 px-2"
-                            disabled={rowBusy === row.id}
-                            onClick={() => void setAcceso(row, 'activo')}
-                          >
+                          <Button size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => void setAcceso(row, 'activo')}>
                             Reactivar
-                          </button>
+                          </Button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
