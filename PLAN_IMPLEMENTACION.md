@@ -8,7 +8,9 @@ Sistema de inventario web con escaneo de barras, validación de duplicados, CRUD
 
 ## Estado actual (resumen ejecutivo)
 
-✅ **Fases 0–15**: Completadas en línea con el código (app en producción / Vercel).
+✅ **Fases 0–16**: Completadas en línea con el código (app en producción / Vercel).
+
+🎨 **Fase 17 (shadcn/ui + temas dark mode)**: **implementado** — componentes UI modernos, dark mode/light mode, Lucide icons, react-hook-form + zod, validación tipada.
 
 ✅ **Mejoras posteriores a la Fase 15** (también implementadas):
 - Alerta de duplicado cuando el bien existe en **otra sede** (`Scan` + `DuplicateAlert` con nombre de sede de origen).
@@ -452,11 +454,264 @@ Consultas ejecutadas en Supabase vía MCP para validar estado real de Fase 16:
 
 ---
 
+---
+
+## Fase 17: shadcn/ui + Tema oscuro/claro (NUEVO - abril 2026)
+
+Modernización de la interfaz visual con componentes composables, soporte de tema oscuro/claro y validación de formularios tipada.
+
+### 17.0 — Dependencias instaladas
+
+```json
+{
+  "@radix-ui/*": "UI primitives (dialog, select, dropdown-menu, tabs, table, etc.)",
+  "class-variance-authority": "Utilidad para variantes de componentes",
+  "clsx": "Utilidad para condicionales CSS",
+  "cmdk": "Comando/combobox para búsquedas (searchable selects)",
+  "lucide-react": "Iconografía moderna",
+  "next-themes": "Soporte dark mode/light mode con localStorage",
+  "react-hook-form": "Gestión de formularios",
+  "sonner": "Toast notifications (opcional, instalado)",
+  "tailwind-merge": "Merge intelligent de clases Tailwind",
+  "zod": "Validación de esquemas tipada"
+}
+```
+
+### 17.1 — Estructura de componentes UI
+
+Carpeta `web/src/components/ui/` con componentes base (auto-generados por `shadcn-ui`):
+
+```
+ui/
+├── alert-dialog.tsx          # AlertDialog (confirmaciones)
+├── alert.tsx                 # Alert (mensajes)
+├── avatar.tsx                # Avatar (fotos de usuario)
+├── badge.tsx                 # Badge (etiquetas)
+├── button.tsx                # Button (base con variantes)
+├── card.tsx                  # Card (contenedores)
+├── command.tsx               # Command (combobox, búsqueda)
+├── dialog.tsx                # Dialog (modales)
+├── dropdown-menu.tsx         # DropdownMenu (menús)
+├── form.tsx                  # Form (integración react-hook-form)
+├── input.tsx                 # Input (campos texto)
+├── label.tsx                 # Label (etiquetas)
+├── popover.tsx               # Popover (popovers)
+├── progress.tsx              # Progress (barra progreso)
+├── scroll-area.tsx           # ScrollArea (área scrolleable)
+├── select.tsx                # Select (dropdown select)
+├── separator.tsx             # Separator (líneas divisoras)
+├── sheet.tsx                 # Sheet (side panel)
+├── skeleton.tsx              # Skeleton (loading placeholder)
+├── switch.tsx                # Switch (toggle)
+├── table.tsx                 # Table (tablas)
+├── tabs.tsx                  # Tabs (pestaña)
+├── textarea.tsx              # Textarea (áreas texto)
+└── tooltip.tsx               # Tooltip (tooltips)
+```
+
+### 17.2 — Archivo de configuración `components.json`
+
+```json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "default",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/index.css",
+    "baseColor": "zinc",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "iconLibrary": "lucide"
+}
+```
+
+### 17.3 — Tema oscuro/claro con `next-themes`
+
+**En `web/src/main.tsx`:**
+- Wrapping de `<App>` con `<ThemeProvider attribute="class" defaultTheme="system" enableSystem>`
+- Persiste preferencia en localStorage: `theme` key
+
+**En `web/src/components/Layout.tsx`:**
+- Componente `ThemeToggle` con botón `<Button variant="ghost" size="icon">` + icono Lucide (Sun/Moon)
+- Usa hook `useTheme()` para cambiar entre `'light'` y `'dark'`
+
+**En `web/src/index.css`:**
+- CSS variables para colores (light y dark) usando Tailwind CSS 4
+- Clases `.light` y `.dark` automáticas
+
+**Uso en componentes:**
+```tsx
+<div className="bg-white dark:bg-slate-900">
+  Contenido que cambia de color con el tema
+</div>
+```
+
+### 17.4 — Modernización de componentes
+
+**Componentes afectados (reescribir con shadcn/ui):**
+
+| Componente | Cambios |
+|-----------|---------|
+| **Layout** | Button (variant, size, icon), Separator, tema toggle |
+| **Home** | Card (CardContent), Badge para contador passkeys |
+| **Login** | Form (react-hook-form), Input, Button, AlertDialog para errores |
+| **BienForm** | Form (react-hook-form), Input, Select, Tabs, Button, Card |
+| **BienDetail** | Card, Tabs, Table, AlertDialog (delete), Badge (estado) |
+| **Search** | Card (filtros), Table (resultados), Button (acciones) |
+| **DuplicateAlert** | AlertDialog (shadcn), Badge, Button |
+| **Admin** | Card, Input, Button, Progress (carga Excel), Table (usuarios) |
+| **Security** | Card, Table (passkeys), AlertDialog (revocar), Button, Dialog (nueva passkey) |
+| **BarcodeScanModal** | Dialog (shadcn), Button |
+| **BarcodeScanner** | Button (variantes), fallback para input manual |
+
+### 17.5 — Validación de formularios: react-hook-form + zod
+
+**Ejemplo en `BienForm`:**
+
+```tsx
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+
+const bienSchema = z.object({
+  codigo_patrimonial: z.string().min(1, 'Código requerido'),
+  nombre_mueble_equipo: z.string().min(1, 'Nombre requerido'),
+  estado: z.enum(['Nuevo', 'Bueno', 'Regular', 'Malo', 'Muy malo']),
+  // ... más campos
+})
+
+type BienFormData = z.infer<typeof bienSchema>
+
+export function BienForm() {
+  const form = useForm<BienFormData>({
+    resolver: zodResolver(bienSchema),
+    defaultValues: { /* ... */ }
+  })
+
+  function onSubmit(data: BienFormData) {
+    // Guardar en Supabase
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <FormField
+          control={form.control}
+          name="codigo_patrimonial"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Código patrimonial</FormLabel>
+              <FormControl>
+                <Input placeholder="Ej: 001234567" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit">Guardar</Button>
+      </form>
+    </Form>
+  )
+}
+```
+
+### 17.6 — Utilidad `cn()` para clases dinámicas
+
+En `web/src/lib/utils.ts`:
+
+```typescript
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+```
+
+**Uso:**
+
+```tsx
+<Button className={cn('px-4 py-2', isActive && 'bg-blue-500')}>
+  Click me
+</Button>
+```
+
+### 17.7 — Lucide Icons integrados
+
+**Importar desde `lucide-react`:**
+
+```tsx
+import { Home, ScanLine, Search, Users, Shield, LogOut, Sun, Moon } from 'lucide-react'
+
+// Usar con tamaño
+<Home className="h-4 w-4" />
+<ScanLine className="h-6 w-6 text-blue-500" />
+```
+
+**Icons comúnmente usados en este proyecto:**
+- `Home`, `ScanLine`, `Search` — navegación
+- `Users`, `Shield` — admin
+- `LogOut` — cerrar sesión
+- `Sun`, `Moon` — tema toggle
+- `ChevronLeft`, `ChevronRight` — navegación
+- `RefreshCw` — recargar
+- `Trash2`, `Edit` — acciones
+- `Download`, `Copy`, `FileText` — exportación
+- `AlertCircle`, `CheckCircle` — estado
+
+### Flujo de cambios Fase 17
+
+```
+1. Agregar dependencias shadcn/ui (@radix-ui/*, tailwind-merge, etc.)
+2. Ejecutar `npx shadcn-ui@latest init` → genera components.json y estructura ui/
+3. Instalar componentes individuales según necesidad (dialog, form, table, etc.)
+4. Configurar next-themes en main.tsx y layout
+5. Reescribir componentes existentes usando shadcn/ui base
+6. Validación de formularios con react-hook-form + zod
+7. Tests visuales en móvil (light mode + dark mode)
+8. Build sin errores
+
+```
+
+### Checklist Fase 17
+
+- [x] Dependencias shadcn/ui instaladas
+- [x] Componentes UI generados en `web/src/components/ui/`
+- [x] `components.json` configurado
+- [x] `next-themes` integrado en `main.tsx`
+- [x] `ThemeToggle` en `Layout.tsx` (botón Sun/Moon)
+- [x] Componentes rediseñados: `Home`, `Layout`, `BienForm`, `Search`, `BienDetail`, `Admin`, `Login`, `Security`
+- [x] Validación: react-hook-form + zod en formularios
+- [x] Lucide icons integrados
+- [x] Dark mode funcional (CSS variables)
+- [x] Responsive mobile-first con Tailwind 4
+- [x] Build sin errores
+- [x] PWA instalable
+- [x] Tests visuales: light/dark mode en producción
+
+---
+
 ## Resumen de arquitectura actualizada
 
 ### Stack
 - React 19 + Vite 6
-- Tailwind CSS
+- **Tailwind CSS 4** + **shadcn/ui** (componentes composables)
+- **Lucide React** (iconografía)
+- **next-themes** (dark mode/light mode)
+- **react-hook-form** + **zod** (validación)
 - Supabase
 - **Quagga2** (escáner fallback)
 - BarcodeDetector (nativo)
@@ -477,6 +732,10 @@ Consultas ejecutadas en Supabase vía MCP para validar estado real de Fase 16:
 10. **Cache de datos maestros**: trabajadores, ubicaciones y sedes con **TTL 1 min** y `reload()` manual
 11. **Historial de cambios** en ficha de bien (`bien_historial`) para estado, responsable y ubicación
 12. **Autocompletado de nombre** desde `siga_bienes` al registrar (`NombreSearchableInput`)
+13. **🎨 Interfaz moderna:** shadcn/ui + Tailwind CSS 4 + Lucide icons
+14. **🌙 Dark mode/Light mode:** tema persistente en localStorage (next-themes)
+15. **✅ Validación tipada:** react-hook-form + zod en todos los formularios
+16. **♿ Accesibilidad:** componentes shadcn/ui con ARIA, keyboard navigation
 
 ### Base de datos
 - 1900+ registros de bienes (orden de magnitud)
@@ -486,26 +745,34 @@ Consultas ejecutadas en Supabase vía MCP para validar estado real de Fase 16:
 - Tabla `bien_historial`: historial de cambios en campos clave del bien
 - Modelo: `ubicacion` como texto (nombre); registros antiguos pueden tener ID como string hasta normalizar
 
-### Estructura de archivos relevantes (actualizada)
+### Estructura de archivos relevantes (actualizada - Fase 17)
 
 ```
 web/src/
 ├── components/
-│   ├── Layout.tsx              # Barra navegación + sede activa
+│   ├── ui/                             # ← shadcn/ui components
+│   │   ├── button.tsx, input.tsx, card.tsx
+│   │   ├── dialog.tsx, alert-dialog.tsx, form.tsx
+│   │   ├── table.tsx, select.tsx, tabs.tsx
+│   │   ├── badge.tsx, progress.tsx, separator.tsx
+│   │   └── ... (20+ componentes)
+│   ├── Layout.tsx              # Barra navegación + sede + theme toggle
 │   ├── AuthGuard.tsx           # Sesión requerida
 │   ├── AuthenticatedShell.tsx  # SedeSelector si no hay sede
 │   ├── RoleGuard.tsx           # admin / operador / consulta
-│   ├── BienForm.tsx            # sede_id, SIGA, historial al editar, NombreSearchableInput
-│   ├── BienDetail.tsx          # SIGA, sede, historial
-│   ├── DuplicateAlert.tsx      # Incluye sede origen y ubicación resuelta
-│   ├── NombreSearchableInput.tsx
-│   ├── BarcodeScanModal.tsx / BarcodeScanner.tsx
-│   └── TrabajadorSearchableSelect.tsx
+│   ├── BienForm.tsx            # ← react-hook-form + zod
+│   ├── BienDetail.tsx          # ← Card, Tabs, Table (shadcn/ui)
+│   ├── DuplicateAlert.tsx      # ← AlertDialog, Badge (shadcn/ui)
+│   ├── NombreSearchableInput.tsx  # ← Command/Combobox
+│   ├── BarcodeScanModal.tsx    # ← Dialog (shadcn/ui)
+│   ├── BarcodeScanner.tsx
+│   └── TrabajadorSearchableSelect.tsx # ← Popover + Command (shadcn/ui)
 ├── pages/
-│   ├── Login.tsx / AuthCallback.tsx
+│   ├── Login.tsx / AuthCallback.tsx    # ← Form, AlertDialog
 │   ├── SedeSelector.tsx
-│   ├── Admin.tsx
-│   ├── Scan.tsx / Search.tsx
+│   ├── Admin.tsx                       # ← Card, Progress, Table
+│   ├── Scan.tsx / Search.tsx           # ← Card, Button, Table
+│   ├── Security.tsx                    # ← Table, AlertDialog, Dialog
 │   └── ...
 ├── context/
 │   ├── AuthContext.tsx
@@ -513,8 +780,14 @@ web/src/
 │   └── CatalogContext.tsx
 ├── hooks/
 │   └── useWebAuthn.ts
-└── App.tsx                     # Rutas + guards
+├── lib/
+│   └── utils.ts                # ← cn() para clases dinámicas
+├── index.css                   # ← CSS variables (light/dark mode)
+├── main.tsx                    # ← ThemeProvider
+└── App.tsx                     # ← Rutas + guards
 ```
+
+**Nota:** `components.json` en raíz configura los alias (`@/components`, `@/ui`, etc.)
 
 ---
 

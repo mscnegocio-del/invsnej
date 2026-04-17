@@ -148,6 +148,11 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | RNF-15 | Arquitectura compatible con passkeys/WebAuthn como método principal recurrente sin reescribir flujo principal |
 | RNF-16 | Operar sin dominio propio: usar dominio provisto por plataforma (Vercel) |
 | RNF-17 | Cookies/sesión seguras bajo HTTPS en entorno productivo |
+| RNF-18 | **Interfaz visual moderna:** shadcn/ui + Tailwind CSS 4 + Lucide icons |
+| RNF-19 | **Soporte dark mode/light mode:** persiste en localStorage vía next-themes |
+| RNF-20 | **Validación de formularios tipada:** react-hook-form + zod |
+| RNF-21 | **Componentes reutilizables:** Button, Input, Select, Card, Dialog, AlertDialog, Table, etc. desde shadcn/ui |
+| RNF-22 | **Accesibilidad:** componentes shadcn/ui con ARIA labels, tabindex, keyboard navigation |
 
 ---
 

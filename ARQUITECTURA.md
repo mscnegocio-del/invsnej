@@ -4,55 +4,52 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                            CELULAR (PWA)                                     │
+│                    CELULAR (PWA + shadcn/ui + Dark Mode)                    │
 │                                                                              │
-│  Home                                                                        │
-│  ├── [Registrar bien] ──► Scan                                              │
-│  │                        ├── Input código + icono cámara                   │
+│  Header: 📍 [Sede Activa] [Cambiar] | ☀️/🌙 Theme | [👤 Admin]             │
+│                                                                              │
+│  Home (Card-based UI)                                                       │
+│  ├── [Registrar bien] ──► Scan (Input + Button con icono cámara)           │
+│  │                        ├── shadcn/ui Input + Button variant             │
 │  │                        ├── Icono 📷 abre BarcodeScanModal               │
-│  │                        │   └── Modal con cámara + "Escribir manualmente" │
+│  │                        │   └── Modal (shadcn/ui Dialog) con cámara      │
 │  │                        │       ├── Detecta código → rellena input        │
-│  │                        │       └── Cierra modal                           │
-│  │                        ├── Presiona "Continuar"                           │
+│  │                        │       └── Cierra modal                          │
+│  │                        ├── Presiona "Continuar"                          │
 │  │                        └── ¿Duplicado? ──┬── Sí ──► DuplicateAlert      │
-│  │                              (query)     │         (Ver/Editar/Otro)    │
+│  │                              (query)     │    (AlertDialog shadcn)       │
 │  │                                          │                               │
-│  │                                          └── No ──► BienForm (Create)   │
-│  │                                                     └── Éxito ──►        │
-│  │                                                       Ver/Editar/Otro    │
+│  │                                          └── No ──► BienForm            │
+│  │                                            (react-hook-form + zod)      │
 │  │                                                                          │
 │  └── [Buscar] ──► Search                                                   │
-│                   ├── Filtros (código, responsable, ubicación)             │
-│                   ├── Resultados paginados (20 por página)                 │
+│                   ├── Filtros (Card containers)                            │
+│                   ├── Resultados paginados (Table shadcn/ui)               │
 │                   ├── Acciones: Copiar / JSON / CSV / Descargar todo       │
-│                   ├── Click resultado ──► BienDetail                        │
+│                   ├── Click resultado ──► BienDetail (Card + Tabs)         │
 │                   │                      ├── Ver                            │
-│                   │                      ├── Editar ──► BienForm (Update)  │
-│                   │                      └── Eliminar (confirmación)       │
+│                   │                      ├── Editar ──► BienForm           │
+│                   │                      └── Eliminar (AlertDialog)        │
 │                   │                                                         │
 │                   ├── Icono 📷 abre modal de escaneo                       │
-│                   │   └── Detecta código → rellena filtro + busca         │
-│                   │                                                         │
-│                   └── Bloque "Descargar todos los bienes"                  │
-│                       ├── Descargar todo Excel (CSV) en bloques 1000       │
-│                       └── Descargar todo JSON en bloques 1000              │
+│                   └── Bloque "Descargar todos"                             │
+│                       ├── CSV bloques 1000                                  │
+│                       └── JSON bloques 1000                                 │
 └─────────────────────────────────────────────────────────────────────────────┘
                                          │
                                          │ HTTPS
                                          ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              VERCEL                                          │
-│                     (Frontend estático / SPA)                                │
+│                     VERCEL (shadcn/ui Prebuilt)                             │
+│                     (Frontend SPA + PWA + Dark Mode)                        │
 └─────────────────────────────────────────────────────────────────────────────┘
                                          │
                                          ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                             SUPABASE                                         │
-│  • bienes (id, codigo_patrimonial, nombre_mueble_equipo, estado,            │
-│            id_trabajador, ubicacion [string], fecha_registro)               │
-│  • trabajadores (id, nombre)                                                │
-│  • ubicaciones (id, nombre)                                                 │
-│  • Índices en: codigo_patrimonial, id_trabajador, ubicacion                │
+│  • bienes, trabajadores, ubicaciones, sedes, siga_bienes, bien_historial   │
+│  • Índices en: codigo_patrimonial, id_trabajador, ubicacion, sede_id       │
+│  • RLS habilitado; autenticación: OTP + passkeys/WebAuthn                  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -181,19 +178,32 @@ BienSearch
 
 ---
 
-## 6. Componentes principales
+## 6. Componentes principales (shadcn/ui + react-hook-form)
 
-| Componente | Responsabilidad |
-|-----------|-----------------|
-| **BarcodeScanner** | Interfaz con video/canvas, marco de escaneo, botones (capturar, flash, rotar, escribir manualmente), selección de input manual de código |
-| **BarcodeScanModal** | Modal que monta `BarcodeScanner`, cámara solo activa dentro del modal, se libera al desmontar |
-| **DuplicateAlert** | Muestra código, nombre, responsable, ubicación de bien duplicado + botones Ver/Editar/Otro/Cancelar |
-| **BienForm** | Create o Update con campos: código (prellenado), nombre, tipo, estado, responsable (searchable), ubicación (select) |
-| **BienDetail** | Vista completa de bien + botones Editar / Eliminar |
-| **Search** | Filtros (código + escaneo), responsable (select buscable), ubicación, resultados paginados, acciones exportar |
-| **TrabajadorSearchableSelect** | Select buscable por nombre, usa `CatalogContext` |
-| **UbicacionSelect** | Select de ubicaciones, usa `CatalogContext` |
-| **Layout** | Navegación inferior móvil (Home, Registrar/Scan, Buscar) |
+| Componente | Responsabilidad | Componentes shadcn/ui |
+|-----------|-----------------|----------------------|
+| **BarcodeScanner** | Interfaz con video/canvas, marco de escaneo, botones (capturar, flash, rotar, escribir manualmente) | Button (variant, size) |
+| **BarcodeScanModal** | Modal que monta `BarcodeScanner`, cámara solo activa dentro | Dialog |
+| **DuplicateAlert** | Muestra código, nombre, responsable, ubicación de bien duplicado + botones | AlertDialog, Badge, Button |
+| **BienForm** | Create/Update con campos: código, nombre, tipo, estado, responsable (searchable), ubicación (select), SIGA (marca, modelo, serie, OC, valor) | Form, Input, Select, Button, Card, Tabs |
+| **BienDetail** | Vista completa de bien + SIGA + historial + botones Editar/Eliminar | Card, Tabs, Table, AlertDialog, Badge |
+| **Search** | Filtros (código + escaneo), responsable (select buscable), ubicación, resultados paginados (Table), acciones exportar | Card, Input, Button, Table, Pagination (custom) |
+| **TrabajadorSearchableSelect** | Select buscable por nombre con Combobox, usa `CatalogContext` | Popover, Command, Button |
+| **UbicacionSelect** | Select de ubicaciones, usa `CatalogContext` | Select (shadcn/ui) |
+| **Layout** | Navegación inferior móvil + header sede + theme toggle | Button, Separator, cn() utility |
+| **Admin** | Carga Excel SIGA, gestión usuarios, barra progreso | Card, Input, Button, Progress, Table, Tabs |
+| **Login** | OTP por correo + passkeys/WebAuthn | Card, Input, Button, Form, AlertDialog |
+| **Security** | Listar passkeys, registrar, revocar | Card, Button, Table, AlertDialog, Dialog |
+
+---
+
+## 6.5 Utilidades UI (shadcn/ui)
+
+- **cn()**: función de `@/lib/utils` que combina clases Tailwind con `clsx` + `tailwind-merge`
+- **Variantes**: Button usa `variant` (default, destructive, outline, secondary, ghost) + `size` (default, sm, lg, icon)
+- **Temas**: `useTheme()` de `next-themes` retorna `{theme, setTheme}`; almacena en localStorage
+- **Iconos**: Lucide React importados desde `lucide-react` (ej. `<Home className="h-4 w-4" />`)
+- **Form**: `react-hook-form` + `zod` para validación tipada
 
 ---
 

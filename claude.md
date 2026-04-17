@@ -9,13 +9,17 @@ App web de inventario patrimonial para móvil. Permite escanear códigos de barr
 ## Stack
 
 - React 19 + Vite 6 (`web/`)
-- Tailwind CSS
+- Tailwind CSS 4 + **shadcn/ui** (componentes composables)
+- **Lucide React** — iconografía moderna (integrada con shadcn/ui)
+- **next-themes** — soporte dark mode / light mode
 - Supabase (`@supabase/supabase-js`)
 - **Edge Functions (Supabase):** `passkeys` (WebAuthn/passkeys + `@simplewebauthn/server`), `admin-users` (admin)
 - **@simplewebauthn/browser** en el cliente (`useWebAuthn`, `Login`, `Security`)
 - **@marsidev/react-turnstile** — CAPTCHA en `/login` si `VITE_TURNSTILE_SITE_KEY` está definida y CAPTCHA está activo en Supabase Auth
 - **Quagga2** para fallback de escaneo (cuando BarcodeDetector no está disponible)
 - BarcodeDetector API (nativa en navegadores soportados)
+- **SheetJS** (`xlsx`) — parseo de Excel SIGA para carga masiva
+- **react-hook-form** + **zod** — validación de formularios
 - Deploy frontend: **Vercel**
 - PWA con service workers
 
@@ -128,12 +132,24 @@ web/src/
 
 - Copiar para compartir, JSON, CSV, bloques 1000 en exportación masiva
 
+## Componentes UI (shadcn/ui)
+
+- **Componentes base:** `Button`, `Input`, `Select`, `Card`, `Dialog`, `AlertDialog`, `Tabs`, `Table`, `Popover`
+- **Ubicación:** `web/src/components/ui/` — importar desde `@/components/ui`
+- **Iconos:** Lucide React (`lucide-react`) — ej. `<Home className="h-4 w-4" />`
+- **Temas:** light/dark vía `next-themes` + `useTheme()` hook
+- **Configuración:** `web/components.json` — alias, tailwind, icons
+
 ## Convenciones
 
-- Componentes funcionales + hooks
+- Componentes funcionales + hooks + **shadcn/ui**
+- Usar `cn()` (de `@/lib/utils`) para combinar clases Tailwind dinámicamente
+- **Form handling:** react-hook-form + zod (en `BienForm`, `Login`, etc.)
+- **Variantes UI:** usar `variant` y `size` en componentes shadcn/ui (ej. `<Button variant="ghost" size="icon">`)
 - Variables de entorno: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, opcional `VITE_TURNSTILE_SITE_KEY` (requerida si CAPTCHA está activo en el proyecto Supabase)
 - Idioma de la UI: español
 - Input de ubicación: nombre (string), no ID, resolviendo desde catálogo
+- **Dark mode:** tema se persiste en localStorage vía next-themes; aplicar `dark:` en CSS cuando sea necesario
 
 ## Deploy
 
