@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Bot, Send, Trash2, X, Sparkles } from 'lucide-react'
+import { Bot, Send, Trash2, Sparkles } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
