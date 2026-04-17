@@ -347,7 +347,7 @@ export function Trabajadores() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setModalOpen(false)} disabled={saving}>
+            <Button variant="outline" onClick={() => setModalOpen(false)} disabled={saving}>
               Cancelar
             </Button>
             <Button onClick={() => void handleSave()} disabled={saving}>
