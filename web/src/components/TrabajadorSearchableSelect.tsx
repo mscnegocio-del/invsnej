@@ -113,7 +113,7 @@ export function TrabajadorSearchableSelect({
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0 z-50" align="start" sideOffset={4}>
+        <PopoverContent className="w-full p-0 z-50" align="start" sideOffset={8} avoidCollisions={true}>
           <Command>
             <CommandInput
               placeholder="Buscar responsable…"
