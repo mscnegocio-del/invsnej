@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom'
 import { BienForm } from '../components/BienForm'
+import { Card, CardContent } from '../components/ui/card'
 
 export function Registro() {
   const [searchParams] = useSearchParams()
@@ -11,9 +12,11 @@ export function Registro() {
       <p className="page-subtitle">Completa la información del bien antes de guardarlo en el inventario.</p>
 
       <section className="mt-6">
-        <div className="card p-6">
-          <BienForm initialCodigo={codigo} />
-        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <BienForm initialCodigo={codigo} />
+          </CardContent>
+        </Card>
       </section>
     </div>
   )

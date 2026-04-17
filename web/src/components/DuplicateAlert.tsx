@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom'
+import { AlertTriangle, MapPin, Eye, Pencil, Plus, X } from 'lucide-react'
 import { useCatalogs } from '../context/CatalogContext'
+import { Button } from './ui/button'
+import { Alert, AlertTitle, AlertDescription } from './ui/alert'
 import type { BienResumen } from '../types'
 
 type Props = {
   codigo: string
   bien: BienResumen
-  /** Nombre de la sede donde está registrado si es distinta a la sede activa. null = misma sede o sin info de sede. */
   sedeOrigen?: string | null
   onRegisterAnother: () => void
   onCancel: () => void
@@ -27,89 +29,82 @@ export function DuplicateAlert({ codigo, bien, sedeOrigen, onRegisterAnother, on
   })()
 
   return (
-    <section
-      className={`mt-6 rounded-2xl border p-5 shadow-sm ${
-        esOtraSede
-          ? 'border-orange-300 bg-orange-50'
-          : 'border-amber-200 bg-amber-50'
-      }`}
-    >
-      <h2
-        className={`text-lg font-semibold ${
-          esOtraSede ? 'text-orange-900' : 'text-amber-900'
-        }`}
-      >
+    <Alert variant={esOtraSede ? 'destructive' : 'warning'} className="mt-6">
+      <AlertTriangle className="h-4 w-4" />
+      <AlertTitle>
         {esOtraSede ? 'Bien registrado en otra sede' : 'Bien ya registrado'}
-      </h2>
+      </AlertTitle>
+      <AlertDescription className="mt-2 space-y-3">
+        <p>
+          {esOtraSede ? (
+            <>
+              El código <strong>{codigo}</strong> ya está registrado en la sede{' '}
+              <strong>{sedeOrigen}</strong>. Verifica con el responsable antes de duplicarlo.
+            </>
+          ) : (
+            <>
+              El código <strong>{codigo}</strong> ya existe en el inventario de esta sede.
+            </>
+          )}
+        </p>
 
-      <p className={`mt-2 text-sm ${esOtraSede ? 'text-orange-800' : 'text-amber-800'}`}>
-        {esOtraSede ? (
-          <>
-            El código <strong>{codigo}</strong> ya está registrado en la sede{' '}
-            <strong>{sedeOrigen}</strong>. Verifica con el responsable antes de duplicarlo.
-          </>
-        ) : (
-          <>
-            El código <strong>{codigo}</strong> ya existe en el inventario de esta sede.
-          </>
-        )}
-      </p>
-
-      <dl className="mt-4 space-y-2">
-        <div>
-          <dt className={`text-sm font-medium ${esOtraSede ? 'text-orange-700' : 'text-amber-700'}`}>
-            Nombre / modelo
-          </dt>
-          <dd className={esOtraSede ? 'text-orange-900' : 'text-amber-900'}>
-            {bien.nombre_mueble_equipo || 'Sin nombre registrado'}
-          </dd>
-        </div>
-        <div>
-          <dt className={`text-sm font-medium ${esOtraSede ? 'text-orange-700' : 'text-amber-700'}`}>
-            Ubicación actual
-          </dt>
-          <dd className={esOtraSede ? 'text-orange-900' : 'text-amber-900'}>
-            {ubicacionNombre || 'Sin ubicación registrada'}
-          </dd>
-        </div>
-        {esOtraSede && (
+        <dl className="space-y-1.5 text-sm">
           <div>
-            <dt className="text-sm font-medium text-orange-700">Sede de origen</dt>
-            <dd className="text-orange-900 font-semibold">{sedeOrigen}</dd>
+            <dt className="font-medium opacity-70">Nombre / modelo</dt>
+            <dd className="font-semibold">{bien.nombre_mueble_equipo || 'Sin nombre registrado'}</dd>
           </div>
-        )}
-      </dl>
+          <div>
+            <dt className="font-medium opacity-70 flex items-center gap-1">
+              <MapPin className="h-3 w-3" /> Ubicación actual
+            </dt>
+            <dd className="font-semibold">{ubicacionNombre || 'Sin ubicación registrada'}</dd>
+          </div>
+          {esOtraSede && (
+            <div>
+              <dt className="font-medium opacity-70">Sede de origen</dt>
+              <dd className="font-bold">{sedeOrigen}</dd>
+            </div>
+          )}
+        </dl>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => navigate(`/bienes/${bien.id}`)}
-          className="btn-primary"
-        >
-          Ver detalle
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate(`/bienes/${bien.id}/editar`)}
-          className="btn-secondary"
-        >
-          Editar
-        </button>
-        <button
-          type="button"
-          onClick={onRegisterAnother}
-          className="btn-ghost"
-        >
-          Registrar otro
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="btn-ghost ml-auto"
-        >
-          Cancelar
-        </button>
-      </div>
-    </section>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button
+            size="sm"
+            onClick={() => navigate(`/bienes/${bien.id}`)}
+            className="gap-1.5"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Ver detalle
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/bienes/${bien.id}/editar`)}
+            className="gap-1.5"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Editar
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onRegisterAnother}
+            className="gap-1.5"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Registrar otro
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            className="ml-auto gap-1.5"
+          >
+            <X className="h-3.5 w-3.5" />
+            Cancelar
+          </Button>
+        </div>
+      </AlertDescription>
+    </Alert>
   )
 }

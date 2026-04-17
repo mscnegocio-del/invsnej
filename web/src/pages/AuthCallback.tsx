@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { Card, CardContent } from '../components/ui/card'
+import { Button } from '../components/ui/button'
+import { Alert, AlertDescription } from '../components/ui/alert'
 
 export function AuthCallback() {
   const navigate = useNavigate()
@@ -48,21 +52,27 @@ export function AuthCallback() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-md card p-6 space-y-4 text-center">
-        <h1 className="text-lg font-semibold text-slate-900">Confirmar inicio de sesión</h1>
-        <p className="text-sm text-slate-600">
-          Esta pantalla queda como compatibilidad transitoria para enlaces heredados. El método principal de
-          acceso ahora es el código numérico enviado al correo.
-        </p>
-        {message && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{message}</p>}
-        <button type="button" className="btn-primary w-full" disabled={loading} onClick={() => void confirmar()}>
-          {loading ? 'Confirmando…' : 'Confirmar acceso'}
-        </button>
-        <Link to="/login" className="inline-block text-sm text-teal-700 underline">
-          Volver al inicio de sesión
-        </Link>
-      </div>
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+      <Card className="w-full max-w-md text-center">
+        <CardContent className="pt-6 space-y-4">
+          <h1 className="text-lg font-semibold">Confirmar inicio de sesión</h1>
+          <p className="text-sm text-muted-foreground">
+            Esta pantalla queda como compatibilidad transitoria para enlaces heredados. El método principal de
+            acceso ahora es el código numérico enviado al correo.
+          </p>
+          {message && (
+            <Alert variant="destructive">
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
+          )}
+          <Button className="w-full" disabled={loading} onClick={() => void confirmar()}>
+            {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Confirmando…</> : 'Confirmar acceso'}
+          </Button>
+          <Link to="/login" className="inline-block text-sm text-primary underline">
+            Volver al inicio de sesión
+          </Link>
+        </CardContent>
+      </Card>
     </div>
   )
 }

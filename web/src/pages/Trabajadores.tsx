@@ -1,14 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Loader2, UserPlus, Pencil, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useCatalogs } from '../context/CatalogContext'
 import type { Trabajador } from '../types'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Card, CardContent } from '../components/ui/card'
+import { Alert, AlertDescription } from '../components/ui/alert'
+import { Skeleton } from '../components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '../components/ui/alert-dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 
 type Row = Trabajador
 
+const ALL_SEDE = '__all__'
+
 function sedeDistintaDeBien(bienSede: number | null | undefined, nuevaSede: number | null | undefined): boolean {
-  const a = bienSede ?? null
-  const b = nuevaSede ?? null
-  return a !== b
+  return (bienSede ?? null) !== (nuevaSede ?? null)
 }
 
 export function Trabajadores() {
@@ -16,6 +30,7 @@ export function Trabajadores() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [cantDeleteMsg, setCantDeleteMsg] = useState<string | null>(null)
 
   const [draftNombre, setDraftNombre] = useState('')
   const [draftCargo, setDraftCargo] = useState('')
@@ -29,6 +44,7 @@ export function Trabajadores() {
   const [sedeId, setSedeId] = useState<number | ''>('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Row | null>(null)
 
   const [sedeWarn, setSedeWarn] = useState<{
     bienes: { id: number; codigo_patrimonial: string | null; sede_id: number | null }[]
@@ -45,15 +61,9 @@ export function Trabajadores() {
       setLoading(true)
       setError(null)
       let q = supabase.from('trabajadores').select('id, nombre, sede_id, cargo').order('nombre', { ascending: true })
-      if (applied.n) {
-        q = q.ilike('nombre', `%${applied.n}%`)
-      }
-      if (applied.c) {
-        q = q.ilike('cargo', `%${applied.c}%`)
-      }
-      if (applied.s !== '') {
-        q = q.eq('sede_id', applied.s)
-      }
+      if (applied.n) q = q.ilike('nombre', `%${applied.n}%`)
+      if (applied.c) q = q.ilike('cargo', `%${applied.c}%`)
+      if (applied.s !== '') q = q.eq('sede_id', applied.s)
       const { data, error: supaError } = await q
       if (cancelled) return
       setLoading(false)
@@ -65,16 +75,17 @@ export function Trabajadores() {
       }
       setRows((data ?? []) as Row[])
     })()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [applied])
 
-  const sedeNombre = useMemo(() => {
+  const sedeNombreMap = useMemo(() => {
     const map = new Map<number, string>()
     for (const s of sedes) map.set(s.id, s.nombre)
-    return (id: number | null | undefined) => (id == null ? '—' : map.get(id) ?? `Sede ${id}`)
+    return map
   }, [sedes])
+
+  const sedeNombre = (id: number | null | undefined) =>
+    id == null ? '—' : sedeNombreMap.get(id) ?? `Sede ${id}`
 
   const openCreate = () => {
     setEditing(null)
@@ -96,10 +107,7 @@ export function Trabajadores() {
 
   const ejecutarGuardado = async () => {
     const nombreTrim = nombre.trim()
-    if (!nombreTrim) {
-      setSaveError('El nombre es obligatorio.')
-      return
-    }
+    if (!nombreTrim) { setSaveError('El nombre es obligatorio.'); return }
     const cargoVal = cargo.trim() || null
     const sedeVal = sedeId === '' ? null : sedeId
 
@@ -112,21 +120,13 @@ export function Trabajadores() {
         .update({ nombre: nombreTrim, cargo: cargoVal, sede_id: sedeVal })
         .eq('id', editing.id)
       setSaving(false)
-      if (upErr) {
-        console.error(upErr)
-        setSaveError('No se pudo guardar. Intenta nuevamente.')
-        return
-      }
+      if (upErr) { console.error(upErr); setSaveError('No se pudo guardar. Intenta nuevamente.'); return }
     } else {
       const { error: insErr } = await supabase
         .from('trabajadores')
         .insert({ nombre: nombreTrim, cargo: cargoVal, sede_id: sedeVal })
       setSaving(false)
-      if (insErr) {
-        console.error(insErr)
-        setSaveError('No se pudo crear. Intenta nuevamente.')
-        return
-      }
+      if (insErr) { console.error(insErr); setSaveError('No se pudo crear. Intenta nuevamente.'); return }
     }
 
     setModalOpen(false)
@@ -137,33 +137,21 @@ export function Trabajadores() {
 
   const handleSave = async () => {
     const nombreTrim = nombre.trim()
-    if (!nombreTrim) {
-      setSaveError('El nombre es obligatorio.')
-      return
-    }
+    if (!nombreTrim) { setSaveError('El nombre es obligatorio.'); return }
     const sedeVal = sedeId === '' ? null : sedeId
 
     if (editing) {
       const prevSede = editing.sede_id ?? null
-      const cambiaSede = (prevSede ?? null) !== (sedeVal ?? null)
-      if (cambiaSede) {
+      if ((prevSede ?? null) !== (sedeVal ?? null)) {
         const { data: bienes, error: bErr } = await supabase
           .from('bienes')
           .select('id, codigo_patrimonial, sede_id')
           .eq('id_trabajador', editing.id)
           .is('eliminado_at', null)
-
-        if (bErr) {
-          console.error(bErr)
-          setSaveError('No se pudo verificar bienes asignados.')
-          return
-        }
+        if (bErr) { console.error(bErr); setSaveError('No se pudo verificar bienes asignados.'); return }
         const lista = (bienes ?? []) as { id: number; codigo_patrimonial: string | null; sede_id: number | null }[]
         const conflictivos = lista.filter((b) => sedeDistintaDeBien(b.sede_id, sedeVal))
-        if (conflictivos.length > 0) {
-          setSedeWarn({ bienes: conflictivos, nuevaSede: sedeVal })
-          return
-        }
+        if (conflictivos.length > 0) { setSedeWarn({ bienes: conflictivos, nuevaSede: sedeVal }); return }
       }
     }
 
@@ -175,215 +163,257 @@ export function Trabajadores() {
     await ejecutarGuardado()
   }
 
-  const handleDelete = async (r: Row) => {
-    const ok = window.confirm(`¿Eliminar al trabajador "${r.nombre}"?`)
-    if (!ok) return
+  const confirmarDelete = async () => {
+    if (!deleteTarget) return
+    const r = deleteTarget
+    setDeleteTarget(null)
 
     const { count, error: cErr } = await supabase
       .from('bienes')
       .select('id', { count: 'exact', head: true })
       .eq('id_trabajador', r.id)
       .is('eliminado_at', null)
-
-    if (cErr) {
-      console.error(cErr)
-      setError('No se pudo verificar bienes asignados.')
-      return
-    }
+    if (cErr) { console.error(cErr); setError('No se pudo verificar bienes asignados.'); return }
     if (count != null && count > 0) {
-      window.alert(
-        `No se puede eliminar: hay ${count} bien(es) activos con este responsable. Reasigna o edita esos bienes antes.`,
+      setCantDeleteMsg(
+        `No se puede eliminar: hay ${count} bien(es) activo(s) con este responsable. Reasigna o edita esos bienes antes.`,
       )
       return
     }
 
     const { error: dErr } = await supabase.from('trabajadores').delete().eq('id', r.id)
-    if (dErr) {
-      console.error(dErr)
-      setError('No se pudo eliminar.')
-      return
-    }
+    if (dErr) { console.error(dErr); setError('No se pudo eliminar.'); return }
     await reloadCatalogos()
     setApplied((prev) => ({ ...prev }))
   }
 
   return (
-    <div>
-      <h1 className="page-title">Trabajadores</h1>
-      <p className="page-subtitle">Catálogo de responsables: nombre, cargo y sede. Solo administradores pueden editar.</p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="page-title">Trabajadores</h1>
+        <p className="page-subtitle">
+          Catálogo de responsables: nombre, cargo y sede. Solo administradores pueden editar.
+        </p>
+      </div>
 
-      {error && <p className="mt-4 rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</p>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {cantDeleteMsg && (
+        <Alert variant="warning">
+          <AlertDescription>{cantDeleteMsg}</AlertDescription>
+        </Alert>
+      )}
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
-        <div className="min-w-[10rem] flex-1">
-          <label className="label" htmlFor="filtro-nombre">
-            Nombre (contiene)
-          </label>
-          <input
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[10rem] flex-1 space-y-1.5">
+          <Label htmlFor="filtro-nombre">Nombre</Label>
+          <Input
             id="filtro-nombre"
-            type="text"
             value={draftNombre}
             onChange={(e) => setDraftNombre(e.target.value)}
-            className="input"
             placeholder="Filtrar…"
           />
         </div>
-        <div className="min-w-[10rem] flex-1">
-          <label className="label" htmlFor="filtro-cargo">
-            Cargo (contiene)
-          </label>
-          <input
+        <div className="min-w-[10rem] flex-1 space-y-1.5">
+          <Label htmlFor="filtro-cargo">Cargo</Label>
+          <Input
             id="filtro-cargo"
-            type="text"
             value={draftCargo}
             onChange={(e) => setDraftCargo(e.target.value)}
-            className="input"
             placeholder="Filtrar…"
           />
         </div>
-        <div className="min-w-[12rem]">
-          <label className="label" htmlFor="filtro-sede">
-            Sede
-          </label>
-          <select
-            id="filtro-sede"
-            value={draftSede === '' ? '' : String(draftSede)}
-            onChange={(e) => setDraftSede(e.target.value === '' ? '' : Number(e.target.value))}
-            className="input"
+        <div className="min-w-[12rem] space-y-1.5">
+          <Label>Sede</Label>
+          <Select
+            value={draftSede === '' ? ALL_SEDE : String(draftSede)}
+            onValueChange={(v) => setDraftSede(v === ALL_SEDE ? '' : Number(v))}
           >
-            <option value="">Todas</option>
-            {sedes.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button type="button" className="btn-secondary" onClick={aplicarFiltros} disabled={loading}>
-          Aplicar
-        </button>
-        <button type="button" className="btn-primary" onClick={openCreate}>
-          Nuevo trabajador
-        </button>
-      </div>
-
-      <div className="mt-6 card overflow-x-auto">
-        {loading ? (
-          <p className="p-6 text-slate-600">Cargando…</p>
-        ) : (
-          <table className="min-w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-slate-700">
-                <th className="px-4 py-3 font-semibold">Nombre</th>
-                <th className="px-4 py-3 font-semibold">Cargo</th>
-                <th className="px-4 py-3 font-semibold">Sede</th>
-                <th className="px-4 py-3 font-semibold w-40">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-slate-100">
-                  <td className="px-4 py-3 font-medium text-slate-900">{r.nombre}</td>
-                  <td className="px-4 py-3 text-slate-700">{r.cargo ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-600">{sedeNombre(r.sede_id)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" className="btn-ghost text-sm px-2 py-1" onClick={() => openEdit(r)}>
-                        Editar
-                      </button>
-                      <button type="button" className="btn-ghost text-sm px-2 py-1 text-red-700" onClick={() => void handleDelete(r)}>
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+            <SelectTrigger>
+              <SelectValue placeholder="Todas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_SEDE}>Todas</SelectItem>
+              {sedes.map((s) => (
+                <SelectItem key={s.id} value={String(s.id)}>{s.nombre}</SelectItem>
               ))}
-            </tbody>
-          </table>
-        )}
-        {!loading && rows.length === 0 && <p className="p-6 text-slate-500">No hay trabajadores con estos filtros.</p>}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button variant="secondary" onClick={aplicarFiltros} disabled={loading}>
+          Aplicar
+        </Button>
+        <Button onClick={openCreate}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Nuevo trabajador
+        </Button>
       </div>
 
-      {modalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" role="dialog" aria-modal="true">
-          <div className="card max-w-md w-full p-6 space-y-4 shadow-xl">
-            <h2 className="text-lg font-semibold text-slate-900">{editing ? 'Editar trabajador' : 'Nuevo trabajador'}</h2>
-            <div>
-              <label className="label" htmlFor="tr-nombre">
-                Nombre *
-              </label>
-              <input id="tr-nombre" className="input" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+      <Card>
+        <CardContent className="p-0 overflow-x-auto">
+          {loading ? (
+            <div className="p-6 space-y-3">
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
-            <div>
-              <label className="label" htmlFor="tr-cargo">
-                Cargo
-              </label>
-              <input
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Cargo</TableHead>
+                  <TableHead>Sede</TableHead>
+                  <TableHead className="w-28">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      No hay trabajadores con estos filtros.
+                    </TableCell>
+                  </TableRow>
+                ) : rows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.nombre}</TableCell>
+                    <TableCell>{r.cargo ?? '—'}</TableCell>
+                    <TableCell>{sedeNombre(r.sede_id)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(r)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(r)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create / Edit dialog */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Editar trabajador' : 'Nuevo trabajador'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="tr-nombre">Nombre *</Label>
+              <Input id="tr-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tr-cargo">Cargo</Label>
+              <Input
                 id="tr-cargo"
-                className="input"
                 value={cargo}
                 onChange={(e) => setCargo(e.target.value)}
                 placeholder="Opcional"
               />
             </div>
-            <div>
-              <label className="label" htmlFor="tr-sede">
-                Sede
-              </label>
-              <select
-                id="tr-sede"
-                className="input"
-                value={sedeId === '' ? '' : String(sedeId)}
-                onChange={(e) => setSedeId(e.target.value === '' ? '' : Number(e.target.value))}
+            <div className="space-y-1.5">
+              <Label>Sede</Label>
+              <Select
+                value={sedeId === '' ? ALL_SEDE : String(sedeId)}
+                onValueChange={(v) => setSedeId(v === ALL_SEDE ? '' : Number(v))}
               >
-                <option value="">Sin sede</option>
-                {sedes.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin sede" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_SEDE}>Sin sede</SelectItem>
+                  {sedes.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>{s.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            {saveError && <p className="text-sm text-red-600">{saveError}</p>}
-            <div className="flex gap-2 justify-end pt-2">
-              <button type="button" className="btn-secondary" onClick={() => setModalOpen(false)} disabled={saving}>
-                Cancelar
-              </button>
-              <button type="button" className="btn-primary" onClick={() => void handleSave()} disabled={saving}>
-                {saving ? 'Guardando…' : 'Guardar'}
-              </button>
-            </div>
+            {saveError && (
+              <Alert variant="destructive">
+                <AlertDescription>{saveError}</AlertDescription>
+              </Alert>
+            )}
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setModalOpen(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void handleSave()} disabled={saving}>
+              {saving
+                ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Guardando…</>
+                : 'Guardar'
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {sedeWarn && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/45" role="dialog" aria-modal="true">
-          <div className="card max-w-lg w-full p-6 space-y-4 shadow-xl">
-            <h2 className="text-lg font-semibold text-amber-900">Inconsistencia con bienes asignados</h2>
-            <p className="text-sm text-slate-700">
-              Este responsable tiene {sedeWarn.bienes.length} bien(es) cuya sede no coincide con la sede seleccionada para el
-              trabajador. Los bienes no se modifican automáticamente. ¿Confirmas el cambio de sede del trabajador?
+      {/* Delete confirmation */}
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar trabajador?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Se eliminará a <span className="font-semibold text-foreground">{deleteTarget?.nombre}</span>.
+            Esta acción no puede deshacerse.
+          </p>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void confirmarDelete()}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Sede conflict warning */}
+      <AlertDialog open={Boolean(sedeWarn)} onOpenChange={(open) => { if (!open) setSedeWarn(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Inconsistencia con bienes asignados</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Este responsable tiene{' '}
+              <span className="font-semibold text-foreground">{sedeWarn?.bienes.length}</span>{' '}
+              bien(es) cuya sede no coincide con la sede seleccionada. Los bienes no se
+              modificarán automáticamente. ¿Confirmas el cambio de sede del trabajador?
             </p>
-            <ul className="text-sm text-slate-600 max-h-36 overflow-y-auto list-disc pl-5 space-y-1">
-              {sedeWarn.bienes.slice(0, 15).map((b) => (
+            <ul className="list-disc pl-5 space-y-1 max-h-36 overflow-y-auto text-xs">
+              {sedeWarn?.bienes.slice(0, 15).map((b) => (
                 <li key={b.id}>
-                  {b.codigo_patrimonial ?? `ID ${b.id}`} — sede del bien: {sedeNombre(b.sede_id)}
+                  {b.codigo_patrimonial ?? `ID ${b.id}`} — sede: {sedeNombre(b.sede_id)}
                 </li>
               ))}
-              {sedeWarn.bienes.length > 15 && <li>… y {sedeWarn.bienes.length - 15} más</li>}
+              {(sedeWarn?.bienes.length ?? 0) > 15 && (
+                <li>… y {(sedeWarn?.bienes.length ?? 0) - 15} más</li>
+              )}
             </ul>
-            <div className="flex gap-2 justify-end flex-wrap">
-              <button type="button" className="btn-secondary" onClick={() => setSedeWarn(null)}>
-                Cancelar
-              </button>
-              <button type="button" className="btn-primary" onClick={() => void confirmarSedeWarn()}>
-                Confirmar cambio de sede
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmarSedeWarn()}>
+              Confirmar cambio de sede
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

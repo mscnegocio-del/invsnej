@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Loader2, Database } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { TrabajadorSearchableSelect } from './TrabajadorSearchableSelect'
 import { UbicacionSelect } from './UbicacionSelect'
@@ -9,6 +10,18 @@ import type { SigaSugerencia } from './NombreSearchableInput'
 import { useCatalogs } from '../context/CatalogContext'
 import { useSede } from '../context/SedeContext'
 import { useAuth } from '../context/AuthContext'
+import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+import { Alert, AlertDescription } from './ui/alert'
+import { Badge } from './ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select'
 import type { BienDetalle } from '../types'
 
 type Props = {
@@ -27,8 +40,6 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const { user } = useAuth()
 
   const codigoFromQuery = searchParams.get('codigo') ?? ''
-
-  // Datos pre-cargados desde SIGA (via query params)
   const sigaMarca = searchParams.get('siga_marca') ?? ''
   const sigaModelo = searchParams.get('siga_modelo') ?? ''
   const sigaSerie = searchParams.get('siga_serie') ?? ''
@@ -43,7 +54,6 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const [estado, setEstado] = useState<string>(ESTADOS[0])
   const [idTrabajador, setIdTrabajador] = useState<number | null>(null)
   const [idUbicacion, setIdUbicacion] = useState<number | null>(null)
-  // Campos SIGA
   const [marca, setMarca] = useState(sigaMarca)
   const [modelo, setModelo] = useState(sigaModelo)
   const [serie, setSerie] = useState(sigaSerie)
@@ -54,7 +64,6 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
 
   useEffect(() => {
     if (modo !== 'edit' || !bienId) return
-
     let cancelled = false
 
     async function loadBien() {
@@ -73,7 +82,6 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       if (cancelled) return
 
       if (supaError || !data) {
-        console.error(supaError)
         setError('No se pudo cargar la información inicial del bien para editar.')
         setLoading(false)
         return
@@ -96,7 +104,6 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       } else {
         setIdUbicacion(null)
       }
-      // Campos SIGA
       setMarca(raw.marca ?? '')
       setModelo(raw.modelo ?? '')
       setSerie(raw.serie ?? '')
@@ -106,15 +113,11 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
     }
 
     loadBien()
-
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [modo, bienId, ubicaciones])
 
   const handleNombreSelect = (row: SigaSugerencia) => {
     setNombre(row.descripcion)
-    // Solo rellena campos SIGA si están vacíos (no sobreescribe datos ya precargados)
     if (!marca && row.marca) setMarca(row.marca)
     if (!modelo && row.modelo) setModelo(row.modelo)
     if (!serie && row.serie) setSerie(row.serie)
@@ -126,25 +129,15 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
     event.preventDefault()
     setError(null)
 
-    if (!codigo.trim()) {
-      setError('El código patrimonial es obligatorio.')
-      return
-    }
-    if (!nombre.trim()) {
-      setError('El nombre o modelo del bien es obligatorio.')
-      return
-    }
-    if (!idTrabajador) {
-      setError('Debes seleccionar un responsable.')
-      return
-    }
+    if (!codigo.trim()) { setError('El código patrimonial es obligatorio.'); return }
+    if (!nombre.trim()) { setError('El nombre o modelo del bien es obligatorio.'); return }
+    if (!idTrabajador) { setError('Debes seleccionar un responsable.'); return }
 
     const ubicacionNombre = idUbicacion
       ? (ubicaciones.find((u) => u.id === idUbicacion)?.nombre ?? null)
       : null
 
     setLoading(true)
-
     const valorNum = valor.trim() ? parseFloat(valor.replace(',', '.')) : null
 
     if (modo === 'create') {
@@ -171,32 +164,17 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
 
       setLoading(false)
 
-      if (supaError) {
-        console.error(supaError)
-        setError('No se pudo registrar el bien. Intenta nuevamente.')
-        return
-      }
-
-      if (!data) {
-        setError('No se recibió respuesta del servidor al registrar el bien.')
-        return
-      }
+      if (supaError) { setError('No se pudo registrar el bien. Intenta nuevamente.'); return }
+      if (!data) { setError('No se recibió respuesta del servidor al registrar el bien.'); return }
 
       const nuevoId = data.id as number
-
       await supabase.from('bien_historial').insert({
-        bien_id: nuevoId,
-        campo: 'creacion',
-        valor_antes: null,
-        valor_despues: nombre.trim(),
-        usuario_id: user?.id ?? null,
-        usuario_email: user?.email ?? null,
-        accion: 'creacion',
+        bien_id: nuevoId, campo: 'creacion', valor_antes: null,
+        valor_despues: nombre.trim(), usuario_id: user?.id ?? null,
+        usuario_email: user?.email ?? null, accion: 'creacion',
       })
-
       navigate(`/bienes/${nuevoId}`, { replace: true })
     } else {
-      // Leer valores actuales antes del update para calcular el diff
       const { data: anterior } = await supabase
         .from('bienes')
         .select('estado, id_trabajador, ubicacion')
@@ -209,117 +187,51 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
           codigo_patrimonial: codigo.trim(),
           nombre_mueble_equipo: nombre.trim(),
           tipo_mueble_equipo: tipo.trim() || null,
-          estado,
-          id_trabajador: idTrabajador,
-          ubicacion: ubicacionNombre,
-          marca: marca.trim() || null,
-          modelo: modelo.trim() || null,
-          serie: serie.trim() || null,
-          orden_compra: ordenCompra.trim() || null,
+          estado, id_trabajador: idTrabajador, ubicacion: ubicacionNombre,
+          marca: marca.trim() || null, modelo: modelo.trim() || null,
+          serie: serie.trim() || null, orden_compra: ordenCompra.trim() || null,
           valor: valorNum != null && !Number.isNaN(valorNum) ? valorNum : null,
         })
         .eq('id', bienId)
 
       setLoading(false)
+      if (supaError) { setError('No se pudo actualizar el bien. Intenta nuevamente.'); return }
 
-      if (supaError) {
-        console.error(supaError)
-        setError('No se pudo actualizar el bien. Intenta nuevamente.')
-        return
-      }
-
-      // Registrar historial de campos cambiados
       if (anterior && bienId) {
         const prev = anterior as { estado: string; id_trabajador: number | null; ubicacion: string | null }
-
         const resolveUbicacion = (val: string | null): string | null => {
           if (!val) return null
           const asNum = Number(val)
-          if (!Number.isNaN(asNum)) {
-            return ubicaciones.find((u) => u.id === asNum)?.nombre ?? val
-          }
-          return val
+          return !Number.isNaN(asNum) ? (ubicaciones.find((u) => u.id === asNum)?.nombre ?? val) : val
         }
+        const resolveTrabajador = (id: number | null): string | null =>
+          id ? (trabajadores.find((t) => t.id === id)?.nombre ?? String(id)) : null
 
-        const resolveTrabajador = (id: number | null): string | null => {
-          if (!id) return null
-          return trabajadores.find((t) => t.id === id)?.nombre ?? String(id)
-        }
-
-        type HistorialFila = {
-          bien_id: number
-          campo: string
-          valor_antes: string | null
-          valor_despues: string | null
-          usuario_id: string | null
-          usuario_email: string | null
-          accion: 'edicion'
-        }
+        type HistorialFila = { bien_id: number; campo: string; valor_antes: string | null; valor_despues: string | null; usuario_id: string | null; usuario_email: string | null; accion: 'edicion' }
         const uid = user?.id ?? null
         const uemail = user?.email ?? null
         const filas: HistorialFila[] = []
-
-        if (prev.estado !== estado) {
-          filas.push({
-            bien_id: bienId,
-            campo: 'estado',
-            valor_antes: prev.estado ?? null,
-            valor_despues: estado,
-            usuario_id: uid,
-            usuario_email: uemail,
-            accion: 'edicion',
-          })
-        }
-
-        if (prev.id_trabajador !== idTrabajador) {
-          filas.push({
-            bien_id: bienId,
-            campo: 'responsable',
-            valor_antes: resolveTrabajador(prev.id_trabajador),
-            valor_despues: resolveTrabajador(idTrabajador),
-            usuario_id: uid,
-            usuario_email: uemail,
-            accion: 'edicion',
-          })
-        }
-
+        if (prev.estado !== estado) filas.push({ bien_id: bienId, campo: 'estado', valor_antes: prev.estado ?? null, valor_despues: estado, usuario_id: uid, usuario_email: uemail, accion: 'edicion' })
+        if (prev.id_trabajador !== idTrabajador) filas.push({ bien_id: bienId, campo: 'responsable', valor_antes: resolveTrabajador(prev.id_trabajador), valor_despues: resolveTrabajador(idTrabajador), usuario_id: uid, usuario_email: uemail, accion: 'edicion' })
         const ubicAntes = resolveUbicacion(prev.ubicacion)
-        if (ubicAntes !== ubicacionNombre) {
-          filas.push({
-            bien_id: bienId,
-            campo: 'ubicacion',
-            valor_antes: ubicAntes,
-            valor_despues: ubicacionNombre,
-            usuario_id: uid,
-            usuario_email: uemail,
-            accion: 'edicion',
-          })
-        }
-
-        if (filas.length > 0) {
-          await supabase.from('bien_historial').insert(filas)
-        }
+        if (ubicAntes !== ubicacionNombre) filas.push({ bien_id: bienId, campo: 'ubicacion', valor_antes: ubicAntes, valor_despues: ubicacionNombre, usuario_id: uid, usuario_email: uemail, accion: 'edicion' })
+        if (filas.length > 0) await supabase.from('bien_historial').insert(filas)
       }
 
-      if (bienId) {
-        navigate(`/bienes/${bienId}`, { replace: true })
-      } else {
-        navigate('/', { replace: true })
-      }
+      navigate(bienId ? `/bienes/${bienId}` : '/', { replace: true })
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <label className="label" htmlFor="form-codigo">Código patrimonial *</label>
-        <input
+      <div className="space-y-1.5">
+        <Label htmlFor="form-codigo">Código patrimonial *</Label>
+        <Input
           id="form-codigo"
           type="text"
           value={codigo}
           onChange={(e) => setCodigo(e.target.value)}
           placeholder="Código leído del código de barras"
-          className="input"
         />
       </div>
 
@@ -329,20 +241,18 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
         onSelect={handleNombreSelect}
       />
 
-      <div>
-        <label className="label" htmlFor="form-estado">Estado *</label>
-        <select
-          id="form-estado"
-          value={estado}
-          onChange={(e) => setEstado(e.target.value)}
-          className="input"
-        >
-          {ESTADOS.map((op) => (
-            <option key={op} value={op}>
-              {op}
-            </option>
-          ))}
-        </select>
+      <div className="space-y-1.5">
+        <Label htmlFor="form-estado">Estado *</Label>
+        <Select value={estado} onValueChange={setEstado}>
+          <SelectTrigger id="form-estado">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ESTADOS.map((op) => (
+              <SelectItem key={op} value={op}>{op}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <TrabajadorSearchableSelect
@@ -353,93 +263,55 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       <UbicacionSelect value={idUbicacion} onChange={setIdUbicacion} />
 
       {/* Sección datos SIGA */}
-      <fieldset className="space-y-3 rounded-xl border border-slate-200 p-4">
-        <legend className="flex items-center gap-2 px-1 text-sm font-semibold text-slate-700">
+      <fieldset className="space-y-3 rounded-xl border border-border p-4">
+        <legend className="flex items-center gap-2 px-1 text-sm font-semibold text-foreground">
+          <Database className="h-4 w-4 text-muted-foreground" />
           Datos del bien (SIGA)
           {tieneSiga && modo === 'create' && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-              🔍 Desde SIGA
-            </span>
+            <Badge variant="warning" className="ml-1">Desde SIGA</Badge>
           )}
         </legend>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="form-marca">Marca</label>
-            <input
-              id="form-marca"
-              type="text"
-              value={marca}
-              onChange={(e) => setMarca(e.target.value)}
-              placeholder="Ej. HP, Dell, Lenovo"
-              className="input"
-            />
+          <div className="space-y-1.5">
+            <Label htmlFor="form-marca">Marca</Label>
+            <Input id="form-marca" type="text" value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Ej. HP, Dell, Lenovo" />
           </div>
-          <div>
-            <label className="label" htmlFor="form-modelo">Modelo</label>
-            <input
-              id="form-modelo"
-              type="text"
-              value={modelo}
-              onChange={(e) => setModelo(e.target.value)}
-              placeholder="Ej. ProBook 440 G8"
-              className="input"
-            />
+          <div className="space-y-1.5">
+            <Label htmlFor="form-modelo">Modelo</Label>
+            <Input id="form-modelo" type="text" value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Ej. ProBook 440 G8" />
           </div>
-          <div>
-            <label className="label" htmlFor="form-serie">N° Serie</label>
-            <input
-              id="form-serie"
-              type="text"
-              value={serie}
-              onChange={(e) => setSerie(e.target.value)}
-              placeholder="Número de serie"
-              className="input"
-            />
+          <div className="space-y-1.5">
+            <Label htmlFor="form-serie">N° Serie</Label>
+            <Input id="form-serie" type="text" value={serie} onChange={(e) => setSerie(e.target.value)} placeholder="Número de serie" />
           </div>
-          <div>
-            <label className="label" htmlFor="form-oc">Orden de compra</label>
-            <input
-              id="form-oc"
-              type="text"
-              value={ordenCompra}
-              onChange={(e) => setOrdenCompra(e.target.value)}
-              placeholder="Ej. OC-2023-001"
-              className="input"
-            />
+          <div className="space-y-1.5">
+            <Label htmlFor="form-oc">Orden de compra</Label>
+            <Input id="form-oc" type="text" value={ordenCompra} onChange={(e) => setOrdenCompra(e.target.value)} placeholder="Ej. OC-2023-001" />
           </div>
-          <div className="sm:col-span-2">
-            <label className="label" htmlFor="form-valor">Valor (S/.)</label>
-            <input
-              id="form-valor"
-              type="number"
-              step="0.01"
-              min="0"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              placeholder="Ej. 3500.00"
-              className="input"
-            />
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="form-valor">Valor (S/.)</Label>
+            <Input id="form-valor" type="number" step="0.01" min="0" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej. 3500.00" />
           </div>
         </div>
       </fieldset>
 
       {error && (
-        <p className="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
-          {error}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      <button type="submit" disabled={loading} className="btn-primary w-full">
+      <Button type="submit" disabled={loading} className="w-full">
         {loading ? (
           <>
-            <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            Guardando...
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Guardando…
           </>
         ) : (
           modo === 'create' ? 'Registrar bien' : 'Guardar cambios'
         )}
-      </button>
+      </Button>
     </form>
   )
 }

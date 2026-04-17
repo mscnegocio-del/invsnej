@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
+import { Loader2, MapPin } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useSede } from '../context/SedeContext'
 import type { Sede } from '../types'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card'
+import { Alert, AlertDescription } from '../components/ui/alert'
+import { Button } from '../components/ui/button'
 
 export function SedeSelector() {
   const { cambiarSede } = useSede()
@@ -15,66 +19,65 @@ export function SedeSelector() {
     async function loadSedes() {
       setLoading(true)
       setError(null)
-
       const { data, error: supaError } = await supabase
         .from('sedes')
         .select('id, nombre, codigo')
         .order('nombre', { ascending: true })
-
       if (cancelled) return
-
       if (supaError) {
         console.error(supaError)
         setError('No se pudo cargar la lista de sedes.')
         setLoading(false)
         return
       }
-
       setSedes((data ?? []) as Sede[])
       setLoading(false)
     }
 
     loadSedes()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <section className="w-full max-w-md card p-6">
-        <h1 className="text-xl font-bold text-slate-900">Selecciona tu sede</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Debes elegir una sede para continuar con el inventario.
-        </p>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-primary" />
+            Selecciona tu sede
+          </CardTitle>
+          <CardDescription>
+            Debes elegir una sede para continuar con el inventario.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {loading && (
+            <div className="flex items-center gap-2 text-muted-foreground py-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Cargando sedes…</span>
+            </div>
+          )}
 
-        {loading && (
-          <p className="mt-4 flex items-center gap-2 text-slate-600">
-            <span className="size-4 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
-            Cargando sedes...
-          </p>
-        )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-        {error && (
-          <p className="mt-4 rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</p>
-        )}
-
-        {!loading && !error && (
-          <div className="mt-4 space-y-2">
-            {sedes.map((sede) => (
-              <button
-                key={sede.id}
-                type="button"
-                className="w-full text-left rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-teal-300 hover:bg-teal-50/30"
-                onClick={() => cambiarSede(sede)}
-              >
-                <p className="font-medium text-slate-900">{sede.nombre}</p>
-                {sede.codigo && <p className="text-xs text-slate-500 mt-0.5">{sede.codigo}</p>}
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+          {!loading && !error && sedes.map((sede) => (
+            <Button
+              key={sede.id}
+              type="button"
+              variant="outline"
+              className="w-full h-auto justify-start flex-col items-start gap-0.5 px-4 py-3 hover:border-primary/40 hover:bg-primary/5"
+              onClick={() => cambiarSede(sede)}
+            >
+              <span className="font-medium">{sede.nombre}</span>
+              {sede.codigo && <span className="text-xs text-muted-foreground font-normal">{sede.codigo}</span>}
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   )
 }

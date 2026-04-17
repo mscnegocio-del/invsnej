@@ -1,6 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { Check, ChevronsUpDown, Plus, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useCatalogs } from '../context/CatalogContext'
+import { Button } from './ui/button'
+import { Label } from './ui/label'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from './ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import { cn } from '../lib/utils'
 
 type Props = {
   value: number | null | ''
@@ -20,7 +34,6 @@ export function TrabajadorSearchableSelect({
   const [query, setQuery] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
 
   const selected =
     typeof value === 'number'
@@ -29,22 +42,19 @@ export function TrabajadorSearchableSelect({
 
   const queryNorm = query.trim().toUpperCase()
 
-  const filtered = trabajadores.filter((t) =>
-    t.nombre.toLowerCase().includes(query.trim().toLowerCase()),
-  )
+  const filtered = query.trim()
+    ? trabajadores.filter((t) =>
+        t.nombre.toLowerCase().includes(query.trim().toLowerCase()),
+      )
+    : trabajadores
 
-  // Mostrar "agregar" solo en modo selección (no en modo "todos"), cuando hay texto y sin resultados
   const puedeAgregar = !allowAll && queryNorm.length > 0 && filtered.length === 0
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  const displayLabel = (() => {
+    if (allowAll && (value === '' || value === null)) return 'Todos los responsables'
+    if (selected) return selected.nombre
+    return null
+  })()
 
   const handleSelect = useCallback(
     (id: number | null | '') => {
@@ -61,7 +71,6 @@ export function TrabajadorSearchableSelect({
     setSaving(true)
     setSaveError(null)
 
-    // Anti-duplicado: si ya existe en el catálogo cargado, seleccionar en lugar de insertar
     const existente = trabajadores.find((t) => t.nombre === queryNorm)
     if (existente) {
       handleSelect(existente.id)
@@ -76,105 +85,108 @@ export function TrabajadorSearchableSelect({
       .maybeSingle()
 
     if (insertError || !data) {
-      console.error(insertError)
       setSaveError('No se pudo agregar el responsable. Intenta nuevamente.')
       setSaving(false)
       return
     }
 
-    // Refrescar catálogo para que el nuevo responsable aparezca en todos los selectores
     reload()
     handleSelect((data as { id: number }).id)
     setSaving(false)
   }
 
   return (
-    <div ref={containerRef} className="relative">
-      <label className="label">{label}</label>
-      <div className="relative">
-        <input
-          type="text"
-          value={open ? query : (selected?.nombre ?? (allowAll && (value === '' || value === null) ? 'Todos' : ''))}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setSaveError(null)
-            if (!open) setOpen(true)
-          }}
-          onFocus={() => setOpen(true)}
-          placeholder={allowAll ? 'Todos los responsables' : 'Buscar responsable...'}
-          disabled={loading || !!error}
-          className={`input pr-10 ${error ? 'input-error' : ''}`}
-          autoComplete="off"
-        />
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-          tabIndex={-1}
-        >
-          {open ? '▲' : '▼'}
-        </button>
-      </div>
-
-      {open && (
-        <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-          {allowAll && (
-            <li>
-              <button
-                type="button"
-                onClick={() => handleSelect('')}
-                className="w-full px-4 py-2 text-left text-slate-700 hover:bg-slate-50"
-              >
-                Todos
-              </button>
-            </li>
-          )}
-          {filtered.length === 0 && !puedeAgregar && (
-            <li className="px-4 py-3 text-sm text-slate-500">No hay resultados</li>
-          )}
-          {filtered.map((t) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => handleSelect(t.id)}
-                className={`w-full px-4 py-2 text-left hover:bg-slate-50 ${
-                  value === t.id ? 'bg-teal-50 text-teal-700' : 'text-slate-700'
-                }`}
-              >
-                <span className="block">{t.nombre}</span>
-                {t.cargo ? <span className="block text-xs text-slate-500">{t.cargo}</span> : null}
-              </button>
-            </li>
-          ))}
-          {puedeAgregar && (
-            <li className="border-t border-slate-100">
-              <button
-                type="button"
-                onClick={handleAgregar}
-                disabled={saving}
-                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-60"
-              >
-                {saving ? (
-                  <>
-                    <span className="size-3 shrink-0 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
-                    Guardando...
-                  </>
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            disabled={loading || !!error}
+            className="w-full justify-between font-normal"
+          >
+            <span className="truncate">
+              {displayLabel ?? (loading ? 'Cargando…' : 'Buscar responsable…')}
+            </span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-full p-0" align="start">
+          <Command>
+            <CommandInput
+              placeholder="Buscar responsable…"
+              value={query}
+              onValueChange={setQuery}
+            />
+            <CommandList>
+              <CommandEmpty>
+                {puedeAgregar ? (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2 text-primary"
+                    onClick={handleAgregar}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )}
+                    {saving ? 'Guardando…' : `Agregar "${queryNorm}"`}
+                  </Button>
                 ) : (
-                  `+ Agregar "${queryNorm}"`
+                  'No hay resultados'
                 )}
-              </button>
-            </li>
-          )}
-        </ul>
-      )}
+              </CommandEmpty>
+              <CommandGroup>
+                {allowAll && (
+                  <>
+                    <CommandItem
+                      value="__todos__"
+                      onSelect={() => handleSelect('')}
+                    >
+                      <Check
+                        className={cn(
+                          'mr-2 h-4 w-4',
+                          (value === '' || value === null) ? 'opacity-100' : 'opacity-0',
+                        )}
+                      />
+                      Todos los responsables
+                    </CommandItem>
+                    <CommandSeparator />
+                  </>
+                )}
+                {filtered.map((t) => (
+                  <CommandItem
+                    key={t.id}
+                    value={t.nombre}
+                    onSelect={() => handleSelect(t.id)}
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        value === t.id ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    <span className="flex-1">
+                      <span className="block">{t.nombre}</span>
+                      {t.cargo && (
+                        <span className="block text-xs text-muted-foreground">{t.cargo}</span>
+                      )}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
-      {saveError && (
-        <small className="mt-1 block text-sm text-red-600">{saveError}</small>
-      )}
+      {saveError && <p className="text-xs text-destructive">{saveError}</p>}
       {error && (
-        <small className="mt-1 block text-sm text-red-600">
-          Error cargando responsables: {error}
-        </small>
+        <p className="text-xs text-destructive">Error cargando responsables: {error}</p>
       )}
     </div>
   )

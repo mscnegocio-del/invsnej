@@ -1,12 +1,18 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Camera, Loader2 } from 'lucide-react'
 import { BarcodeScanModal } from '../components/BarcodeScanModal'
 import { supabase } from '../lib/supabaseClient'
 import { DuplicateAlert } from '../components/DuplicateAlert'
 import type { BienResumen, SigaDatos } from '../types'
 import { useSede } from '../context/SedeContext'
 import { useCatalogs } from '../context/CatalogContext'
+import { Card, CardContent } from '../components/ui/card'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Alert, AlertDescription } from '../components/ui/alert'
 
 export function Scan() {
   const [codigo, setCodigo] = useState('')
@@ -50,8 +56,6 @@ export function Scan() {
       setBienDuplicado(data as BienResumen)
     } else {
       setBienDuplicado(null)
-
-      // Consultar siga_bienes para pre-rellenar el formulario
       const { data: sigaData } = await supabase
         .from('siga_bienes')
         .select('marca, modelo, serie, orden_compra, valor, descripcion')
@@ -87,81 +91,72 @@ export function Scan() {
   }
 
   return (
-    <div>
-      <h1 className="page-title">Registrar bien</h1>
-      <p className="page-subtitle">
-        Escanea el código de barras o escribe el código manualmente para registrar el bien.
-      </p>
+    <div className="space-y-4">
+      <div>
+        <h1 className="page-title">Registrar bien</h1>
+        <p className="page-subtitle">
+          Escanea el código de barras o escribe el código manualmente para registrar el bien.
+        </p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="mt-6 card p-6 space-y-4 max-w-xl mx-auto w-full">
-        <div>
-          <label className="label" htmlFor="scan-codigo">
-            Código patrimonial
-          </label>
-          <div className="flex gap-2">
-            <input
-              id="scan-codigo"
-              type="text"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              placeholder="Escribe o escanea el código"
-              className="input flex-1"
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              onClick={() => setShowScanModal(true)}
-              className="btn-secondary shrink-0 px-4"
-              title="Escanear código de barras con la cámara"
-            >
-              📷
-            </button>
-          </div>
-        </div>
+      <Card className="max-w-xl mx-auto">
+        <CardContent className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="scan-codigo">Código patrimonial</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="scan-codigo"
+                  type="text"
+                  value={codigo}
+                  onChange={(e) => setCodigo(e.target.value)}
+                  placeholder="Escribe o escanea el código"
+                  autoComplete="off"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowScanModal(true)}
+                  title="Escanear con la cámara"
+                  className="shrink-0"
+                >
+                  <Camera className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
-        <button
-          type="submit"
-          disabled={checking || !codigo.trim()}
-          className="btn-primary w-full"
-        >
-          {checking ? (
-            <>
-              <span className="size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              Verificando código...
-            </>
-          ) : (
-            'Continuar'
-          )}
-        </button>
-      </form>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button type="submit" disabled={checking || !codigo.trim()} className="w-full">
+              {checking
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Verificando…</>
+                : 'Continuar'
+              }
+            </Button>
+          </form>
+
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full text-sm"
+            onClick={() => navigate('/registro')}
+          >
+            Registrar bien sin usar la cámara
+          </Button>
+        </CardContent>
+      </Card>
 
       {showScanModal && (
         <BarcodeScanModal
           onDetected={handleDetected}
           onClose={() => setShowScanModal(false)}
         />
-      )}
-
-      <div className="mt-4 text-sm text-slate-600">
-        <button
-          type="button"
-          onClick={() => navigate('/registro')}
-          className="btn-ghost"
-        >
-          Registrar bien sin usar la cámara
-        </button>
-      </div>
-
-      {checking && (
-        <p className="mt-4 flex items-center gap-2 text-slate-600">
-          <span className="size-4 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
-          Verificando código en el inventario...
-        </p>
-      )}
-      {error && (
-        <p className="mt-4 rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
-          {error}
-        </p>
       )}
 
       {lastCode && bienDuplicado && (() => {
@@ -176,10 +171,7 @@ export function Scan() {
             codigo={lastCode}
             bien={bienDuplicado}
             sedeOrigen={sedeOrigen}
-            onRegisterAnother={() => {
-              setBienDuplicado(null)
-              setLastCode(null)
-            }}
+            onRegisterAnother={() => { setBienDuplicado(null); setLastCode(null) }}
             onCancel={() => navigate('/')}
           />
         )
