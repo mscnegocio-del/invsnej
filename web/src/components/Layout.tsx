@@ -89,9 +89,11 @@ export function Layout() {
       {/* ── Sidebar (md+) ── */}
       <aside className={cn(
         'hidden md:flex flex-col border-r border-border bg-sidebar shrink-0 fixed inset-y-0 left-0 z-30',
-        'transition-[width] duration-200 ease-in-out overflow-hidden',
+        'transition-[width] duration-200 ease-in-out',
         sidebarCollapsed ? 'w-14' : 'w-64'
       )}>
+        {/* Contenido interno con overflow-hidden para evitar derrame durante transición */}
+        <div className="flex flex-col flex-1 overflow-hidden min-h-0">
         {/* Logo */}
         <div className={cn(
           'flex items-center border-b border-sidebar-border',
@@ -215,6 +217,8 @@ export function Layout() {
             </>
           )}
         </div>
+
+        </div>{/* fin contenido interno */}
 
         {/* Botón toggle colapsar/expandir */}
         <button

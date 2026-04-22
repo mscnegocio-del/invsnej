@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Database, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { Button } from '../components/ui/button'
@@ -32,6 +32,19 @@ export function SigaPJ() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasBuscado, setHasBuscado] = useState(false)
+  const [ultimaActualizacion, setUltimaActualizacion] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase
+      .from('siga_bienes')
+      .select('updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.updated_at) setUltimaActualizacion(data.updated_at as string)
+      })
+  }, [])
 
   const handleBuscar = async (p = 0) => {
     setLoading(true)
@@ -76,7 +89,17 @@ export function SigaPJ() {
     <div className="space-y-5">
       <div>
         <h1 className="page-title">Base SIGA PJ</h1>
-        <p className="page-subtitle">Consulta la base de datos general del SIGA Patrimonial Judicial.</p>
+        <p className="page-subtitle">
+          Consulta la base de datos general del SIGA Patrimonial Judicial.
+          {ultimaActualizacion && (
+            <span className="ml-1 text-muted-foreground">
+              · Datos actualizados al{' '}
+              <span className="font-medium text-foreground">
+                {new Date(ultimaActualizacion).toLocaleString('es-PE')}
+              </span>
+            </span>
+          )}
+        </p>
       </div>
 
       <Card>

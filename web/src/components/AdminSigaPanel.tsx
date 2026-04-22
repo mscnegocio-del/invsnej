@@ -21,6 +21,7 @@ type SigaRow = {
   serie: string | null
   orden_compra: string | null
   valor: number | null
+  updated_at?: string
 }
 
 const COLUMN_MAP: Record<keyof SigaRow, string[]> = {
@@ -112,8 +113,9 @@ export function AdminSigaPanel() {
     setError(null)
     let errores = 0
     let exitosos = 0
+    const now = new Date().toISOString()
     for (let i = 0; i < allRows.length; i += BATCH_SIZE) {
-      const batch = allRows.slice(i, i + BATCH_SIZE)
+      const batch = allRows.slice(i, i + BATCH_SIZE).map((r) => ({ ...r, updated_at: now }))
       const { error: supaError } = await supabase
         .from('siga_bienes')
         .upsert(batch, { onConflict: 'codigo_patrimonial' })
