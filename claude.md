@@ -201,6 +201,7 @@ web/src/
 - **Feature:** Botón circular en el borde del sidebar colapsa/expande a modo icono (w-14) o completo (w-64).
 - **Estado:** `sidebarCollapsed` en `Layout.tsx`, persistido en `localStorage('sidebar_collapsed')`.
 - **Contenido principal:** margin-left dinámico `md:ml-14` / `md:ml-64` con `transition-all duration-200`.
+- **Pitfall:** `overflow-hidden` en `<aside>` recorta el botón toggle que sobresale con `-right-3`. Solución: quitar `overflow-hidden` del `<aside>` y envolverlo en un `<div className="flex flex-col flex-1 overflow-hidden min-h-0">` interno que contiene logo/nav/footer, dejando el botón fuera de ese div.
 - **Archivo:** `web/src/components/Layout.tsx`
 
 #### Filtros móvil colapsables en Search
@@ -221,6 +222,8 @@ web/src/
 - **Feature:** Nueva ruta `/siga-pj` con búsqueda paginada (25/página) de la tabla `siga_bienes`.
 - **Filtros:** código patrimonial (ILIKE), descripción (ILIKE), responsable/usuario (ILIKE). Búsqueda bajo demanda (botón Buscar, no auto-search).
 - **Tabla:** scroll horizontal en móvil. Columnas: Código, Descripción, Marca, Modelo, Serie, Responsable, OC, Valor.
+- **Fecha de actualización:** `useEffect` al montar consulta `siga_bienes` ordenado por `updated_at desc limit 1` para obtener la fecha más reciente. Se muestra en el subtítulo ("Datos actualizados al [fecha]"), no por fila.
+- **`updated_at` en carga masiva:** `AdminSigaPanel.tsx` inyecta `updated_at: new Date().toISOString()` en cada fila del batch antes del upsert. `COLUMN_MAP` usa `Record<Exclude<keyof SigaRow, 'updated_at'>, string[]>` para excluir el campo (se inyecta en código, no viene del Excel).
 - **Acceso:** todos los roles (admin, operador, consulta) — solo AuthGuard, sin RoleGuard adicional.
 - **Archivo nuevo:** `web/src/pages/SigaPJ.tsx`
 - **Ruta:** `web/src/App.tsx` — `<Route path="/siga-pj" element={<SigaPJ />} />`

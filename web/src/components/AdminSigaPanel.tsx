@@ -24,7 +24,7 @@ type SigaRow = {
   updated_at?: string
 }
 
-const COLUMN_MAP: Record<keyof SigaRow, string[]> = {
+const COLUMN_MAP: Record<Exclude<keyof SigaRow, 'updated_at'>, string[]> = {
   codigo_patrimonial: ['CÓDIGO', 'CODIGO', 'COD_PATRIMONIAL', 'CÓDIGO PATRIMONIAL', 'CODIGO PATRIMONIAL'],
   descripcion: ['DESCRIPCIÓN', 'DESCRIPCION', 'NOMBRE', 'NOMBRE DEL BIEN'],
   usuario: ['USUARIO', 'RESPONSABLE', 'ASIGNADO', 'USUARIO ASIGNADO'],
