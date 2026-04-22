@@ -35,15 +35,20 @@ export function SigaPJ() {
   const [ultimaActualizacion, setUltimaActualizacion] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase
-      .from('siga_bienes')
-      .select('updated_at')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.updated_at) setUltimaActualizacion(data.updated_at as string)
-      })
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('siga_bienes')
+        .select('updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error cargando fecha SIGA:', error)
+        return
+      }
+      if (data?.updated_at) setUltimaActualizacion(data.updated_at as string)
+    })()
   }, [])
 
   const handleBuscar = async (p = 0) => {
