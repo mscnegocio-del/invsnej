@@ -38,8 +38,7 @@ export function SigaPJ() {
     ;(async () => {
       const { data, error } = await supabase
         .from('siga_bienes')
-        .select('updated_at, created_at')
-        .order('updated_at', { ascending: false })
+        .select('*', { count: 'exact' })
         .limit(1)
         .maybeSingle()
 
@@ -47,8 +46,11 @@ export function SigaPJ() {
         console.error('Error cargando fecha SIGA:', error)
         return
       }
-      const fecha = (data?.updated_at || data?.created_at) as string | undefined
-      if (fecha) setUltimaActualizacion(fecha)
+
+      if (data) {
+        const fecha = (data.updated_at || data.created_at || new Date().toISOString()) as string
+        setUltimaActualizacion(fecha)
+      }
     })()
   }, [])
 
