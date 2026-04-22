@@ -1,9 +1,11 @@
 import type { FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import {
-  ScanLine, Copy, FileJson, FileSpreadsheet, ChevronLeft, ChevronRight,
+  ScanLine, Copy, Check, FileJson, FileSpreadsheet, ChevronLeft, ChevronRight,
   Loader2, X, Search as SearchIcon, MoreHorizontal, Eye, Tag, User, MapPin,
+  Filter, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { BarcodeScanModal } from '../components/BarcodeScanModal'
@@ -85,6 +87,7 @@ export function Search() {
     campo: 'estado' | 'responsable' | 'ubicacion'
   } | null
   const [quickEdit, setQuickEdit] = useState<QuickEditTarget>(null)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
   const findResponsableNombre = (idTrab: number | null) =>
     idTrab ? (trabajadores.find((tr) => tr.id === idTrab)?.nombre ?? null) : null
@@ -251,7 +254,9 @@ export function Search() {
     const texto = [`Resultados (${resultados.length} bien${resultados.length === 1 ? '' : 'es'})`, ...bloques].join('\n\n')
     try {
       await navigator.clipboard.writeText(texto)
-      setCopied(true); window.setTimeout(() => setCopied(false), 2500)
+      setCopied(true)
+      toast.success('Copiado al portapapeles')
+      window.setTimeout(() => setCopied(false), 2500)
     } catch { /* ignore */ }
   }
 
@@ -320,97 +325,128 @@ export function Search() {
                   </div>
                 </div>
 
-                <TrabajadorSearchableSelect
-                  value={idTrabajador}
-                  onChange={(v) => setIdTrabajador(v === null ? '' : v)}
-                  label="Responsable"
-                  allowAll
-                />
+                {/* Botón toggle filtros avanzados — solo móvil */}
+                {(() => {
+                  const activeFilterCount = [
+                    nombreChips.length > 0,
+                    idTrabajador !== '',
+                    textoUbicacion.trim() !== '',
+                    textoMarca.trim() !== '',
+                    textoModelo.trim() !== '',
+                    todasLasSedes,
+                  ].filter(Boolean).length
+                  return (
+                    <button
+                      type="button"
+                      className="lg:hidden flex items-center gap-2 text-sm text-primary font-medium py-1"
+                      onClick={() => setShowAdvancedFilters(v => !v)}
+                    >
+                      <Filter className="h-3.5 w-3.5" />
+                      Filtros avanzados
+                      {activeFilterCount > 0 && (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs">{activeFilterCount}</Badge>
+                      )}
+                      {showAdvancedFilters
+                        ? <ChevronUp className="h-3.5 w-3.5 ml-auto" />
+                        : <ChevronDown className="h-3.5 w-3.5 ml-auto" />}
+                    </button>
+                  )
+                })()}
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="search-nombre-modelo">Nombre / modelo del bien</Label>
-                  {nombreChips.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {nombreChips.map((c) => (
-                        <Badge key={c} variant="outline" className="gap-1 text-primary border-primary/30 bg-primary/5 pr-1">
-                          {c}
-                          <button
-                            type="button"
-                            onClick={() => quitarNombreChip(c)}
-                            className="rounded-full hover:bg-primary/20 p-0.5"
-                            aria-label={`Quitar ${c}`}
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  <div className="relative">
-                    <Input
-                      id="search-nombre-modelo"
-                      value={nombreDraft}
-                      onChange={(e) => setNombreDraft(e.target.value)}
-                      onFocus={() => { if (nombreSugerencias.length > 0) setNombreSuggestOpen(true) }}
-                      onBlur={() => { window.setTimeout(() => setNombreSuggestOpen(false), 200) }}
-                      placeholder="Escribe para ver sugerencias…"
-                      autoComplete="off"
-                      className={nombreSuggestLoading ? 'pr-8' : ''}
-                    />
-                    {nombreSuggestLoading && (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      </span>
-                    )}
-                    {nombreSuggestOpen && nombreSugerencias.length > 0 && (
-                      <ul
-                        className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-border bg-popover py-1 shadow-lg"
-                        role="listbox"
-                      >
-                        {nombreSugerencias.map((s) => (
-                          <li key={s} role="option">
+                {/* Filtros avanzados: ocultos en móvil por defecto, siempre visibles en desktop */}
+                <div className={cn('space-y-4', !showAdvancedFilters && 'hidden lg:block', showAdvancedFilters && 'block')}>
+                  <TrabajadorSearchableSelect
+                    value={idTrabajador}
+                    onChange={(v) => setIdTrabajador(v === null ? '' : v)}
+                    label="Responsable"
+                    allowAll
+                  />
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="search-nombre-modelo">Nombre / modelo del bien</Label>
+                    {nombreChips.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {nombreChips.map((c) => (
+                          <Badge key={c} variant="outline" className="gap-1 text-primary border-primary/30 bg-primary/5 pr-1">
+                            {c}
                             <button
                               type="button"
-                              className="w-full px-3 py-1.5 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => agregarNombreChip(s)}
+                              onClick={() => quitarNombreChip(c)}
+                              className="rounded-full hover:bg-primary/20 p-0.5"
+                              aria-label={`Quitar ${c}`}
                             >
-                              {s}
+                              <X className="h-3 w-3" />
                             </button>
-                          </li>
+                          </Badge>
                         ))}
-                      </ul>
+                      </div>
                     )}
+                    <div className="relative">
+                      <Input
+                        id="search-nombre-modelo"
+                        value={nombreDraft}
+                        onChange={(e) => setNombreDraft(e.target.value)}
+                        onFocus={() => { if (nombreSugerencias.length > 0) setNombreSuggestOpen(true) }}
+                        onBlur={() => { window.setTimeout(() => setNombreSuggestOpen(false), 200) }}
+                        placeholder="Escribe para ver sugerencias…"
+                        autoComplete="off"
+                        className={nombreSuggestLoading ? 'pr-8' : ''}
+                      />
+                      {nombreSuggestLoading && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </span>
+                      )}
+                      {nombreSuggestOpen && nombreSugerencias.length > 0 && (
+                        <ul
+                          className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-border bg-popover py-1 shadow-lg"
+                          role="listbox"
+                        >
+                          {nombreSugerencias.map((s) => (
+                            <li key={s} role="option">
+                              <button
+                                type="button"
+                                className="w-full px-3 py-1.5 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => agregarNombreChip(s)}
+                              >
+                                {s}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="search-ubicacion">Ubicación (contiene)</Label>
-                  <Input id="search-ubicacion" value={textoUbicacion} onChange={(e) => setTextoUbicacion(e.target.value)} placeholder="Texto parcial" />
-                </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="search-ubicacion">Ubicación (contiene)</Label>
+                    <Input id="search-ubicacion" value={textoUbicacion} onChange={(e) => setTextoUbicacion(e.target.value)} placeholder="Texto parcial" />
+                  </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="search-marca">Marca (contiene)</Label>
-                  <Input id="search-marca" value={textoMarca} onChange={(e) => setTextoMarca(e.target.value)} placeholder="Texto parcial" />
-                </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="search-marca">Marca (contiene)</Label>
+                    <Input id="search-marca" value={textoMarca} onChange={(e) => setTextoMarca(e.target.value)} placeholder="Texto parcial" />
+                  </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="search-modelo-siga">Modelo SIGA (contiene)</Label>
-                  <Input id="search-modelo-siga" value={textoModelo} onChange={(e) => setTextoModelo(e.target.value)} placeholder="Texto parcial" />
-                </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="search-modelo-siga">Modelo SIGA (contiene)</Label>
+                    <Input id="search-modelo-siga" value={textoModelo} onChange={(e) => setTextoModelo(e.target.value)} placeholder="Texto parcial" />
+                  </div>
 
-                <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={todasLasSedes}
-                    onChange={(e) => setTodasLasSedes(e.target.checked)}
-                    className="h-4 w-4 rounded border-input accent-primary"
-                  />
-                  Buscar en todas las sedes
-                  {!todasLasSedes && sedeActiva && (
-                    <span className="text-muted-foreground text-xs">({sedeActiva.nombre})</span>
-                  )}
-                </label>
+                  <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={todasLasSedes}
+                      onChange={(e) => setTodasLasSedes(e.target.checked)}
+                      className="h-4 w-4 rounded border-input accent-primary"
+                    />
+                    Buscar en todas las sedes
+                    {!todasLasSedes && sedeActiva && (
+                      <span className="text-muted-foreground text-xs">({sedeActiva.nombre})</span>
+                    )}
+                  </label>
+                </div>
 
                 <Button type="submit" disabled={loading} className="w-full gap-2">
                   {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Buscando…</> : <><SearchIcon className="h-4 w-4" />Buscar</>}
@@ -446,9 +482,15 @@ export function Search() {
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {copied && <span className="text-xs text-primary font-medium">¡Copiado!</span>}
-                  <Button variant="ghost" size="sm" onClick={handleCopyResultados} className="gap-1.5 h-8 text-xs">
-                    <Copy className="h-3.5 w-3.5" /> Copiar
+                  <Button
+                    variant={copied ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={handleCopyResultados}
+                    className={cn('gap-1.5 h-8 text-xs transition-colors', copied && 'text-green-600 dark:text-green-400')}
+                  >
+                    {copied
+                      ? <><Check className="h-3.5 w-3.5" /> Copiado</>
+                      : <><Copy className="h-3.5 w-3.5" /> Copiar</>}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => handleDownloadResultadosJson()} className="gap-1.5 h-8 text-xs">
                     <FileJson className="h-3.5 w-3.5" /> JSON

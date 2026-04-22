@@ -7,6 +7,10 @@ import { Card, CardHeader, CardContent, CardTitle } from './ui/card'
 import { Alert, AlertTitle, AlertDescription } from './ui/alert'
 import { Progress } from './ui/progress'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from './ui/alert-dialog'
 
 type SigaRow = {
   codigo_patrimonial: string
@@ -69,6 +73,7 @@ export function AdminSigaPanel() {
   const [progress, setProgress] = useState({ procesados: 0, total: 0 })
   const [resumen, setResumen] = useState<{ exitosos: number; errores: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -192,7 +197,7 @@ export function AdminSigaPanel() {
               {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
               <div className="flex gap-3">
                 <Button variant="ghost" className="flex-1" onClick={handleReset}>Cancelar</Button>
-                <Button className="flex-1" onClick={() => void handleConfirmar()}>
+                <Button className="flex-1" onClick={() => setShowConfirmDialog(true)}>
                   Confirmar carga ({allRows.length.toLocaleString()} registros)
                 </Button>
               </div>
@@ -262,6 +267,23 @@ export function AdminSigaPanel() {
           </dl>
         </CardContent>
       </Card>
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar carga de datos SIGA?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se actualizarán <strong>{allRows.length.toLocaleString()}</strong> registros en la base de datos.
+              Los existentes serán reemplazados (upsert por código patrimonial). Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowConfirmDialog(false); void handleConfirmar() }}>
+              Sí, confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

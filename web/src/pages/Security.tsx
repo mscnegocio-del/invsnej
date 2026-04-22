@@ -10,6 +10,10 @@ import { Badge } from '../components/ui/badge'
 import { Alert, AlertDescription } from '../components/ui/alert'
 import { Skeleton } from '../components/ui/skeleton'
 import { Separator } from '../components/ui/separator'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '../components/ui/alert-dialog'
 
 function formatDate(value: string | null) {
   if (!value) return 'Nunca'
@@ -35,6 +39,7 @@ export function Security() {
   const [message, setMessage] = useState<string | null>(null)
 
   const activos = useMemo(() => items.filter((p) => !p.revoked_at), [items])
+  const [revokeTarget, setRevokeTarget] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -180,7 +185,7 @@ export function Security() {
                     variant="ghost"
                     size="sm"
                     className="text-destructive hover:text-destructive gap-2 self-start sm:self-auto"
-                    onClick={() => void handleRevoke(item.id)}
+                    onClick={() => setRevokeTarget(item.id)}
                     disabled={saving}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -192,6 +197,27 @@ export function Security() {
           )}
         </CardContent>
       </Card>
+    </div>
+
+      <AlertDialog open={revokeTarget !== null} onOpenChange={(open) => { if (!open) setRevokeTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Revocar esta passkey?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Perderás el acceso rápido desde este dispositivo. Podrás registrar una nueva passkey en cualquier momento.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { void handleRevoke(revokeTarget!); setRevokeTarget(null) }}
+            >
+              Sí, revocar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

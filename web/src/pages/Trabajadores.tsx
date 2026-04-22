@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 
@@ -50,6 +50,7 @@ export function Trabajadores() {
     bienes: { id: number; codigo_patrimonial: string | null; sede_id: number | null }[]
     nuevaSede: number | null
   } | null>(null)
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false)
 
   const aplicarFiltros = () => {
     setApplied({ n: draftNombre.trim(), c: draftCargo.trim(), s: draftSede })
@@ -155,7 +156,7 @@ export function Trabajadores() {
       }
     }
 
-    await ejecutarGuardado()
+    setShowSaveConfirm(true)
   }
 
   const confirmarSedeWarn = async () => {
@@ -410,6 +411,28 @@ export function Trabajadores() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={() => void confirmarSedeWarn()}>
               Confirmar cambio de sede
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmación al crear/editar trabajador */}
+      <AlertDialog open={showSaveConfirm} onOpenChange={(open) => { if (!open) setShowSaveConfirm(false) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {editing ? `¿Guardar cambios en ${editing.nombre}?` : '¿Registrar nuevo trabajador?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {editing
+                ? 'Se actualizarán los datos de este trabajador en el sistema.'
+                : `Se creará un nuevo trabajador con el nombre "${nombre.trim()}".`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowSaveConfirm(false); void ejecutarGuardado() }}>
+              Sí, guardar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

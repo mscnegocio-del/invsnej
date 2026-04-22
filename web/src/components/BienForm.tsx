@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Loader2, Database } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
@@ -22,6 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from './ui/alert-dialog'
 import type { BienDetalle } from '../types'
 
 type Props = {
@@ -61,7 +65,12 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const [valor, setValor] = useState(sigaValor)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false)
 
+  // Ref para debounce del lookup SIGA por código patrimonial
+  const sigaLookupRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cargar bien en modo edit
   useEffect(() => {
     if (modo !== 'edit' || !bienId) return
     let cancelled = false
@@ -116,6 +125,33 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
     return () => { cancelled = true }
   }, [modo, bienId, ubicaciones])
 
+  // Lookup SIGA por código patrimonial exacto (solo en modo create, silencioso)
+  useEffect(() => {
+    if (modo !== 'create') return
+    const trimmed = codigo.trim()
+
+    if (sigaLookupRef.current) clearTimeout(sigaLookupRef.current)
+    if (!trimmed) return
+
+    sigaLookupRef.current = setTimeout(async () => {
+      const { data } = await supabase
+        .from('siga_bienes')
+        .select('descripcion, marca, modelo, serie, orden_compra, valor')
+        .eq('codigo_patrimonial', trimmed)
+        .maybeSingle()
+
+      if (!data) return
+      // Solo rellenar campos vacíos para no pisar lo que el usuario ya escribió
+      if (!marca && data.marca) setMarca(data.marca)
+      if (!modelo && data.modelo) setModelo(data.modelo)
+      if (!serie && data.serie) setSerie(data.serie)
+      if (!ordenCompra && data.orden_compra) setOrdenCompra(data.orden_compra)
+      if (!valor && data.valor != null) setValor(String(data.valor))
+    }, 500)
+
+    return () => { if (sigaLookupRef.current) clearTimeout(sigaLookupRef.current) }
+  }, [codigo, modo]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleNombreSelect = (row: SigaSugerencia) => {
     setNombre(row.descripcion)
     if (!marca && row.marca) setMarca(row.marca)
@@ -125,14 +161,15 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
     if (!valor && row.valor != null) setValor(String(row.valor))
   }
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault()
+  const runValidation = (): boolean => {
     setError(null)
+    if (!codigo.trim()) { setError('El código patrimonial es obligatorio.'); return false }
+    if (!nombre.trim()) { setError('El nombre o modelo del bien es obligatorio.'); return false }
+    if (!idTrabajador) { setError('Debes seleccionar un responsable.'); return false }
+    return true
+  }
 
-    if (!codigo.trim()) { setError('El código patrimonial es obligatorio.'); return }
-    if (!nombre.trim()) { setError('El nombre o modelo del bien es obligatorio.'); return }
-    if (!idTrabajador) { setError('Debes seleccionar un responsable.'); return }
-
+  const executeSubmit = async () => {
     const ubicacionNombre = idUbicacion
       ? (ubicaciones.find((u) => u.id === idUbicacion)?.nombre ?? null)
       : null
@@ -222,96 +259,128 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
     }
   }
 
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!runValidation()) return
+
+    if (modo === 'edit') {
+      setShowSaveConfirm(true)
+      return
+    }
+
+    await executeSubmit()
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="space-y-1.5">
-        <Label htmlFor="form-codigo">Código patrimonial *</Label>
-        <Input
-          id="form-codigo"
-          type="text"
-          value={codigo}
-          onChange={(e) => setCodigo(e.target.value)}
-          placeholder="Código leído del código de barras"
-        />
-      </div>
-
-      <NombreSearchableInput
-        value={nombre}
-        onChange={setNombre}
-        onSelect={handleNombreSelect}
-      />
-
-      <div className="space-y-1.5">
-        <Label htmlFor="form-estado">Estado *</Label>
-        <Select value={estado} onValueChange={setEstado}>
-          <SelectTrigger id="form-estado">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ESTADOS.map((op) => (
-              <SelectItem key={op} value={op}>{op}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <TrabajadorSearchableSelect
-        value={idTrabajador}
-        onChange={(v) => setIdTrabajador(v === '' || v === null ? null : v)}
-        label="Responsable *"
-      />
-      <UbicacionSelect value={idUbicacion} onChange={setIdUbicacion} />
-
-      {/* Sección datos SIGA */}
-      <fieldset className="space-y-3 rounded-xl border border-border p-4">
-        <legend className="flex items-center gap-2 px-1 text-sm font-semibold text-foreground">
-          <Database className="h-4 w-4 text-muted-foreground" />
-          Datos del bien (SIGA)
-          {tieneSiga && modo === 'create' && (
-            <Badge variant="warning" className="ml-1">Desde SIGA</Badge>
-          )}
-        </legend>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="form-marca">Marca</Label>
-            <Input id="form-marca" type="text" value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Ej. HP, Dell, Lenovo" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="form-modelo">Modelo</Label>
-            <Input id="form-modelo" type="text" value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Ej. ProBook 440 G8" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="form-serie">N° Serie</Label>
-            <Input id="form-serie" type="text" value={serie} onChange={(e) => setSerie(e.target.value)} placeholder="Número de serie" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="form-oc">Orden de compra</Label>
-            <Input id="form-oc" type="text" value={ordenCompra} onChange={(e) => setOrdenCompra(e.target.value)} placeholder="Ej. OC-2023-001" />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="form-valor">Valor (S/.)</Label>
-            <Input id="form-valor" type="number" step="0.01" min="0" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej. 3500.00" />
-          </div>
+    <>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-1.5">
+          <Label htmlFor="form-codigo">Código patrimonial *</Label>
+          <Input
+            id="form-codigo"
+            type="text"
+            value={codigo}
+            onChange={(e) => setCodigo(e.target.value)}
+            placeholder="Código leído del código de barras"
+          />
         </div>
-      </fieldset>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+        <NombreSearchableInput
+          value={nombre}
+          onChange={setNombre}
+          onSelect={handleNombreSelect}
+        />
 
-      <Button type="submit" disabled={loading} className="w-full">
-        {loading ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Guardando…
-          </>
-        ) : (
-          modo === 'create' ? 'Registrar bien' : 'Guardar cambios'
+        <div className="space-y-1.5">
+          <Label htmlFor="form-estado">Estado *</Label>
+          <Select value={estado} onValueChange={setEstado}>
+            <SelectTrigger id="form-estado">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ESTADOS.map((op) => (
+                <SelectItem key={op} value={op}>{op}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <TrabajadorSearchableSelect
+          value={idTrabajador}
+          onChange={(v) => setIdTrabajador(v === '' || v === null ? null : v)}
+          label="Responsable *"
+        />
+        <UbicacionSelect value={idUbicacion} onChange={setIdUbicacion} />
+
+        {/* Sección datos SIGA */}
+        <fieldset className="space-y-3 rounded-xl border border-border p-4">
+          <legend className="flex items-center gap-2 px-1 text-sm font-semibold text-foreground">
+            <Database className="h-4 w-4 text-muted-foreground" />
+            Datos del bien (SIGA)
+            {tieneSiga && modo === 'create' && (
+              <Badge variant="warning" className="ml-1">Desde SIGA</Badge>
+            )}
+          </legend>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="form-marca">Marca</Label>
+              <Input id="form-marca" type="text" value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Ej. HP, Dell, Lenovo" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="form-modelo">Modelo</Label>
+              <Input id="form-modelo" type="text" value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Ej. ProBook 440 G8" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="form-serie">N° Serie</Label>
+              <Input id="form-serie" type="text" value={serie} onChange={(e) => setSerie(e.target.value)} placeholder="Número de serie" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="form-oc">Orden de compra</Label>
+              <Input id="form-oc" type="text" value={ordenCompra} onChange={(e) => setOrdenCompra(e.target.value)} placeholder="Ej. OC-2023-001" />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="form-valor">Valor (S/.)</Label>
+              <Input id="form-valor" type="number" step="0.01" min="0" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej. 3500.00" />
+            </div>
+          </div>
+        </fieldset>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
-      </Button>
-    </form>
+
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Guardando…
+            </>
+          ) : (
+            modo === 'create' ? 'Registrar bien' : 'Guardar cambios'
+          )}
+        </Button>
+      </form>
+
+      {/* AlertDialog de confirmación — solo en modo edit */}
+      <AlertDialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Guardar cambios?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se actualizarán los datos del bien en el inventario.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setShowSaveConfirm(false); void executeSubmit() }}>
+              Sí, guardar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

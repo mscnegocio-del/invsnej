@@ -23,9 +23,45 @@ import {
   TableHeader,
   TableRow,
 } from './ui/table'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from './ui/alert-dialog'
 import type { AccesoEstado, AdminUserRow, AppRole } from '../types'
 
 const ROLES: AppRole[] = ['admin', 'operador', 'consulta']
+
+type ConfirmAction =
+  | { type: 'invite'; email: string; role: AppRole }
+  | { type: 'role'; row: AdminUserRow; newRole: AppRole }
+  | { type: 'acceso'; row: AdminUserRow; newAcceso: AccesoEstado }
+
+function getConfirmTexts(action: ConfirmAction): { title: string; description: string; actionLabel: string; isDestructive?: boolean } {
+  switch (action.type) {
+    case 'invite':
+      return {
+        title: `¿Invitar a ${action.email}?`,
+        description: `Se enviará una invitación con el rol "${action.role}". El usuario quedará en estado pendiente hasta ser aprobado.`,
+        actionLabel: 'Sí, invitar',
+      }
+    case 'role':
+      return {
+        title: `¿Cambiar rol de ${action.row.email ?? 'este usuario'}?`,
+        description: `El rol pasará a ser "${action.newRole}". Los permisos se actualizarán de inmediato.`,
+        actionLabel: 'Sí, cambiar',
+      }
+    case 'acceso': {
+      const email = action.row.email ?? 'este usuario'
+      if (action.newAcceso === 'activo' && action.row.acceso_estado === 'pendiente')
+        return { title: '¿Aprobar acceso?', description: `Se aprobará el acceso para ${email}. Podrá ingresar al sistema.`, actionLabel: 'Sí, aprobar' }
+      if (action.newAcceso === 'activo')
+        return { title: '¿Reactivar cuenta?', description: `Se reactivará la cuenta de ${email}. Podrá volver a iniciar sesión.`, actionLabel: 'Sí, reactivar' }
+      if (action.row.acceso_estado === 'activo')
+        return { title: '¿Suspender cuenta?', description: `Se suspenderá la cuenta de ${email}. No podrá iniciar sesión hasta ser reactivado.`, actionLabel: 'Sí, suspender', isDestructive: true }
+      return { title: '¿Rechazar acceso?', description: `Se rechazará la solicitud de ${email}. No podrá ingresar al sistema.`, actionLabel: 'Sí, rechazar', isDestructive: true }
+    }
+  }
+}
 
 function estadoVariant(e: AccesoEstado): 'warning' | 'success' | 'secondary' {
   switch (e) {
@@ -52,6 +88,7 @@ export function AdminUsuarios() {
   const [inviteRole, setInviteRole] = useState<AppRole>('operador')
   const [inviteBusy, setInviteBusy] = useState(false)
   const [rowBusy, setRowBusy] = useState<string | null>(null)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -68,13 +105,27 @@ export function AdminUsuarios() {
 
   useEffect(() => { void load() }, [load])
 
-  const handleInvite = async () => {
+  // ── Fase 1: pedir confirmación ──
+  const requestInvite = () => {
     const email = inviteEmail.trim()
     if (!email) { setError('Ingresa un correo para invitar.'); return }
+    setConfirmAction({ type: 'invite', email, role: inviteRole })
+  }
+
+  const requestRoleChange = (row: AdminUserRow, newRole: AppRole) => {
+    setConfirmAction({ type: 'role', row, newRole })
+  }
+
+  const requestAccesoChange = (row: AdminUserRow, newAcceso: AccesoEstado) => {
+    setConfirmAction({ type: 'acceso', row, newAcceso })
+  }
+
+  // ── Fase 2: ejecutar ──
+  const executeInvite = async (email: string, role: AppRole) => {
     setInviteBusy(true)
     setError(null)
     try {
-      await inviteUser(email, inviteRole)
+      await inviteUser(email, role)
       setInviteEmail('')
       await load()
       await refreshPerfil()
@@ -85,7 +136,7 @@ export function AdminUsuarios() {
     }
   }
 
-  const handleRoleChange = async (row: AdminUserRow, app_role: AppRole) => {
+  const executeRoleChange = async (row: AdminUserRow, app_role: AppRole) => {
     setRowBusy(row.id)
     try {
       await updateUserProfile(row.id, { app_role })
@@ -98,7 +149,7 @@ export function AdminUsuarios() {
     }
   }
 
-  const setAcceso = async (row: AdminUserRow, acceso_estado: AccesoEstado) => {
+  const executeAccesoChange = async (row: AdminUserRow, acceso_estado: AccesoEstado) => {
     setRowBusy(row.id)
     try {
       await updateUserProfile(row.id, { acceso_estado })
@@ -109,6 +160,15 @@ export function AdminUsuarios() {
     } finally {
       setRowBusy(null)
     }
+  }
+
+  const handleConfirm = () => {
+    const action = confirmAction
+    if (!action) return
+    setConfirmAction(null)
+    if (action.type === 'invite') void executeInvite(action.email, action.role)
+    else if (action.type === 'role') void executeRoleChange(action.row, action.newRole)
+    else void executeAccesoChange(action.row, action.newAcceso)
   }
 
   return (
@@ -129,7 +189,7 @@ export function AdminUsuarios() {
               placeholder="correo@dominio.gob.pe"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') void handleInvite() }}
+              onKeyDown={(e) => { if (e.key === 'Enter') requestInvite() }}
             />
             <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as AppRole)}>
               <SelectTrigger className="sm:w-36">
@@ -139,7 +199,7 @@ export function AdminUsuarios() {
                 {ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button onClick={() => void handleInvite()} disabled={inviteBusy} className="gap-2 shrink-0">
+            <Button onClick={requestInvite} disabled={inviteBusy} className="gap-2 shrink-0">
               {inviteBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
               {inviteBusy ? 'Enviando…' : 'Invitar'}
             </Button>
@@ -182,7 +242,7 @@ export function AdminUsuarios() {
                     <TableCell>
                       <Select
                         value={row.app_role}
-                        onValueChange={(v) => void handleRoleChange(row, v as AppRole)}
+                        onValueChange={(v) => requestRoleChange(row, v as AppRole)}
                         disabled={rowBusy === row.id}
                       >
                         <SelectTrigger className="h-8 w-32 text-xs">
@@ -202,21 +262,21 @@ export function AdminUsuarios() {
                       <div className="flex flex-wrap gap-1.5">
                         {row.acceso_estado === 'pendiente' && (
                           <>
-                            <Button size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => void setAcceso(row, 'activo')}>
+                            <Button size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => requestAccesoChange(row, 'activo')}>
                               Aprobar
                             </Button>
-                            <Button variant="secondary" size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => void setAcceso(row, 'rechazado')}>
+                            <Button variant="secondary" size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => requestAccesoChange(row, 'rechazado')}>
                               Rechazar
                             </Button>
                           </>
                         )}
                         {row.acceso_estado === 'activo' && row.id !== user?.id && (
-                          <Button variant="secondary" size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => void setAcceso(row, 'rechazado')}>
+                          <Button variant="secondary" size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => requestAccesoChange(row, 'rechazado')}>
                             Suspender
                           </Button>
                         )}
                         {row.acceso_estado === 'rechazado' && (
-                          <Button size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => void setAcceso(row, 'activo')}>
+                          <Button size="sm" className="h-7 text-xs" disabled={rowBusy === row.id} onClick={() => requestAccesoChange(row, 'activo')}>
                             Reactivar
                           </Button>
                         )}
@@ -229,6 +289,32 @@ export function AdminUsuarios() {
           )}
         </CardContent>
       </Card>
+
+      {/* AlertDialog de confirmación unificado */}
+      <AlertDialog open={confirmAction !== null} onOpenChange={(open) => { if (!open) setConfirmAction(null) }}>
+        <AlertDialogContent>
+          {confirmAction && (() => {
+            const { title, description, actionLabel, isDestructive } = getConfirmTexts(confirmAction)
+            return (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{title}</AlertDialogTitle>
+                  <AlertDialogDescription>{description}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    className={isDestructive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                    onClick={handleConfirm}
+                  >
+                    {actionLabel}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            )
+          })()}
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

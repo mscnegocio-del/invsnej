@@ -14,6 +14,7 @@ import { Login } from './pages/Login'
 import { AuthCallback } from './pages/AuthCallback'
 import { Security } from './pages/Security'
 import { Trabajadores } from './pages/Trabajadores'
+import { SigaPJ } from './pages/SigaPJ'
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/security" element={<Security />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/siga-pj" element={<SigaPJ />} />
             <Route path="/bienes/:id" element={<BienDetail />} />
             <Route
               path="/scan"
