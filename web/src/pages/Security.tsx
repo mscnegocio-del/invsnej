@@ -91,6 +91,7 @@ export function Security() {
   }
 
   return (
+    <>
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="page-title">Seguridad de acceso</h1>
@@ -218,6 +219,6 @@ export function Security() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   )
 }

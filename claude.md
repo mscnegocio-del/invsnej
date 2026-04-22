@@ -195,6 +195,49 @@ web/src/
 - **Historial:** solo durante la sesión/ventana abierta; se pierde al recargar.
 - **Acceso:** todos los roles (admin, operador, consulta) pueden usar el chat.
 
+### Mejoras UX/funcionales — 2026-04-22
+
+#### Sidebar desktop toggle
+- **Feature:** Botón circular en el borde del sidebar colapsa/expande a modo icono (w-14) o completo (w-64).
+- **Estado:** `sidebarCollapsed` en `Layout.tsx`, persistido en `localStorage('sidebar_collapsed')`.
+- **Contenido principal:** margin-left dinámico `md:ml-14` / `md:ml-64` con `transition-all duration-200`.
+- **Archivo:** `web/src/components/Layout.tsx`
+
+#### Filtros móvil colapsables en Search
+- **Feature:** En móvil solo aparece el campo "Código patrimonial". Botón "Filtros avanzados" despliega el resto con contador de filtros activos.
+- **Implementación:** Estado `showAdvancedFilters`, clase `hidden lg:block` para visibilidad desktop siempre activa.
+- **Archivo:** `web/src/pages/Search.tsx`
+
+#### Feedback visual al copiar (Search)
+- **Cambio:** Botón Copiar cambia a ícono ✓ verde + "Copiado" mientras `copied=true`; añade `toast.success('Copiado al portapapeles')` via Sonner.
+- **Archivo:** `web/src/pages/Search.tsx`
+
+#### Carga SIGA silenciosa por código patrimonial (BienForm)
+- **Feature:** Al escribir en el campo `codigo_patrimonial` en modo `create`, después de 500ms hace lookup exacto en `siga_bienes`. Si existe, rellena automáticamente marca, modelo, serie, OC y valor (solo campos vacíos).
+- **No muestra lista:** carga silenciosa y automática, sin popup de sugerencias.
+- **Archivo:** `web/src/components/BienForm.tsx` — `useEffect` con `sigaLookupRef` (debounce ref).
+
+#### Página SIGA PJ
+- **Feature:** Nueva ruta `/siga-pj` con búsqueda paginada (25/página) de la tabla `siga_bienes`.
+- **Filtros:** código patrimonial (ILIKE), descripción (ILIKE), responsable/usuario (ILIKE). Búsqueda bajo demanda (botón Buscar, no auto-search).
+- **Tabla:** scroll horizontal en móvil. Columnas: Código, Descripción, Marca, Modelo, Serie, Responsable, OC, Valor.
+- **Acceso:** todos los roles (admin, operador, consulta) — solo AuthGuard, sin RoleGuard adicional.
+- **Archivo nuevo:** `web/src/pages/SigaPJ.tsx`
+- **Ruta:** `web/src/App.tsx` — `<Route path="/siga-pj" element={<SigaPJ />} />`
+- **Sidebar:** entrada "SIGA PJ" con icono `Database` en `navItemsAll` para los 3 roles. Bottom nav móvil se actualiza automáticamente.
+
+#### Modales de confirmación (AlertDialog shadcn/ui)
+Patrón: estado `target/confirmAction/showDialog` → botón setea estado → AlertDialog abre → usuario confirma → se ejecuta la acción. El AlertDialog usa `onOpenChange` para cerrar con Escape o click fuera.
+
+- **Security.tsx** — `revokeTarget: string | null` controla el dialog antes de revocar passkey. El return usa Fragment `<>` para tener `<div>` + `<AlertDialog>` como hermanos.
+- **AdminUsuarios.tsx** — tipo `ConfirmAction` unificado para: invite, role, acceso. Función `getConfirmTexts()` fuera del componente genera título/descripción/label/isDestructive por tipo. Handlers separados en `request*` (abre dialog) y `execute*` (ejecuta acción).
+- **BienForm.tsx** — `showSaveConfirm: boolean`, solo en modo `edit`. `handleSubmit` refactorizado en `runValidation()` + `executeSubmit()` + `handleSubmit(event)`.
+- **AdminSigaPanel.tsx** — `showConfirmDialog: boolean` antes de `handleConfirmar()`. La descripción incluye `allRows.length` para informar cuántos registros se actualizarán.
+- **Trabajadores.tsx** — `showSaveConfirm: boolean`. `handleSave` llama `setShowSaveConfirm(true)` en vez de `ejecutarGuardado()` directo. El flujo con conflicto de sede (`sedeWarn`) sigue directo a `ejecutarGuardado` desde `confirmarSedeWarn` (usuario ya confirmó la advertencia). Añadido `AlertDialogDescription` al import.
+
+#### Pitfall corregido — Security.tsx JSX
+- `AlertDialog` quedó fuera del `<div>` principal. Solución: envolver el return en Fragment `<>` para que `<div>` y `<AlertDialog>` sean hermanos válidos sin un parent extra.
+
 ## Deploy
 
 - **Frontend:** Vercel (proyecto `web/` o monorepo según configuración).
