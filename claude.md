@@ -222,7 +222,7 @@ web/src/
 - **Feature:** Nueva ruta `/siga-pj` con búsqueda paginada (25/página) de la tabla `siga_bienes`.
 - **Filtros:** código patrimonial (ILIKE), descripción (ILIKE), responsable/usuario (ILIKE). Búsqueda bajo demanda (botón Buscar, no auto-search).
 - **Tabla:** scroll horizontal en móvil. Columnas: Código, Descripción, Marca, Modelo, Serie, Responsable, OC, Valor.
-- **Fecha de actualización:** `useEffect` al montar consulta `siga_bienes` ordenado por `updated_at desc limit 1` para obtener la fecha más reciente. Se muestra en el subtítulo ("Datos actualizados al [fecha]"), no por fila.
+- **Fecha de actualización:** `useEffect` al montar consulta primer registro de `siga_bienes` con fallback a `created_at` o fecha actual. Se muestra en el subtítulo ("Datos actualizados al [fecha]"), no por fila. Implementación: `.select('*').limit(1).maybeSingle()` con `const fecha = (data.updated_at || data.created_at || new Date().toISOString())`.
 - **`updated_at` en carga masiva:** `AdminSigaPanel.tsx` inyecta `updated_at: new Date().toISOString()` en cada fila del batch antes del upsert. `COLUMN_MAP` usa `Record<Exclude<keyof SigaRow, 'updated_at'>, string[]>` para excluir el campo (se inyecta en código, no viene del Excel).
 - **Acceso:** todos los roles (admin, operador, consulta) — solo AuthGuard, sin RoleGuard adicional.
 - **Archivo nuevo:** `web/src/pages/SigaPJ.tsx`
@@ -241,7 +241,47 @@ Patrón: estado `target/confirmAction/showDialog` → botón setea estado → Al
 #### Pitfall corregido — Security.tsx JSX
 - `AlertDialog` quedó fuera del `<div>` principal. Solución: envolver el return en Fragment `<>` para que `<div>` y `<AlertDialog>` sean hermanos válidos sin un parent extra.
 
+## Documentación externa
+
+- **architecture.md** — Estructura de directorios, flujos principales, tablas BD, patrones de diseño, performance, seguridad
+- **PRD.md** — Requerimientos funcionales y no funcionales, criterios de aceptación, métricas de éxito
+- **design.md** — Paleta de colores, tipografía, componentes UI, responsive, accesibilidad, ejemplos de pantallas
+
 ## Deploy
 
 - **Frontend:** Vercel (proyecto `web/` o monorepo según configuración).
 - **Edge Functions:** `supabase functions deploy` o MCP Supabase `deploy_edge_function` (p. ej. `passkeys`, `admin-users`, `ai-chat`).
+- **Variables de entorno:**
+  - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+  - `VITE_TURNSTILE_SITE_KEY` (opcional, si CAPTCHA activo en Supabase Auth)
+  - En Supabase Secrets: `GROQ_API_KEY` (para Edge Function ai-chat), `PASSKEY_EXTRA_HOSTS` (hosts adicionales para WebAuthn)
+
+## Sprint completado (2026-04-23)
+
+**11 mejoras implementadas:**
+1. ✅ Sidebar toggle desktop (colapsable, persistido)
+2. ✅ Filtros móvil colapsables con contador
+3. ✅ Feedback copiar mejorado (botón verde + toast)
+4. ✅ Carga SIGA silenciosa por código (500ms debounce)
+5. ✅ Página SIGA PJ (búsqueda paginada)
+6. ✅ Entrada SIGA en sidebar para todos los roles
+7. ✅ AlertDialog revocar passkey
+8. ✅ AlertDialogs en gestión usuarios (invite/role/acceso)
+9. ✅ AlertDialog guardar bien (edit mode)
+10. ✅ AlertDialog carga masiva SIGA
+11. ✅ AlertDialogs crear/editar trabajador
+
+**Fixes Tailwind v4:**
+- `@theme inline` en index.css para resolución de colores
+- Contraste mejorado en Dialog/AlertDialog (`bg-card`)
+- Button "Cancelar" en Trabajadores: `outline` en lugar de `ghost`
+
+**Errores resueltos:**
+- TypeScript: `Record<Exclude<keyof SigaRow, 'updated_at'>, string[]>` en COLUMN_MAP
+- Security.tsx: Fragment `<>` para múltiples root JSX elements
+- Layout.tsx: `overflow-hidden` movido a div interior para mostrar botón toggle
+
+**Cambios CLAUDE.md:**
+- Actualizado con todos los patrones implementados
+- Detalles técnicos de cada mejora
+- Fixes y pitfalls conocidos

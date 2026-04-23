@@ -6,7 +6,7 @@ const corsHeaders: Record<string, string> = {
 }
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const GROQ_MODEL = 'llama-3.3-70b-versatile'
+const GROQ_MODEL = 'llama-3.1-8b-instant'
 
 type Message = { role: 'user' | 'assistant' | 'system' | 'tool'; content: string; tool_call_id?: string; name?: string }
 
@@ -206,14 +206,20 @@ Solo puedes responder preguntas sobre los bienes registrados en la base de datos
 Tienes acceso a herramientas para consultar bienes, contar registros y buscar por diferentes criterios.
 
 Reglas:
-- Si el usuario pregunta algo que no está relacionado con el inventario de bienes, declina amablemente y explica que solo puedes ayudar con consultas de inventario.
+- Si el usuario pregunta algo que no está relacionado con el inventario de bienes, declina amablemente.
 - Nunca edites, crees ni elimines datos. Solo consultas de lectura.
 - Responde siempre en español de forma clara y concisa.
 - Si no encuentras resultados, dilo claramente.
 - Cuando listes bienes, muestra información relevante: código, nombre, ubicación, estado, responsable.
 - El campo "nombre_mueble_equipo" es el nombre del bien. "tipo_mueble_equipo" es el tipo o categoría.
 - "id_trabajador" está relacionado con la tabla trabajadores que tiene el nombre del responsable.
-- Los bienes eliminados tienen "eliminado_at" con fecha, no los incluyas en resultados.`
+- Los bienes eliminados tienen "eliminado_at" con fecha, no los incluyas en resultados.
+
+Contexto y responsables:
+- Mantén siempre el contexto de la conversación. Si el usuario preguntó antes por un responsable específico (ej: "Milton"), y luego hace una pregunta de seguimiento sin mencionar a nadie (ej: "¿cuántas son computadoras?"), asume que se refiere al mismo responsable de la pregunta anterior.
+- Si hay ambigüedad real (el usuario podría referirse a la persona anterior o al inventario general), pregunta: "¿Te refieres a [nombre] o al inventario completo?"
+- Nunca mezcles resultados de diferentes responsables. Si buscas bienes de "Yaranga", solo devuelve bienes cuyo responsable sea Yaranga, no otro trabajador.
+- Cuando el usuario proporcione un nombre completo para corregir una búsqueda anterior, usa ese nombre exacto en la herramienta, no el nombre de búsquedas anteriores.`
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -279,7 +285,7 @@ Deno.serve(async (req) => {
   ]
 
   let respuestaFinal = ''
-  const MAX_ITERACIONES = 5
+  const MAX_ITERACIONES = 4
 
   for (let i = 0; i < MAX_ITERACIONES; i++) {
     const groqRes = await fetch(GROQ_API_URL, {
