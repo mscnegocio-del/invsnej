@@ -109,7 +109,26 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | RF-39 | Deploy en Vercel | Alta |
 | RF-40 | Service worker para precaching | Media |
 
-### 3.8 Autenticación y seguridad
+### 3.8 Asistente IA (Chat)
+
+| ID   | Requisito | Prioridad |
+|------|-----------|-----------|
+| RF-52 | Panel chat lateral (Sheet) con icono Bot en header/sidebar/bottom-nav | Alta |
+| RF-53 | Entrada de usuario con Textarea (Shift+Enter para nueva línea, Enter envía) | Alta |
+| RF-54 | Historial de conversación visible durante la sesión (se pierde al recargar) | Media |
+| RF-55 | Typing indicator (3 puntos rebotando) mientras el asistente procesa | Media |
+| RF-56 | 4 sugerencias de ejemplo al abrir chat vacío | Media |
+| RF-57 | Botón limpiar conversación (icono papelera) | Media |
+| RF-58 | Soporte para 4 tools: buscar por código exacto, búsqueda filtrada, conteos, listar por responsable | Alta |
+| RF-59 | Contexto multi-turno: si usuario preguntó por "Milton" antes, preguntas sin nombre se asumen de Milton | Alta |
+| RF-60 | Ambigüedad: asistente pregunta aclaración en lugar de adivinar trabajadores | Alta |
+| RF-61 | Asistente no puede crear, editar ni eliminar bienes (solo lectura) | Alta |
+| RF-62 | Respuestas en español, claras y concisas | Alta |
+| RF-63 | Acceso: todos los roles (admin, operador, consulta) pueden usar el chat | Alta |
+| RF-64 | Edge Function `ai-chat` usa Groq API con modelo llama-3.1-8b-instant | Alta |
+| RF-65 | Agentic loop: máximo 4 iteraciones por pregunta para optimizar tokens | Alta |
+
+### 3.9 Autenticación y seguridad
 
 | ID   | Requisito | Prioridad |
 |------|-----------|-----------|

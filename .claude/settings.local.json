@@ -3,7 +3,14 @@
     "allow": [
       "Bash(npm install *)",
       "Bash(npm run *)",
-      "Bash(grep -E \"\\\\.tsx$\")"
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "Bash(supabase functions *)",
+      "Bash(npx supabase *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'feat: dual-provider AI chat \\(Claude Haiku + Groq fallback con prompt caching\\) *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'fix: mejorar descripcion de tools y system prompt para que Llama use contar_bienes con responsable *)",
+      "Bash(git commit -m 'fix: mejorar system prompt para Llama 8b con tabla de decisiones y sinonimos *)"
     ]
   }
 }

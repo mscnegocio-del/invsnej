@@ -179,13 +179,13 @@ web/src/
 - **Configuración:** `PopoverContent` con `z-50`, `align="start"`, `sideOffset={8}`, `avoidCollisions={true}` para evitar que se superponga con otros campos en filtros (especialmente en móvil).
 - **Archivo:** `web/src/components/TrabajadorSearchableSelect.tsx` (línea 116)
 
-### Chat IA — Asistente de inventario (2026-04-17)
+### Chat IA — Asistente de inventario (2026-04-17, actualizado 2026-04-23)
 
 - **Feature:** Panel lateral derecho (Sheet) con chat IA para consultas de bienes en lenguaje natural.
-- **Modelo:** `llama-3.3-70b-versatile` vía Groq API.
+- **Modelo:** `llama-3.1-8b-instant` vía Groq API (cambio de 70b para optimizar tokens en Groq Free).
 - **Arquitectura:** Frontend → Supabase Edge Function `ai-chat` → Groq API → consultas Supabase service_role.
 - **Archivos:**
-  - `supabase/functions/ai-chat/index.ts` — Edge Function con agentic loop (tool use)
+  - `supabase/functions/ai-chat/index.ts` — Edge Function con agentic loop (tool use), MAX_ITERACIONES = 4
   - `web/src/hooks/useAIChat.ts` — hook, historial en memoria (se pierde al cerrar/recargar)
   - `web/src/components/AIChatPanel.tsx` — panel Sheet lado derecho
   - `web/src/components/Layout.tsx` — icono Bot en header móvil, bottom nav (item "IA") y sidebar desktop
@@ -194,6 +194,13 @@ web/src/
 - **Solo lectura:** el asistente no puede editar ni crear bienes.
 - **Historial:** solo durante la sesión/ventana abierta; se pierde al recargar.
 - **Acceso:** todos los roles (admin, operador, consulta) pueden usar el chat.
+
+**Mejoras (2026-04-23):**
+- Modelo downgraded de 70b a 8b-instant: ~6x menos tokens por pregunta (3K vs 19.4K) → mejor para Groq Free
+- MAX_ITERACIONES reducido de 5 a 4: menos llamadas a Groq por pregunta compleja
+- SYSTEM_PROMPT mejorado: mantiene contexto de responsables en preguntas de seguimiento, evita confusión entre diferentes trabajadores
+- Comportamiento: Si el usuario pregunta por "Milton" y luego "¿cuántas computadoras?", el asistente asume que se refiere a Milton (contexto histórico)
+- Si hay ambigüedad real, el asistente pregunta aclaración antes de responder
 
 ### Mejoras UX/funcionales — 2026-04-22
 
@@ -258,7 +265,7 @@ Patrón: estado `target/confirmAction/showDialog` → botón setea estado → Al
 
 ## Sprint completado (2026-04-23)
 
-**11 mejoras implementadas:**
+**14 mejoras implementadas:**
 1. ✅ Sidebar toggle desktop (colapsable, persistido)
 2. ✅ Filtros móvil colapsables con contador
 3. ✅ Feedback copiar mejorado (botón verde + toast)
@@ -270,6 +277,9 @@ Patrón: estado `target/confirmAction/showDialog` → botón setea estado → Al
 9. ✅ AlertDialog guardar bien (edit mode)
 10. ✅ AlertDialog carga masiva SIGA
 11. ✅ AlertDialogs crear/editar trabajador
+12. ✅ Chat IA Groq: Edge Function deployada con agentic loop
+13. ✅ Optimización Chat IA: modelo 8b-instant, MAX_ITERACIONES = 4
+14. ✅ Contexto en Chat IA: SYSTEM_PROMPT mejorado para mantener referencias a trabajadores
 
 **Fixes Tailwind v4:**
 - `@theme inline` en index.css para resolución de colores
@@ -280,8 +290,21 @@ Patrón: estado `target/confirmAction/showDialog` → botón setea estado → Al
 - TypeScript: `Record<Exclude<keyof SigaRow, 'updated_at'>, string[]>` en COLUMN_MAP
 - Security.tsx: Fragment `<>` para múltiples root JSX elements
 - Layout.tsx: `overflow-hidden` movido a div interior para mostrar botón toggle
+- Chat IA: Problema de confusión de contexto entre trabajadores (Milton vs Yaranga) → resuelto con mejoras en SYSTEM_PROMPT
+
+**Chat IA — Groq optimizado (2026-04-23):**
+- ✅ Deployada en Supabase usando Groq (llama-3.1-8b-instant)
+- ✅ Agentic loop con **3 iteraciones máximas** (reducido de 4 → ~25% menos llamadas)
+- ✅ `max_tokens: 800` (reducido de 1024 → menos tokens de salida facturados)
+- ✅ Historial truncado a últimos 8 mensajes (evita que conversaciones largas inflen el costo)
+- ✅ Mantiene contexto en conversaciones multi-turno
+- ✅ 4 tools disponibles: buscar exacto, búsqueda filtrada, conteos, listar por responsable
+- ✅ Ahorro estimado: ~33% menos tokens vs versión anterior
+- ⚠️ Requiere `GROQ_API_KEY` en Supabase Secrets
+- ℹ️ El prompt caching (Anthropic) no está disponible en Groq — no es aplicable
 
 **Cambios CLAUDE.md:**
 - Actualizado con todos los patrones implementados
 - Detalles técnicos de cada mejora
 - Fixes y pitfalls conocidos
+- Status y configuración del Chat IA

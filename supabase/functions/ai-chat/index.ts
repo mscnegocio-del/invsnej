@@ -328,7 +328,8 @@ Deno.serve(async (req) => {
 
       if (!groqRes.ok) {
         const err = await groqRes.text()
-        throw new Error(`Error Groq: ${err}`)
+        console.error(`[ai-chat] Groq HTTP ${groqRes.status}:`, err)
+        throw new Error(`Error Groq ${groqRes.status}: ${err}`)
       }
 
       const groqData = await groqRes.json() as { choices: Array<{ message: { content: string; tool_calls?: ToolCall[] } }> }

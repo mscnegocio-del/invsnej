@@ -297,4 +297,6 @@ Usado en `BienForm.tsx` para SIGA lookup:
 6. **Modales de confirmación** — AlertDialog en 6 flujos críticos
 7. **Fecha de actualización SIGA** — en subtítulo, fallback a created_at o fecha actual
 8. **Fixes Tailwind v4** — `@theme inline` en index.css, dark mode contraste mejorado
+9. **Chat IA con Groq** — Panel Sheet lateral (icono Bot) con asistente de inventario usando Edge Function `ai-chat`, modelo `llama-3.1-8b-instant`, agentic loop con 4 iteraciones máximas, 4 tools para consultas (buscar exacto, búsqueda filtrada, conteos, listar por responsable)
+10. **Contexto en Chat IA** — SYSTEM_PROMPT mejorado para mantener referencias a trabajadores en conversaciones multi-turno, evita confusión entre diferentes responsables
 

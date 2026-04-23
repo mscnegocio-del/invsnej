@@ -402,6 +402,49 @@ body.dark {
 └──────────────────────────────────────┘
 ```
 
+### Chat IA (Asistente Groq)
+
+**Desktop:** Panel Sheet deslizante por la derecha. **Mobile:** Bot icon en header o bottom nav.
+
+```
+┌─ Asistente IA ─────────────────────┐
+│ Consultas de inventario         [🗑] │  ← botón limpiar
+├────────────────────────────────────┤
+│ ScrollArea:                        │
+│ [Bot] ¿En qué te ayudo?            │
+│                                    │
+│ [Bot] Puedo consultar bienes,      │
+│ ubicaciones, responsables y más.   │
+│                                    │
+│ [Sugerencias de ejemplo]           │
+│ - ¿Dónde está bien 7521487526?     │
+│ - ¿Cuántos televisores tengo?      │
+│ - ¿Cuántas computadoras en buen... │
+│ - ¿Qué bienes tiene Oliver?        │
+│                                    │
+│ [Usuario] dime cantidad de bienes  │
+│ que tiene asignado Milton Salcedo  │
+│                                    │
+│ [Bot] Milton Salcedo tiene         │
+│ asignados 50 bienes.               │
+│ [···]                              │
+├────────────────────────────────────┤
+│ [Textarea] Pregunta sobre tus      │
+│ bienes...                          │ height: auto (1-5 líneas)
+│                                    │
+│ [Botón enviar] ↑                   │
+│ Shift+Enter nueva línea · Solo lectura
+└────────────────────────────────────┘
+```
+
+**Estilos:**
+- Header: Icono Sparkles (azul primary), título "Asistente IA", subtítulo "Consultas de inventario"
+- Mensajes usuario: `bg-primary text-primary-foreground` alineado derecha, burbujas redondeadas
+- Mensajes asistente: `bg-muted text-foreground` alineado izquierda, icono Bot pequeño
+- Typing indicator: 3 puntos rebotando
+- Error: `border border-destructive/30 bg-destructive/5 text-destructive`
+- Sugerencias vacías: centradas, icono Bot grande, descripción clara
+
 ## Guía de estilo — tone of voice
 
 - **Amigable:** "¡Guardado! El bien se registró correctamente."
