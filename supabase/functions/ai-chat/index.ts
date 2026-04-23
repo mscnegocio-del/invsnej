@@ -6,7 +6,7 @@ const corsHeaders: Record<string, string> = {
 }
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
-const GEMINI_MODEL = 'gemini-2.0-flash-lite'
+const GEMINI_MODEL = 'gemini-1.5-flash'
 const MAX_ITERACIONES = 3
 
 type Message = { role: 'user' | 'assistant' | 'system' | 'tool'; content: string; tool_call_id?: string; name?: string }
@@ -338,9 +338,15 @@ Deno.serve(async (req) => {
       const llmRes = await llamarLLM(geminiKey, conversacion)
 
       if (!llmRes.ok) {
-        const err = await llmRes.text()
-        console.error(`[ai-chat] Gemini HTTP ${llmRes.status}:`, err)
-        throw new Error(`Error Gemini ${llmRes.status}: ${err}`)
+        const errText = await llmRes.text()
+        console.error(`[ai-chat] Gemini HTTP ${llmRes.status}:`, errText)
+        return new Response(JSON.stringify({ 
+          error: `Gemini API Error (${llmRes.status})`, 
+          details: errText 
+        }), {
+          status: llmRes.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
 
       const groqData = await llmRes.json() as { choices: Array<{ message: { content: string; tool_calls?: ToolCall[] } }> }
