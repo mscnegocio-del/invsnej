@@ -58,7 +58,7 @@ const tools = [
     type: 'function',
     function: {
       name: 'contar_bienes',
-      description: 'Cuenta bienes con filtros opcionales. Devuelve el total.',
+      description: 'Cuenta bienes con filtros opcionales. Devuelve el total numérico. Usar para preguntas como "¿cuántos bienes tiene X?", "¿cuántas laptops hay?", "¿cuántos bienes de estado Bueno tiene Romario?".',
       parameters: {
         type: 'object',
         properties: {
@@ -68,7 +68,7 @@ const tools = [
           estado: { type: 'string', description: 'Estado: Nuevo, Bueno, Regular, Malo, Muy malo' },
           ubicacion: { type: 'string', description: 'Ubicación (texto parcial)' },
           orden_compra: { type: 'string', description: 'Número de orden de compra' },
-          nombre_responsable: { type: 'string', description: 'Nombre del trabajador responsable' },
+          nombre_responsable: { type: 'string', description: 'Nombre o parte del nombre del trabajador responsable. Usar para contar bienes de una persona específica.' },
         },
         required: [],
       },
@@ -213,14 +213,19 @@ Reglas:
 - Si no encuentras resultados, dilo claramente.
 - Cuando listes bienes, muestra información relevante: código, nombre, ubicación, estado, responsable.
 - El campo "nombre_mueble_equipo" es el nombre del bien. "tipo_mueble_equipo" es el tipo o categoría.
-- "id_trabajador" está relacionado con la tabla trabajadores que tiene el nombre del responsable.
 - Los bienes eliminados tienen "eliminado_at" con fecha, no los incluyas en resultados.
+
+Uso de herramientas — IMPORTANTE:
+- Para contar bienes de una persona: llama contar_bienes con nombre_responsable. Ejemplo: "¿cuántos bienes tiene Romario?" → contar_bienes({ nombre_responsable: "Romario" })
+- Para contar bienes con múltiples filtros: contar_bienes({ nombre_responsable: "X", estado: "Bueno" })
+- Para listar bienes de una persona: listar_bienes_por_responsable({ nombre_responsable: "X" })
+- SIEMPRE llama la herramienta directamente. Nunca digas que no puedes usar una herramienta — todas están disponibles.
 
 Contexto y responsables:
 - Mantén siempre el contexto de la conversación. Si el usuario preguntó antes por un responsable específico (ej: "Milton"), y luego hace una pregunta de seguimiento sin mencionar a nadie (ej: "¿cuántas son computadoras?"), asume que se refiere al mismo responsable de la pregunta anterior.
 - Si hay ambigüedad real (el usuario podría referirse a la persona anterior o al inventario general), pregunta: "¿Te refieres a [nombre] o al inventario completo?"
-- Nunca mezcles resultados de diferentes responsables. Si buscas bienes de "Yaranga", solo devuelve bienes cuyo responsable sea Yaranga, no otro trabajador.
-- Cuando el usuario proporcione un nombre completo para corregir una búsqueda anterior, usa ese nombre exacto en la herramienta, no el nombre de búsquedas anteriores.`
+- Nunca mezcles resultados de diferentes responsables.
+- Cuando el usuario proporcione un nombre completo para corregir una búsqueda anterior, usa ese nombre exacto en la herramienta.`
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
