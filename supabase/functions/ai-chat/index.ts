@@ -5,10 +5,13 @@ const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
+const CLAUDE_MODEL = 'claude-3-5-haiku-20241022'
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const GROQ_MODEL = 'llama-3.1-8b-instant'
+const MAX_ITERACIONES = 4
 
-type Message = { role: 'user' | 'assistant' | 'system' | 'tool'; content: string; tool_call_id?: string; name?: string }
+type Message = { role: 'user' | 'assistant' | 'system' | 'tool'; content: string | Record<string, unknown>[]; tool_call_id?: string; name?: string; tool_calls?: ToolCall[] }
 
 type ToolCall = {
   id: string
@@ -16,6 +19,14 @@ type ToolCall = {
   function: { name: string; arguments: string }
 }
 
+type ClaudeToolUse = {
+  type: 'tool_use'
+  id: string
+  name: string
+  input: Record<string, unknown>
+}
+
+// Tools format: OpenAI/Groq
 const tools = [
   {
     type: 'function',
@@ -89,6 +100,14 @@ const tools = [
     },
   },
 ]
+
+// Tools format: Claude (Anthropic)
+const claudeTools = tools.map((t, idx, arr) => ({
+  name: t.function.name,
+  description: t.function.description,
+  input_schema: t.function.parameters,
+  ...(idx === arr.length - 1 ? { cache_control: { type: 'ephemeral' } } : {}),
+}))
 
 type BienesFilters = {
   nombre?: string
@@ -221,16 +240,166 @@ Contexto y responsables:
 - Nunca mezcles resultados de diferentes responsables. Si buscas bienes de "Yaranga", solo devuelve bienes cuyo responsable sea Yaranga, no otro trabajador.
 - Cuando el usuario proporcione un nombre completo para corregir una búsqueda anterior, usa ese nombre exacto en la herramienta, no el nombre de búsquedas anteriores.`
 
+// Agentic loop para Claude Haiku
+async function ejecutarLoopClaude(
+  mensajesOriginales: Message[],
+  anthropicKey: string,
+  supabase: ReturnType<typeof createClient>
+): Promise<string> {
+  const conversacion: Array<{ role: 'user' | 'assistant'; content: string | Record<string, unknown>[] }> = mensajesOriginales
+    .filter((m) => m.role !== 'system')
+    .map((m) => ({
+      role: m.role as 'user' | 'assistant',
+      content: typeof m.content === 'string' ? m.content : m.content,
+    }))
+
+  let respuestaFinal = ''
+
+  for (let i = 0; i < MAX_ITERACIONES; i++) {
+    const res = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: 1024,
+        system: [
+          {
+            type: 'text',
+            text: SYSTEM_PROMPT,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
+        messages: conversacion,
+        tools: claudeTools,
+        tool_choice: { type: 'auto' },
+        temperature: 0.3,
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.text()
+      throw new Error(`Error Claude: ${err}`)
+    }
+
+    const data = await res.json() as { content: Array<{ type: string; text?: string; id?: string; name?: string; input?: unknown }>; stop_reason: string }
+    const assistantMsg = { role: 'assistant' as const, content: data.content }
+
+    conversacion.push(assistantMsg)
+
+    // Buscar tool_use en content
+    const toolUses = data.content.filter((c): c is { type: 'tool_use'; id: string; name: string; input: unknown } => c.type === 'tool_use')
+    const textContent = data.content.find((c): c is { type: 'text'; text: string } => c.type === 'text')
+
+    if (data.stop_reason === 'end_turn' || toolUses.length === 0) {
+      respuestaFinal = textContent?.text ?? ''
+      break
+    }
+
+    // Ejecutar tool calls
+    for (const tu of toolUses) {
+      const resultado = await ejecutarTool(tu.name, tu.input as Record<string, unknown>, supabase)
+      conversacion.push({
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: tu.id,
+            content: resultado,
+          },
+        ],
+      })
+    }
+  }
+
+  return respuestaFinal
+}
+
+// Agentic loop para Groq
+async function ejecutarLoopGroq(
+  mensajesOriginales: Message[],
+  groqKey: string,
+  supabase: ReturnType<typeof createClient>
+): Promise<string> {
+  const conversacion: Message[] = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    ...mensajesOriginales,
+  ]
+
+  let respuestaFinal = ''
+
+  for (let i = 0; i < MAX_ITERACIONES; i++) {
+    const groqRes = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: conversacion,
+        tools,
+        tool_choice: 'auto',
+        temperature: 0.3,
+        max_tokens: 1024,
+      }),
+    })
+
+    if (!groqRes.ok) {
+      const err = await groqRes.text()
+      throw new Error(`Error Groq: ${err}`)
+    }
+
+    const groqData = await groqRes.json() as { choices: Array<{ message: { content: string; tool_calls?: ToolCall[] } }> }
+    const choice = groqData.choices?.[0]
+    const msg = choice?.message
+
+    if (!msg) break
+
+    conversacion.push({ role: 'assistant' as const, content: msg.content, tool_calls: msg.tool_calls })
+
+    if (!msg.tool_calls || msg.tool_calls.length === 0) {
+      respuestaFinal = msg.content ?? ''
+      break
+    }
+
+    for (const tc of msg.tool_calls) {
+      let args: Record<string, unknown> = {}
+      try {
+        args = JSON.parse(tc.function.arguments)
+      } catch {
+        // args vacío
+      }
+
+      const resultado = await ejecutarTool(tc.function.name, args, supabase)
+
+      conversacion.push({
+        role: 'tool',
+        tool_call_id: tc.id,
+        name: tc.function.name,
+        content: resultado,
+      })
+    }
+  }
+
+  return respuestaFinal
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
   const groqKey = Deno.env.get('GROQ_API_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-  if (!groqKey || !supabaseUrl || !serviceKey) {
+  if ((!anthropicKey && !groqKey) || !supabaseUrl || !serviceKey) {
     return new Response(JSON.stringify({ error: 'Configuración incompleta del servidor' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -278,71 +447,30 @@ Deno.serve(async (req) => {
     })
   }
 
-  // Agentic loop: llamar Groq → ejecutar tools → volver a llamar hasta respuesta final
-  const conversacion: Message[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    ...messages,
-  ]
-
   let respuestaFinal = ''
-  const MAX_ITERACIONES = 4
+  let usedFallback = false
 
-  for (let i = 0; i < MAX_ITERACIONES; i++) {
-    const groqRes = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: conversacion,
-        tools,
-        tool_choice: 'auto',
-        temperature: 0.3,
-        max_tokens: 1024,
-      }),
+  try {
+    if (anthropicKey) {
+      try {
+        respuestaFinal = await ejecutarLoopClaude(messages, anthropicKey, supabase)
+      } catch (e) {
+        if (!groqKey) throw e
+        usedFallback = true
+        respuestaFinal = await ejecutarLoopGroq(messages, groqKey, supabase)
+      }
+    } else if (groqKey) {
+      respuestaFinal = await ejecutarLoopGroq(messages, groqKey, supabase)
+    }
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : 'Error desconocido'
+    return new Response(JSON.stringify({ error: errorMsg }), {
+      status: 502,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
-
-    if (!groqRes.ok) {
-      const err = await groqRes.text()
-      return new Response(JSON.stringify({ error: `Error Groq: ${err}` }), {
-        status: 502,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const groqData = await groqRes.json()
-    const choice = groqData.choices?.[0]
-    const msg = choice?.message
-
-    if (!msg) break
-
-    conversacion.push(msg)
-
-    // Si no hay tool calls, tenemos la respuesta final
-    if (!msg.tool_calls || msg.tool_calls.length === 0) {
-      respuestaFinal = msg.content ?? ''
-      break
-    }
-
-    // Ejecutar cada tool call
-    for (const tc of msg.tool_calls as ToolCall[]) {
-      let args: Record<string, unknown> = {}
-      try { args = JSON.parse(tc.function.arguments) } catch { /* args vacío */ }
-
-      const resultado = await ejecutarTool(tc.function.name, args, supabase)
-
-      conversacion.push({
-        role: 'tool',
-        tool_call_id: tc.id,
-        name: tc.function.name,
-        content: resultado,
-      })
-    }
   }
 
-  return new Response(JSON.stringify({ reply: respuestaFinal }), {
+  return new Response(JSON.stringify({ reply: respuestaFinal, fallback: usedFallback }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 })

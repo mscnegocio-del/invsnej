@@ -17,6 +17,7 @@ export function useAIChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastFallback, setLastFallback] = useState(false)
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return
@@ -31,6 +32,7 @@ export function useAIChat() {
     setMessages((prev) => [...prev, userMsg])
     setLoading(true)
     setError(null)
+    setLastFallback(false)
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -50,7 +52,12 @@ export function useAIChat() {
       if (res.error) throw new Error(res.error.message)
 
       const reply = res.data?.reply as string | undefined
+      const fallback = res.data?.fallback as boolean | undefined
       if (!reply) throw new Error('Respuesta vacía del servidor')
+
+      if (fallback) {
+        setLastFallback(true)
+      }
 
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -72,5 +79,5 @@ export function useAIChat() {
     setError(null)
   }, [])
 
-  return { messages, loading, error, sendMessage, clearMessages }
+  return { messages, loading, error, sendMessage, clearMessages, lastFallback }
 }
