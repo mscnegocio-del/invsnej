@@ -6,7 +6,8 @@ const corsHeaders: Record<string, string> = {
 }
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const GROQ_MODEL = 'llama-3.1-8b-instant'
+// Modelos en orden de fallback (límites de TPM independientes)
+const GROQ_MODELS = ['llama-3.1-8b-instant', 'gemma2-9b-it']
 const MAX_ITERACIONES = 3
 
 type Message = { role: 'user' | 'assistant' | 'system' | 'tool'; content: string; tool_call_id?: string; name?: string }
@@ -17,16 +18,17 @@ type ToolCall = {
   function: { name: string; arguments: string }
 }
 
+// Herramientas con descripciones compactas
 const tools = [
   {
     type: 'function',
     function: {
       name: 'buscar_bien_por_codigo',
-      description: 'Busca un bien por su código patrimonial exacto',
+      description: 'Busca un bien por código patrimonial exacto',
       parameters: {
         type: 'object',
         properties: {
-          codigo: { type: 'string', description: 'Código patrimonial del bien' },
+          codigo: { type: 'string', description: 'Código patrimonial' },
         },
         required: ['codigo'],
       },
@@ -36,19 +38,19 @@ const tools = [
     type: 'function',
     function: {
       name: 'buscar_bienes',
-      description: 'Busca bienes con filtros opcionales. Devuelve lista de bienes.',
+      description: 'Busca bienes con filtros opcionales',
       parameters: {
         type: 'object',
         properties: {
-          nombre: { type: 'string', description: 'Parte del nombre del mueble/equipo' },
-          tipo: { type: 'string', description: 'Tipo de mueble/equipo' },
-          marca: { type: 'string', description: 'Marca del bien' },
-          modelo: { type: 'string', description: 'Modelo del bien' },
-          estado: { type: 'string', description: 'Estado: Nuevo, Bueno, Regular, Malo, Muy malo' },
-          ubicacion: { type: 'string', description: 'Ubicación (texto parcial)' },
-          orden_compra: { type: 'string', description: 'Número de orden de compra' },
-          nombre_responsable: { type: 'string', description: 'Nombre del trabajador responsable (busca por nombre)' },
-          limit: { type: 'number', description: 'Máximo de resultados a devolver (default 10, max 50)' },
+          nombre: { type: 'string', description: 'Nombre parcial del bien' },
+          tipo: { type: 'string', description: 'Tipo de bien' },
+          marca: { type: 'string', description: 'Marca' },
+          modelo: { type: 'string', description: 'Modelo' },
+          estado: { type: 'string', description: 'Nuevo|Bueno|Regular|Malo|Muy malo' },
+          ubicacion: { type: 'string', description: 'Ubicación parcial' },
+          orden_compra: { type: 'string', description: 'Orden de compra' },
+          nombre_responsable: { type: 'string', description: 'Nombre del responsable' },
+          limit: { type: 'number', description: 'Máx resultados (def 10, max 50)' },
         },
         required: [],
       },
@@ -58,17 +60,17 @@ const tools = [
     type: 'function',
     function: {
       name: 'contar_bienes',
-      description: 'Cuenta bienes con filtros opcionales. Devuelve el total numérico. Usar para preguntas como "¿cuántos bienes tiene X?", "¿cuántas laptops hay?", "¿cuántos bienes de estado Bueno tiene Romario?".',
+      description: 'Cuenta bienes con filtros. Usar para "¿cuántos?"',
       parameters: {
         type: 'object',
         properties: {
-          nombre: { type: 'string', description: 'Parte del nombre del mueble/equipo' },
-          tipo: { type: 'string', description: 'Tipo de mueble/equipo' },
-          marca: { type: 'string', description: 'Marca del bien' },
-          estado: { type: 'string', description: 'Estado: Nuevo, Bueno, Regular, Malo, Muy malo' },
-          ubicacion: { type: 'string', description: 'Ubicación (texto parcial)' },
-          orden_compra: { type: 'string', description: 'Número de orden de compra' },
-          nombre_responsable: { type: 'string', description: 'Nombre o parte del nombre del trabajador responsable. Usar para contar bienes de una persona específica.' },
+          nombre: { type: 'string', description: 'Nombre parcial' },
+          tipo: { type: 'string', description: 'Tipo' },
+          marca: { type: 'string', description: 'Marca' },
+          estado: { type: 'string', description: 'Nuevo|Bueno|Regular|Malo|Muy malo' },
+          ubicacion: { type: 'string', description: 'Ubicación' },
+          orden_compra: { type: 'string', description: 'Orden de compra' },
+          nombre_responsable: { type: 'string', description: 'Nombre del responsable' },
         },
         required: [],
       },
@@ -78,12 +80,12 @@ const tools = [
     type: 'function',
     function: {
       name: 'listar_bienes_por_responsable',
-      description: 'Lista todos los bienes asignados a un trabajador por su nombre',
+      description: 'Lista bienes asignados a un trabajador',
       parameters: {
         type: 'object',
         properties: {
-          nombre_responsable: { type: 'string', description: 'Nombre o parte del nombre del trabajador' },
-          limit: { type: 'number', description: 'Máximo de resultados (default 20)' },
+          nombre_responsable: { type: 'string', description: 'Nombre del trabajador' },
+          limit: { type: 'number', description: 'Máx resultados (def 20)' },
         },
         required: ['nombre_responsable'],
       },
@@ -101,6 +103,26 @@ type BienesFilters = {
   orden_compra?: string
   nombre_responsable?: string
   limit?: number
+}
+
+// Trunca el resultado de una tool para no inflar el historial
+function truncarResultadoTool(resultado: string): string {
+  try {
+    const obj = JSON.parse(resultado)
+    // Si es una lista de resultados, limitar a 5 y quitar campos pesados
+    if (obj.resultados && Array.isArray(obj.resultados)) {
+      const camposLigeros = ['codigo_patrimonial', 'nombre_mueble_equipo', 'estado', 'ubicacion', 'trabajadores']
+      obj.resultados = obj.resultados.slice(0, 5).map((item: Record<string, unknown>) => {
+        const slim: Record<string, unknown> = {}
+        for (const k of camposLigeros) if (item[k] !== undefined) slim[k] = item[k]
+        return slim
+      })
+      obj.truncado = obj.total > 5
+    }
+    return JSON.stringify(obj)
+  } catch {
+    return resultado
+  }
 }
 
 async function ejecutarTool(
@@ -123,7 +145,7 @@ async function ejecutarTool(
         .maybeSingle()
 
       if (error) return JSON.stringify({ error: error.message })
-      if (!data) return JSON.stringify({ resultado: null, mensaje: `No se encontró ningún bien con código ${codigo}` })
+      if (!data) return JSON.stringify({ resultado: null, mensaje: `No se encontró bien con código ${codigo}` })
       return JSON.stringify({ resultado: data })
     }
 
@@ -156,13 +178,13 @@ async function ejecutarTool(
           .ilike('nombre', `%${filters.nombre_responsable}%`)
 
         const ids = (trabajadores ?? []).map((t: { id: number }) => t.id)
-        if (ids.length === 0) return JSON.stringify({ resultados: [], total: 0, mensaje: `No se encontró trabajador con nombre "${filters.nombre_responsable}"` })
+        if (ids.length === 0) return JSON.stringify({ resultados: [], total: 0, mensaje: `No se encontró trabajador "${filters.nombre_responsable}"` })
         query = query.in('id_trabajador', ids)
       }
 
       const { data, error } = await query
       if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ resultados: data ?? [], total: data?.length ?? 0 })
+      return truncarResultadoTool(JSON.stringify({ resultados: data ?? [], total: data?.length ?? 0 }))
     }
 
     if (nombre === 'contar_bienes') {
@@ -187,7 +209,7 @@ async function ejecutarTool(
           .ilike('nombre', `%${filters.nombre_responsable}%`)
 
         const ids = (trabajadores ?? []).map((t: { id: number }) => t.id)
-        if (ids.length === 0) return JSON.stringify({ total: 0, mensaje: `No se encontró trabajador con nombre "${filters.nombre_responsable}"` })
+        if (ids.length === 0) return JSON.stringify({ total: 0, mensaje: `No se encontró trabajador "${filters.nombre_responsable}"` })
         query = query.in('id_trabajador', ids)
       }
 
@@ -202,45 +224,59 @@ async function ejecutarTool(
   }
 }
 
-const SYSTEM_PROMPT = `Eres un asistente de consultas del inventario patrimonial. Solo respondes sobre bienes registrados en la base de datos. Solo lectura — nunca modificas datos. Responde siempre en español, breve y directo.
+// Prompt del sistema compactado
+const SYSTEM_PROMPT = `Eres asistente de inventario patrimonial. Solo consultas — nunca modificas datos. Responde en español, breve y directo.
 
-REGLA PRINCIPAL: SIEMPRE llama una herramienta antes de responder. Nunca respondas sin consultar primero la base de datos.
+REGLA: SIEMPRE llama una herramienta antes de responder.
 
-CUÁNDO USAR CADA HERRAMIENTA:
-- "¿Cuántos bienes tiene [persona]?" → contar_bienes(nombre_responsable: "[persona]")
-- "¿Cuántos [tipo] hay?" → contar_bienes(nombre: "[tipo]")
-- "¿Cuántos [tipo] tiene [persona]?" → contar_bienes(nombre_responsable: "[persona]", nombre: "[tipo]")
-- "¿Cuántos bienes en [estado] tiene [persona]?" → contar_bienes(nombre_responsable: "[persona]", estado: "[estado]")
-- "¿Cuántos bienes hay en total?" → contar_bienes() sin filtros
-- "¿Qué bienes tiene [persona]?" → listar_bienes_por_responsable(nombre_responsable: "[persona]")
-- "¿Dónde está / busca el bien [código]?" → buscar_bien_por_codigo(codigo: "[código]")
-- "¿Qué hay en [ubicación]?" → buscar_bienes(ubicacion: "[ubicación]")
-- "¿Bienes en mal estado?" → buscar_bienes(estado: "Malo")
-- "¿Tiene [persona] algún [tipo]?" → buscar_bienes(nombre_responsable: "[persona]", nombre: "[tipo]")
+HERRAMIENTAS:
+- "¿Cuántos?" → contar_bienes
+- "¿Qué bienes tiene [persona]?" → listar_bienes_por_responsable
+- "Busca el bien [código]" → buscar_bien_por_codigo
+- "¿Qué hay en [ubicación/estado/tipo]?" → buscar_bienes
 
-SINÓNIMOS — cuando el usuario use estas palabras, búscalas así en el campo nombre:
-- computadora / laptop / PC / equipo de cómputo → "laptop" o "computadora"
-- impresora / printer → "impresora"
-- proyector / cañón → "proyector"
-- escritorio / mesa de trabajo → "escritorio"
-- silla / asiento / sillón → "silla"
-- televisor / TV / monitor → "televisor" o "monitor"
-- teléfono / celular / móvil → "teléfono"
-- vehículo / auto / camioneta → "vehiculo" o "camioneta"
+SINÓNIMOS (buscar con nombre):
+laptop/PC/computadora, impresora, proyector/cañón, escritorio, silla/sillón, televisor/monitor, teléfono/celular, vehículo/camioneta
 
-ESTADOS VÁLIDOS (usar exactamente estos valores): Nuevo, Bueno, Regular, Malo, Muy malo
+ESTADOS (exactos): Nuevo, Bueno, Regular, Malo, Muy malo
 
-FORMATO DE RESPUESTA:
-- Conteo: "[Persona] tiene N bienes." o "Hay N [tipo] en total."
-- Lista: máximo 5 items. Formato: "• [código] — [nombre] ([estado]) · [responsable]"
-- Si hay más de 5: mostrar los primeros 5 y escribir "... y N más."
-- Si no hay resultados: "No se encontraron bienes con esos criterios."
-- No expliques tu razonamiento ni los pasos que seguiste.
+RESPUESTA:
+- Conteo: "[Persona] tiene N bienes."
+- Lista: máx 5 items. "• [código] — [nombre] ([estado]) · [responsable]". Si hay más: "... y N más."
+- Sin resultados: "No se encontraron bienes con esos criterios."
+- Contexto: si el usuario hace seguimiento sin mencionar persona, asume la misma de antes.`
 
-CONTEXTO DE CONVERSACIÓN:
-- Si el usuario preguntó antes por una persona y hace seguimiento sin mencionar a nadie, asume que sigue siendo la misma persona.
-- Si es ambiguo, pregunta: "¿Te refieres a [nombre] o al inventario completo?"
-- Nunca mezcles resultados de diferentes responsables.`
+// Llama a Groq con fallback de modelos si hay 429
+async function llamarGroq(
+  groqKey: string,
+  messages: Message[],
+  modelIndex = 0
+): Promise<Response> {
+  const model = GROQ_MODELS[modelIndex]
+  const res = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${groqKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      tools,
+      tool_choice: 'auto',
+      temperature: 0.3,
+      max_tokens: 600,
+    }),
+  })
+
+  // Si es 429 y hay otro modelo disponible, intentar con el siguiente
+  if (res.status === 429 && modelIndex + 1 < GROQ_MODELS.length) {
+    console.warn(`[ai-chat] Rate limit en ${model}, intentando con ${GROQ_MODELS[modelIndex + 1]}`)
+    return llamarGroq(groqKey, messages, modelIndex + 1)
+  }
+
+  return res
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -298,8 +334,8 @@ Deno.serve(async (req) => {
     })
   }
 
-  // Limitar historial a los últimos 8 mensajes para reducir tokens
-  const historialTruncado = messages.slice(-8)
+  // Historial reducido: últimos 4 mensajes (ahorro ~500 tokens)
+  const historialTruncado = messages.slice(-4)
 
   const conversacion: Message[] = [
     { role: 'system', content: SYSTEM_PROMPT },
@@ -310,21 +346,7 @@ Deno.serve(async (req) => {
 
   try {
     for (let i = 0; i < MAX_ITERACIONES; i++) {
-      const groqRes = await fetch(GROQ_API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${groqKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: GROQ_MODEL,
-          messages: conversacion,
-          tools,
-          tool_choice: 'auto',
-          temperature: 0.3,
-          max_tokens: 800,
-        }),
-      })
+      const groqRes = await llamarGroq(groqKey, conversacion)
 
       if (!groqRes.ok) {
         const err = await groqRes.text()
