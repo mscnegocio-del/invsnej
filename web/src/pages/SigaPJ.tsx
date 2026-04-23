@@ -39,8 +39,7 @@ export function SigaPJ() {
       const { data, error } = await supabase
         .from('siga_bienes')
         .select('updated_at')
-        .not('updated_at', 'is', null)
-        .order('updated_at', { ascending: false })
+        .order('updated_at', { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle()
 
