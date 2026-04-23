@@ -5,9 +5,8 @@ const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-// Modelos en orden de fallback (límites de TPM independientes)
-const GROQ_MODELS = ['llama-3.1-8b-instant', 'gemma2-9b-it']
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+const GEMINI_MODEL = 'gemini-2.0-flash-lite'
 const MAX_ITERACIONES = 3
 
 type Message = { role: 'user' | 'assistant' | 'system' | 'tool'; content: string; tool_call_id?: string; name?: string }
@@ -246,21 +245,19 @@ RESPUESTA:
 - Sin resultados: "No se encontraron bienes con esos criterios."
 - Contexto: si el usuario hace seguimiento sin mencionar persona, asume la misma de antes.`
 
-// Llama a Groq con fallback de modelos si hay 429
-async function llamarGroq(
-  groqKey: string,
-  messages: Message[],
-  modelIndex = 0
+// Llama a Gemini 2.0 Flash Lite vía endpoint OpenAI-compatible de Google
+async function llamarLLM(
+  apiKey: string,
+  messages: Message[]
 ): Promise<Response> {
-  const model = GROQ_MODELS[modelIndex]
-  const res = await fetch(GROQ_API_URL, {
+  return fetch(GEMINI_API_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${groqKey}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model,
+      model: GEMINI_MODEL,
       messages,
       tools,
       tool_choice: 'auto',
@@ -268,14 +265,6 @@ async function llamarGroq(
       max_tokens: 600,
     }),
   })
-
-  // Si es 429 y hay otro modelo disponible, intentar con el siguiente
-  if (res.status === 429 && modelIndex + 1 < GROQ_MODELS.length) {
-    console.warn(`[ai-chat] Rate limit en ${model}, intentando con ${GROQ_MODELS[modelIndex + 1]}`)
-    return llamarGroq(groqKey, messages, modelIndex + 1)
-  }
-
-  return res
 }
 
 Deno.serve(async (req) => {
@@ -283,11 +272,11 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const groqKey = Deno.env.get('GROQ_API_KEY')
+  const geminiKey = Deno.env.get('GEMINI_API_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
-  if (!groqKey || !supabaseUrl || !serviceKey) {
+  if (!geminiKey || !supabaseUrl || !serviceKey) {
     return new Response(JSON.stringify({ error: 'Configuración incompleta del servidor' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -346,15 +335,15 @@ Deno.serve(async (req) => {
 
   try {
     for (let i = 0; i < MAX_ITERACIONES; i++) {
-      const groqRes = await llamarGroq(groqKey, conversacion)
+      const llmRes = await llamarLLM(geminiKey, conversacion)
 
-      if (!groqRes.ok) {
-        const err = await groqRes.text()
-        console.error(`[ai-chat] Groq HTTP ${groqRes.status}:`, err)
-        throw new Error(`Error Groq ${groqRes.status}: ${err}`)
+      if (!llmRes.ok) {
+        const err = await llmRes.text()
+        console.error(`[ai-chat] Gemini HTTP ${llmRes.status}:`, err)
+        throw new Error(`Error Gemini ${llmRes.status}: ${err}`)
       }
 
-      const groqData = await groqRes.json() as { choices: Array<{ message: { content: string; tool_calls?: ToolCall[] } }> }
+      const groqData = await llmRes.json() as { choices: Array<{ message: { content: string; tool_calls?: ToolCall[] } }> }
       const msg = groqData.choices?.[0]?.message
 
       if (!msg) break
