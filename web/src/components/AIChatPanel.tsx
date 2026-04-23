@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Bot, Send, Trash2, Sparkles, AlertTriangle } from 'lucide-react'
+import { Bot, Send, Trash2, Sparkles } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
 import { ScrollArea } from './ui/scroll-area'
-import { Alert, AlertDescription } from './ui/alert'
 import { cn } from '../lib/utils'
 import { useAIChat } from '../hooks/useAIChat'
 
@@ -38,7 +37,7 @@ const SUGERENCIAS = [
 ]
 
 export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
-  const { messages, loading, error, sendMessage, clearMessages, lastFallback } = useAIChat()
+  const { messages, loading, error, sendMessage, clearMessages } = useAIChat()
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -169,17 +168,7 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
 
         {/* Input */}
         <div className="px-4 py-3 border-t border-border shrink-0">
-          {lastFallback && (
-            <div className="mb-2">
-              <Alert variant="warning" className="py-2">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                <AlertDescription className="text-xs">
-                  Servicio principal no disponible. Respondiendo con servicio alternativo.
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
-          <div className="flex gap-2 items-end">
+<div className="flex gap-2 items-end">
             <Textarea
               ref={textareaRef}
               value={input}
