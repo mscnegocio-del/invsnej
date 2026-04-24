@@ -347,3 +347,30 @@ Patrón: estado `target/confirmAction/showDialog` → botón setea estado → Al
 - Detalles técnicos de cada mejora
 - Fixes y pitfalls conocidos
 - Status y configuración del Chat IA
+
+## Fixes (2026-04-24)
+
+### CORS en Edge Function admin-users
+- **Problema:** Método PATCH fallaba con "Failed to send a request to the Edge Function" — preflight CORS rechazaba porque la función no declaraba `Access-Control-Allow-Methods`.
+- **Solución:** Agregadas headers CORS completas en [supabase/functions/admin-users/index.ts](supabase/functions/admin-users/index.ts#L3-L6):
+  ```
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS'
+  'Access-Control-Max-Age': '86400'
+  ```
+- **Impacto:** Aprobar/rechazar/reactivar usuarios desde `/admin` ahora funciona. Redesplegada Edge Function.
+
+### Error handling en AdminUsuarios
+- **Problema:** Botones Aprobar/Rechazar/Suspender mostraban "No se pudo actualizar el estado de acceso." genérico sin detalles del servidor.
+- **Solución:** [web/src/components/AdminUsuarios.tsx](web/src/components/AdminUsuarios.tsx#L139-L163) — mejorado catch en `executeRoleChange` y `executeAccesoChange` para incluir `e.message`:
+  ```typescript
+  } catch (e) {
+    const detail = e instanceof Error && e.message ? `: ${e.message}` : ''
+    setError(`No se pudo actualizar el rol${detail}`)
+  }
+  ```
+- **Impacto:** Errores reales (RLS, columna faltante, etc.) ahora visibles al usuario.
+
+### Chat IA — acceso para consulta confirmado
+- **Verificado:** Rol `consulta` ya tiene acceso al chat (sin restricción de código ni RLS).
+- **Detalle:** Layout.tsx renderiza botón Bot para todos los roles; `ai-chat` Edge Function usa `service_role` y no valida `app_role`.
+- **Status:** Funcionando correctamente.

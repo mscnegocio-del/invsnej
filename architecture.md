@@ -302,3 +302,19 @@ Usado en `BienForm.tsx` para SIGA lookup:
 11. **Fix paginación Search** — Reemplazado setTimeout stale closure por patrón setPendingSearch + useEffect, arregla bug donde página anterior se re-consultaba
 12. **NombreSearchableInput refinado** — Solo busca si usuario tipea manualmente (userTypedRef), deduplicación por descripción, previene reapertura al seleccionar
 
+## Fixes (2026-04-24)
+
+1. **CORS en Edge Function admin-users**
+   - **Problema:** Método PATCH fallaba con "Failed to send a request to the Edge Function" — preflight CORS del navegador rechazaba porque la función no declaraba `Access-Control-Allow-Methods`
+   - **Solución:** Agregadas headers CORS en `supabase/functions/admin-users/index.ts`: `Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS` y `Access-Control-Max-Age: 86400`
+   - **Impacto:** Flujo Aprobar/Rechazar/Suspender usuarios en `/admin` ahora funciona correctamente
+
+2. **Error handling mejorado en AdminUsuarios**
+   - **Problema:** Botones de acción genéricos: "No se pudo actualizar el estado de acceso." sin detalles del servidor
+   - **Solución:** Mejorado catch en `executeRoleChange` y `executeAccesoChange` para incluir `e.message` en el error visible
+   - **Impacto:** Usuarios ven errores reales (RLS, validación, permisos) ayudando a diagnóstico
+
+3. **Chat IA acceso para consulta confirmado**
+   - **Verificado:** Rol `consulta` ya tiene acceso sin restricción — Layout renderiza botón para todos los roles, `ai-chat` usa `service_role`
+   - **Status:** Funcionando correctamente sin cambios necesarios
+

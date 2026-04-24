@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Loader2, Pencil, Trash2 } from 'lucide-react'
+import { ChevronDown, Loader2, Pencil, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useCatalogs } from '../context/CatalogContext'
 import { useAuth } from '../context/AuthContext'
@@ -55,6 +55,7 @@ export function BienDetail() {
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [sigaOpen, setSigaOpen] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -197,7 +198,7 @@ export function BienDetail() {
   })()
 
   return (
-    <div className="mx-auto w-full lg:max-w-4xl space-y-6">
+    <div className="mx-auto w-full lg:max-w-6xl space-y-6">
       <h1 className="page-title">Detalle de bien</h1>
 
       {loading && (
@@ -215,7 +216,7 @@ export function BienDetail() {
       )}
 
       {bien && !loading && (
-        <>
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
           <Card>
             <CardContent className="p-0">
               <dl className="divide-y divide-border">
@@ -237,25 +238,35 @@ export function BienDetail() {
 
                 {(bien.marca || bien.modelo || bien.serie || bien.orden_compra || bien.valor != null) && (
                   <>
-                    <div className="px-6 py-3 bg-amber-50/40 dark:bg-amber-950/20">
+                    <button
+                      type="button"
+                      onClick={() => setSigaOpen((v) => !v)}
+                      aria-expanded={sigaOpen}
+                      className="w-full px-6 py-3 bg-amber-50/40 dark:bg-amber-950/20 flex items-center justify-between gap-2 lg:cursor-default"
+                    >
                       <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
                         Datos SIGA PJ
                       </p>
+                      <ChevronDown
+                        className={`h-4 w-4 text-amber-700 dark:text-amber-400 transition-transform lg:hidden ${sigaOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                    <div className={`${sigaOpen ? 'block' : 'hidden'} lg:block`}>
+                      {[
+                        { term: 'Marca', value: bien.marca },
+                        { term: 'Modelo', value: bien.modelo },
+                        { term: 'N° Serie', value: bien.serie },
+                        { term: 'Orden de compra', value: bien.orden_compra },
+                        { term: 'Valor', value: bien.valor != null ? `S/. ${bien.valor.toLocaleString()}` : null },
+                      ]
+                        .filter(({ value }) => value != null)
+                        .map(({ term, value }) => (
+                          <div key={term} className="px-6 py-4 sm:grid sm:grid-cols-2 sm:gap-4 border-t border-border">
+                            <dt className="text-sm font-medium text-muted-foreground">{term}</dt>
+                            <dd className="mt-1 text-foreground sm:mt-0">{value}</dd>
+                          </div>
+                        ))}
                     </div>
-                    {[
-                      { term: 'Marca', value: bien.marca },
-                      { term: 'Modelo', value: bien.modelo },
-                      { term: 'N° Serie', value: bien.serie },
-                      { term: 'Orden de compra', value: bien.orden_compra },
-                      { term: 'Valor', value: bien.valor != null ? `S/. ${bien.valor.toLocaleString()}` : null },
-                    ]
-                      .filter(({ value }) => value != null)
-                      .map(({ term, value }) => (
-                        <div key={term} className="px-6 py-4 sm:grid sm:grid-cols-2 sm:gap-4">
-                          <dt className="text-sm font-medium text-muted-foreground">{term}</dt>
-                          <dd className="mt-1 text-foreground sm:mt-0">{value}</dd>
-                        </div>
-                      ))}
                   </>
                 )}
               </dl>
@@ -338,7 +349,7 @@ export function BienDetail() {
               </CardContent>
             </Card>
           )}
-        </>
+        </div>
       )}
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
