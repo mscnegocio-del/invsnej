@@ -179,34 +179,37 @@ web/src/
 - **Configuración:** `PopoverContent` con `z-50`, `align="start"`, `sideOffset={8}`, `avoidCollisions={true}` para evitar que se superponga con otros campos en filtros (especialmente en móvil).
 - **Archivo:** `web/src/components/TrabajadorSearchableSelect.tsx` (línea 116)
 
-### Chat IA — Asistente de inventario (2026-04-17, actualizado 2026-04-24)
+### Chat IA — Asistente de inventario (2026-04-17, mejorado 2026-04-24)
 
 - **Feature:** Panel lateral derecho (Sheet) con chat IA para consultas de bienes en lenguaje natural.
-- **Modelo:** `gemini-2.5-flash-lite` vía Google Gemini API (free tier optimizado).
+- **Modelo:** `gemini-2.5-flash` vía Google Gemini API con billing (único disponible para nuevas cuentas a abril 2026).
 - **Arquitectura:** Frontend → Supabase Edge Function `ai-chat` → Gemini API → consultas Supabase service_role.
 - **Archivos:**
-  - `supabase/functions/ai-chat/index.ts` — Edge Function con retry logic (exponential backoff), MAX_ITERACIONES = 1, maxOutputTokens = 300
+  - `supabase/functions/ai-chat/index.ts` — Edge Function con camelCase (Gemini 2.5), retry logic (exponential backoff), MAX_ITERACIONES = 5, maxOutputTokens = 500, thinkingConfig deshabilitado
   - `web/src/hooks/useAIChat.ts` — hook, historial en memoria (se pierde al cerrar/recargar)
-  - `web/src/components/AIChatPanel.tsx` — panel Sheet lado derecho con mejor manejo de errores
-  - `web/src/components/Layout.tsx` — icono Bot en header móvil, bottom nav (item "IA") y sidebar desktop
-- **Variable de entorno requerida en Supabase Secrets:** `GEMINI_API_KEY=...` (free tier de Google AI Studio)
+  - `web/src/components/AIChatPanel.tsx` — panel Sheet lado derecho, Badge "Beta", AlertDialog confirmación antes de limpiar
+  - `web/src/components/Layout.tsx` — icono Bot en header móvil, bottom nav (item "IA") y sidebar desktop, Badge "Beta"
+- **Variable de entorno requerida en Supabase Secrets:** `GEMINI_API_KEY=...` (con billing/quota)
 - **Tools disponibles:** `buscar_bien_por_codigo`, `buscar_bienes`, `contar_bienes`, `listar_bienes_por_responsable`
 - **Solo lectura:** el asistente no puede editar ni crear bienes.
 - **Historial:** solo durante la sesión/ventana abierta; se pierde al recargar.
 - **Acceso:** todos los roles (admin, operador, consulta) pueden usar el chat.
 
-**Rate Limiting (Free Tier):**
-- Gemini 2.5 Flash-Lite: 15 RPM (requests/minuto), 1,500 RPD, 250K TPM
-- Con MAX_ITERACIONES=1: 1 solicitud por pregunta = máximo 15 preguntas/minuto
-- Si se excede: error 429, reintenta automáticamente con backoff exponencial (1s, 2s, 4s)
-- UI muestra "Sin cuota disponible. Espera 1 minuto e intenta de nuevo" si persiste
+**Mejoras técnicas (2026-04-24):**
+- Cambio a `gemini-2.5-flash` (único modelo disponible para billing; 1.5 deprecado)
+- camelCase en API: `functionCall`, `functionResponse`, `functionDeclarations`, `systemInstruction`, `thinkingConfig`
+- `thinkingConfig: { thinkingBudget: 0 }` para deshabilitar thinking (optimiza tokens y simplifica formato)
+- Deduplicación de thought parts en respuestas finales (filtro `!p.thought`)
+- SYSTEM_PROMPT mejorado: solo fuerza herramientas para consultas de inventario, no para saludos
+- MAX_ITERACIONES = 5 (antes 3): soporta 2-3 tool calls + respuesta final
+- Fallback sin herramientas si el loop agota iteraciones sin generar texto
+- Logging expandido en Edge Function para debugging de estructura de respuestas
+- Fix en búsqueda de trabajadores: tokenización de nombres (split por espacios, AND lógico) — soporta "milton salcedo" para "SALCEDO CRUZ MILTON ALEJANDRO"
 
-**Mejoras (2026-04-24):**
-- Migrado de Groq a Gemini free tier (llama-3.1-8b → gemini-2.5-flash-lite)
-- MAX_ITERACIONES: 1 (sin tool calling, respuesta directa) para optimizar rate limit
-- maxOutputTokens: 300 (reducido de 800) para ahorrar tokens
-- Retry logic: exponential backoff automático para errores 429
-- Error handling mejorado: usuario ve errores claros en lugar de "Respuesta vacía del servidor"
+**Rate Limiting (Gemini with billing):**
+- Límites según plan de billing (no free tier)
+- Retry automático en 429 con exponential backoff (1s, 2s, 4s)
+- UI muestra "Sin cuota disponible. Espera 1 minuto e intenta de nuevo" si persiste
 
 ### Mejoras UX/funcionales — 2026-04-22
 
@@ -241,6 +244,36 @@ web/src/
 - **Archivo nuevo:** `web/src/pages/SigaPJ.tsx`
 - **Ruta:** `web/src/App.tsx` — `<Route path="/siga-pj" element={<SigaPJ />} />`
 - **Sidebar:** entrada "SIGA PJ" con icono `Database` en `navItemsAll` para los 3 roles. Bottom nav móvil se actualiza automáticamente.
+
+#### Beta badge y UI refinements (2026-04-24)
+- **Badge "Beta"** en chat ("Asistente IA BETA") y en app principal ("Inventario BETA")
+  - Ubicación: `AIChatPanel.tsx` (header), `Layout.tsx` (sidebar desktop y header móvil)
+  - Estilo: fondo amber/10, texto amber-600/dark:amber-400, uppercase, pequeño
+- **iOS Safari zoom fix:** Textarea en chat tiene `text-base sm:text-sm` (16px móvil previene auto-zoom de Safari, 14px desktop)
+  - Añadido `flex-1 min-w-0` para que textarea no desborde
+- **AlertDialog "Limpiar conversación":** Confirmación antes de eliminar chat (ej. "¿Limpiar conversación? Se eliminarán todos los mensajes")
+  - Implementado en `AIChatPanel.tsx` (estado `showClearConfirm`, AlertDialog shadcn)
+  - Botón limpiar con `mr-7` para no sobreponerse con la X de cierre del Sheet
+
+#### Búsqueda con persistencia en URL (2026-04-24 - Search.tsx)
+- **Filtros en URL:** Al buscar, los filtros se guardan en URL (`/search?codigo=X&responsable=Y&nombres=Z|W...`)
+  - Helper `writeFiltersToUrl()` genera URLSearchParams desde estado
+  - Parámetros: `codigo`, `trabajador`, `ubicacion`, `marca`, `modelo`, `nombres` (pipe-separated), `todas` (1 o ausente), `p` (página)
+- **Restauración al volver:** Mount effect lee URL → restaura estado → ejecuta búsqueda
+  - Usuario navega a `/search?codigo=...` → vuelve desde detalle → remonta → read URL → refetch automático
+  - Cambios hechos en detalle son visibles (Supabase re-consulta)
+- **Arreglo del bug de paginación:** Reemplazado `setTimeout(handleSearch)` por patrón `setPendingSearch(true)` + useEffect
+  - Antes: stale closure en `page` con setTimeout
+  - Ahora: React flush de estado → re-render → effect corre handleSearch con estado actual
+  - Afecta a `handleSubmit`, `handleNextPage`, `handlePrevPage`, `handleCodeScanned`
+
+#### NombreSearchableInput — dedup y user-only search (2026-04-24)
+- **Bug:** Popover mostraba 6+ duplicados de la misma descripción (siga_bienes tiene 1 fila/código)
+- **Fixes:**
+  - `userTypedRef`: solo busca si el usuario escribió manualmente, no en cambios programáticos (query params, autofill SIGA)
+  - Deduplicación por `descripcion` usando `Map` antes de mostrar (keep first)
+  - Al seleccionar sugerencia, `userTypedRef.current = false` previene reapertura del popover
+- **Resultado:** Popover solo aparece cuando tipeas, con descripciones únicas
 
 #### Modales de confirmación (AlertDialog shadcn/ui)
 Patrón: estado `target/confirmAction/showDialog` → botón setea estado → AlertDialog abre → usuario confirma → se ejecuta la acción. El AlertDialog usa `onOpenChange` para cerrar con Escape o click fuera.

@@ -402,13 +402,13 @@ body.dark {
 └──────────────────────────────────────┘
 ```
 
-### Chat IA (Asistente Groq)
+### Chat IA (Asistente Gemini 2.5 Flash)
 
-**Desktop:** Panel Sheet deslizante por la derecha. **Mobile:** Bot icon en header o bottom nav.
+**Desktop:** Panel Sheet deslizante por la derecha. **Mobile:** Bot icon en header o bottom nav. Badge "BETA" junto al título.
 
 ```
-┌─ Asistente IA ─────────────────────┐
-│ Consultas de inventario         [🗑] │  ← botón limpiar
+┌─ Asistente IA [BETA] ──────────────┐
+│ Consultas de inventario    [🗑] [X]  │  ← botón limpiar + cerrar; limpiar tiene AlertDialog confirmación
 ├────────────────────────────────────┤
 │ ScrollArea:                        │
 │ [Bot] ¿En qué te ayudo?            │
@@ -444,6 +444,28 @@ body.dark {
 - Typing indicator: 3 puntos rebotando
 - Error: `border border-destructive/30 bg-destructive/5 text-destructive`
 - Sugerencias vacías: centradas, icono Bot grande, descripción clara
+
+### Estilo Chat IA (actualizado 2026-04-24):
+- Badge "BETA" junto a título: fondo amber-500/15, texto amber-600 (dark:amber-400), uppercase pequeño
+- AlertDialog "Limpiar conversación" con confirmación destructiva
+- Textarea `text-base` en móvil (16px) para prevenir zoom Safari, `text-sm` en desktop
+- Botón limpiar con `mr-7` para no sobreponerse con botón cerrar Sheet
+
+## Mejoras recientes (2026-04-24)
+
+### Sistema de búsqueda persistente
+- URL query params guardan filtros: `?codigo=X&trabajador=Y&ubicacion=Z&nombres=A|B&p=1`
+- Volver desde detalle → remonta Search → restaura filtros automáticamente → refetch datos frescos
+- Fix bug paginación: stale `page` en setTimeout reemplazado por `setPendingSearch` + useEffect
+
+### Popup sugerencias (NombreSearchableInput)
+- **Antes:** 6+ duplicados de misma descripción sin filtrar cuándo
+- **Ahora:** Deduplicación por descripción, solo busca si usuario tipea (no en autofill SIGA)
+- Resultado: popover limpio, menos distracciones al registrar bien
+
+### UI badges "Beta"
+- Chat IA y app principal ("Inventario BETA") con badge ámbar
+- Indica estado experimental, abierto a feedback
 
 ## Guía de estilo — tone of voice
 

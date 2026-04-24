@@ -142,8 +142,9 @@ export function AdminUsuarios() {
       await updateUserProfile(row.id, { app_role })
       await load()
       if (row.id === user?.id) await refreshPerfil()
-    } catch {
-      setError('No se pudo actualizar el rol.')
+    } catch (e) {
+      const detail = e instanceof Error && e.message ? `: ${e.message}` : ''
+      setError(`No se pudo actualizar el rol${detail}`)
     } finally {
       setRowBusy(null)
     }
@@ -155,8 +156,9 @@ export function AdminUsuarios() {
       await updateUserProfile(row.id, { acceso_estado })
       await load()
       if (row.id === user?.id) await refreshPerfil()
-    } catch {
-      setError('No se pudo actualizar el estado de acceso.')
+    } catch (e) {
+      const detail = e instanceof Error && e.message ? `: ${e.message}` : ''
+      setError(`No se pudo actualizar el estado de acceso${detail}`)
     } finally {
       setRowBusy(null)
     }

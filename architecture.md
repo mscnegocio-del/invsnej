@@ -58,7 +58,7 @@ inv-web/
 │   ├── functions/
 │   │   ├── passkeys/        # WebAuthn registration + authentication
 │   │   ├── admin-users/     # Invitación + gestión usuarios
-│   │   └── ai-chat/         # Chat IA (Groq API)
+│   │   └── ai-chat/         # Chat IA (Gemini API with billing, camelCase format)
 │   └── migrations/ (o sql/)
 ├── sql/
 │   ├── 001_auth_perfiles_rls.sql
@@ -297,6 +297,8 @@ Usado en `BienForm.tsx` para SIGA lookup:
 6. **Modales de confirmación** — AlertDialog en 6 flujos críticos
 7. **Fecha de actualización SIGA** — en subtítulo, fallback a created_at o fecha actual
 8. **Fixes Tailwind v4** — `@theme inline` en index.css, dark mode contraste mejorado
-9. **Chat IA con Groq** — Panel Sheet lateral (icono Bot) con asistente de inventario usando Edge Function `ai-chat`, modelo `llama-3.1-8b-instant`, agentic loop con 4 iteraciones máximas, 4 tools para consultas (buscar exacto, búsqueda filtrada, conteos, listar por responsable)
-10. **Contexto en Chat IA** — SYSTEM_PROMPT mejorado para mantener referencias a trabajadores en conversaciones multi-turno, evita confusión entre diferentes responsables
+9. **Chat IA con Gemini 2.5 Flash** — Panel Sheet lateral (icono Bot) con Badge "Beta" usando Edge Function `ai-chat`, modelo `gemini-2.5-flash` (camelCase API, thinking deshabilitado), agentic loop máximo 5 iteraciones, 4 tools para consultas (buscar exacto, búsqueda filtrada, conteos, listar por responsable), deduplicación de thought parts, fallback sin tools si agota iteraciones
+10. **Búsqueda con persistencia URL** — Filtros guardados en URL (`/search?codigo=X&...`), restauración al volver de detalle, refetch automático desde Supabase
+11. **Fix paginación Search** — Reemplazado setTimeout stale closure por patrón setPendingSearch + useEffect, arregla bug donde página anterior se re-consultaba
+12. **NombreSearchableInput refinado** — Solo busca si usuario tipea manualmente (userTypedRef), deduplicación por descripción, previene reapertura al seleccionar
 
