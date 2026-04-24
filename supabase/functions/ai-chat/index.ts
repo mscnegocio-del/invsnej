@@ -142,7 +142,10 @@ async function ejecutarTool(nombre: string, args: any, supabase: any): Promise<s
       if (args.estado) query = query.eq('estado', args.estado)
       if (args.ubicacion) query = query.ilike('ubicacion', `%${args.ubicacion}%`)
       if (args.nombre_responsable) {
-        const { data: trab } = await supabase.from('trabajadores').select('id').ilike('nombre', `%${args.nombre_responsable}%`)
+        const tokens = String(args.nombre_responsable).trim().split(/\s+/).filter((t: string) => t.length > 1)
+        let trabQ = supabase.from('trabajadores').select('id, nombre')
+        for (const tk of tokens) trabQ = trabQ.ilike('nombre', `%${tk}%`)
+        const { data: trab } = await trabQ
         const ids = (trab || []).map((t: any) => t.id)
         if (ids.length === 0) return JSON.stringify({ resultados: [], total: 0 })
         query = query.in('id_trabajador', ids)
@@ -158,8 +161,12 @@ async function ejecutarTool(nombre: string, args: any, supabase: any): Promise<s
       if (args.estado) query = query.eq('estado', args.estado)
       if (args.ubicacion) query = query.ilike('ubicacion', `%${args.ubicacion}%`)
       if (args.nombre_responsable) {
-        const { data: trab } = await supabase.from('trabajadores').select('id').ilike('nombre', `%${args.nombre_responsable}%`)
+        const tokens = String(args.nombre_responsable).trim().split(/\s+/).filter((t: string) => t.length > 1)
+        let trabQ = supabase.from('trabajadores').select('id')
+        for (const tk of tokens) trabQ = trabQ.ilike('nombre', `%${tk}%`)
+        const { data: trab } = await trabQ
         const ids = (trab || []).map((t: any) => t.id)
+        if (ids.length === 0) return JSON.stringify({ total: 0 })
         query = query.in('id_trabajador', ids)
       }
       const { count, error } = await query
