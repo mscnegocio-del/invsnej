@@ -196,7 +196,7 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
               onKeyDown={handleKeyDown}
               placeholder="Pregunta sobre tus bienes..."
               rows={1}
-              className="resize-none min-h-[40px] max-h-[120px] text-sm"
+              className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[120px] text-base sm:text-sm"
               disabled={loading}
             />
             <Button
