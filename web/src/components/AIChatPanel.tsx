@@ -4,6 +4,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
 import { ScrollArea } from './ui/scroll-area'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog'
 import { cn } from '../lib/utils'
 import { useAIChat } from '../hooks/useAIChat'
 
@@ -39,6 +49,7 @@ const SUGERENCIAS = [
 export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
   const { messages, loading, error, sendMessage, clearMessages } = useAIChat()
   const [input, setInput] = useState('')
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -80,15 +91,18 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
               <Sparkles className="h-4 w-4 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <SheetTitle className="text-sm font-semibold leading-none">Asistente IA</SheetTitle>
+              <div className="flex items-center gap-1.5">
+                <SheetTitle className="text-sm font-semibold leading-none">Asistente IA</SheetTitle>
+                <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">Beta</span>
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5">Consultas de inventario</p>
             </div>
             {messages.length > 0 && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                onClick={clearMessages}
+                className="h-8 w-8 mr-7 text-muted-foreground hover:text-destructive shrink-0"
+                onClick={() => setShowClearConfirm(true)}
                 title="Limpiar conversación"
               >
                 <Trash2 className="h-4 w-4" />
@@ -200,6 +214,28 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
           </p>
         </div>
       </SheetContent>
+      <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Limpiar conversación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán todos los mensajes de la conversación actual. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                clearMessages()
+                setShowClearConfirm(false)
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Limpiar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   )
 }

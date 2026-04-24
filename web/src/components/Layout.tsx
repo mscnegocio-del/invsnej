@@ -104,7 +104,10 @@ export function Layout() {
           </div>
           {!sidebarCollapsed && (
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm text-sidebar-foreground leading-none">Inventario</p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-bold text-sm text-sidebar-foreground leading-none">Inventario</p>
+                <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">Beta</span>
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5 truncate">Bienes patrimoniales</p>
             </div>
           )}
@@ -255,6 +258,7 @@ export function Layout() {
             <Link to="/" className="flex items-center gap-2 flex-1 min-w-0">
               <ClipboardList className="h-5 w-5 text-primary shrink-0" />
               <span className="font-bold text-base text-foreground truncate">Inventario</span>
+              <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400 shrink-0">Beta</span>
             </Link>
             <Button
               variant="ghost"
