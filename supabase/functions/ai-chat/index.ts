@@ -6,7 +6,7 @@ const corsHeaders: Record<string, string> = {
 }
 
 const GEMINI_MODEL = 'gemini-2.5-flash-lite'
-const MAX_ITERACIONES = 3
+const MAX_ITERACIONES = 1
 
 // Herramientas en formato Gemini
 const tools = [
@@ -78,6 +78,46 @@ const tools = [
 const SYSTEM_PROMPT = `Eres asistente de inventario patrimonial. Solo consultas. Responde en español, breve y directo.
 REGLA: SIEMPRE llama una herramienta antes de responder.
 SINÓNIMOS: laptop/PC, impresora, proyector, escritorio, silla, televisor, teléfono, vehículo.`
+
+async function callGeminiWithRetry(body: any, geminiKey: string) {
+  const maxRetries = 3
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }
+      )
+
+      const data = await res.json()
+
+      // Si hay error 429, reintentar con backoff
+      if (!res.ok && data.error?.code === 429) {
+        const waitMs = Math.pow(2, attempt) * 1000
+        lastError = new Error(`Rate limited (429). Retry attempt ${attempt + 1}/${maxRetries}`)
+        console.log(`429 received. Waiting ${waitMs}ms before retry...`)
+        await new Promise(r => setTimeout(r, waitMs))
+        continue
+      }
+
+      if (!res.ok) {
+        throw new Error(`Gemini error: ${data.error?.code || 'unknown'} - ${data.error?.message || 'unknown'}`)
+      }
+
+      return data
+    } catch (e: any) {
+      lastError = e
+      if (attempt < maxRetries - 1 && !e.message.includes('429')) throw e
+    }
+  }
+
+  throw lastError || new Error('Gemini API: Max retries exceeded')
+}
 
 async function ejecutarTool(nombre: string, args: any, supabase: any): Promise<string> {
   try {
@@ -154,19 +194,15 @@ Deno.serve(async (req) => {
     let currentContents = [...contents]
 
     for (let i = 0; i < MAX_ITERACIONES; i++) {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await callGeminiWithRetry(
+        {
           contents: currentContents,
           tools,
           system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          generationConfig: { temperature: 0.1, maxOutputTokens: 800 }
-        })
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(`Gemini API Error: ${JSON.stringify(data)}`)
+          generationConfig: { temperature: 0.1, maxOutputTokens: 300 }
+        },
+        geminiKey
+      )
 
       const candidate = data.candidates?.[0]
       const parts = candidate?.content?.parts || []

@@ -46,10 +46,13 @@ export function useAIChat() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
 
-      if (res.error) throw new Error(res.error.message)
+      if (res.error) {
+        const errorMsg = typeof res.error === 'string' ? res.error : res.error?.message
+        throw new Error(errorMsg || 'Error desconocido del servidor')
+      }
 
       const reply = res.data?.reply as string | undefined
-      if (!reply) throw new Error('Respuesta vacía del servidor')
+      if (!reply) throw new Error('El asistente no pudo procesar tu pregunta')
 
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),

@@ -157,8 +157,14 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
             {loading && <TypingIndicator />}
 
             {error && (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive">
-                Error: {error}
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-xs text-destructive space-y-1">
+                <p className="font-semibold">Error:</p>
+                <p>{error}</p>
+                {error.includes('429') && (
+                  <p className="text-[10px] mt-2 font-medium">
+                    Sin cuota disponible. Espera 1 minuto e intenta de nuevo.
+                  </p>
+                )}
               </div>
             )}
 
