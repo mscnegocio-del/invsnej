@@ -6,7 +6,7 @@ const corsHeaders: Record<string, string> = {
 }
 
 const GEMINI_MODEL = 'gemini-2.5-flash'
-const MAX_ITERACIONES = 1
+const MAX_ITERACIONES = 2
 
 // Herramientas en formato Gemini
 const tools = [
