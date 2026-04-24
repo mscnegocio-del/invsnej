@@ -6,12 +6,11 @@ const corsHeaders: Record<string, string> = {
 }
 
 const GEMINI_MODEL = 'gemini-2.5-flash'
-const MAX_ITERACIONES = 2
+const MAX_ITERACIONES = 5
 
-// Herramientas en formato Gemini
 const tools = [
   {
-    function_declarations: [
+    functionDeclarations: [
       {
         name: 'buscar_bien_por_codigo',
         description: 'Busca un bien por código patrimonial exacto',
@@ -44,7 +43,7 @@ const tools = [
       },
       {
         name: 'contar_bienes',
-        description: 'Cuenta bienes con filtros. Usar para "¿cuántos?"',
+        description: 'Cuenta bienes con filtros. Usar para preguntas de cuántos.',
         parameters: {
           type: 'OBJECT',
           properties: {
@@ -75,8 +74,9 @@ const tools = [
   }
 ]
 
-const SYSTEM_PROMPT = `Eres asistente de inventario patrimonial. Solo consultas. Responde en español, breve y directo.
-REGLA: SIEMPRE llama una herramienta antes de responder.
+const SYSTEM_PROMPT = `Eres asistente de inventario patrimonial. Solo consultas, no puedes editar ni crear bienes. Responde en español, breve y directo.
+Para saludos o preguntas generales responde DIRECTAMENTE sin usar herramientas.
+Usa herramientas SOLO cuando el usuario pregunta sobre bienes, inventario, responsables o ubicaciones específicas.
 SINÓNIMOS: laptop/PC, impresora, proyector, escritorio, silla, televisor, teléfono, vehículo.`
 
 async function callGeminiWithRetry(body: any, geminiKey: string) {
@@ -96,7 +96,6 @@ async function callGeminiWithRetry(body: any, geminiKey: string) {
 
       const data = await res.json()
 
-      // Si hay error 429, reintentar con backoff
       if (!res.ok && data.error?.code === 429) {
         const waitMs = Math.pow(2, attempt) * 1000
         lastError = new Error(`Rate limited (429). Retry attempt ${attempt + 1}/${maxRetries}`)
@@ -122,16 +121,26 @@ async function callGeminiWithRetry(body: any, geminiKey: string) {
 async function ejecutarTool(nombre: string, args: any, supabase: any): Promise<string> {
   try {
     if (nombre === 'buscar_bien_por_codigo') {
-      const { data, error } = await supabase.from('bienes').select('*, trabajadores(nombre)').eq('codigo_patrimonial', args.codigo).is('eliminado_at', null).maybeSingle()
+      const { data, error } = await supabase
+        .from('bienes')
+        .select('*, trabajadores(nombre)')
+        .eq('codigo_patrimonial', args.codigo)
+        .is('eliminado_at', null)
+        .maybeSingle()
       if (error) return JSON.stringify({ error: error.message })
       return JSON.stringify({ resultado: data || null })
     }
     if (nombre === 'buscar_bienes' || nombre === 'listar_bienes_por_responsable') {
       const limit = Math.min(args.limit ?? 10, 50)
-      let query = supabase.from('bienes').select('id, codigo_patrimonial, nombre_mueble_equipo, estado, ubicacion, trabajadores(nombre)').is('eliminado_at', null).limit(limit)
+      let query = supabase
+        .from('bienes')
+        .select('id, codigo_patrimonial, nombre_mueble_equipo, estado, ubicacion, trabajadores(nombre)')
+        .is('eliminado_at', null)
+        .limit(limit)
       if (args.nombre) query = query.ilike('nombre_mueble_equipo', `%${args.nombre}%`)
       if (args.tipo) query = query.ilike('tipo_mueble_equipo', `%${args.tipo}%`)
       if (args.estado) query = query.eq('estado', args.estado)
+      if (args.ubicacion) query = query.ilike('ubicacion', `%${args.ubicacion}%`)
       if (args.nombre_responsable) {
         const { data: trab } = await supabase.from('trabajadores').select('id').ilike('nombre', `%${args.nombre_responsable}%`)
         const ids = (trab || []).map((t: any) => t.id)
@@ -140,10 +149,14 @@ async function ejecutarTool(nombre: string, args: any, supabase: any): Promise<s
       }
       const { data, error } = await query
       if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ resultados: data?.slice(0, 5) || [], total: data?.length || 0 })
+      return JSON.stringify({ resultados: data?.slice(0, 10) || [], total: data?.length || 0 })
     }
     if (nombre === 'contar_bienes') {
       let query = supabase.from('bienes').select('id', { count: 'exact', head: true }).is('eliminado_at', null)
+      if (args.nombre) query = query.ilike('nombre_mueble_equipo', `%${args.nombre}%`)
+      if (args.tipo) query = query.ilike('tipo_mueble_equipo', `%${args.tipo}%`)
+      if (args.estado) query = query.eq('estado', args.estado)
+      if (args.ubicacion) query = query.ilike('ubicacion', `%${args.ubicacion}%`)
       if (args.nombre_responsable) {
         const { data: trab } = await supabase.from('trabajadores').select('id').ilike('nombre', `%${args.nombre_responsable}%`)
         const ids = (trab || []).map((t: any) => t.id)
@@ -171,7 +184,7 @@ Deno.serve(async (req) => {
     const { messages } = await req.json()
     const supabase = createClient(supabaseUrl!, serviceKey!)
 
-    // Mapeo estricto a formato Gemini (alternando user/model)
+    // Mapeo a formato Gemini (camelCase)
     const contents: any[] = []
     messages.slice(-6).forEach((m: any) => {
       if (m.role === 'user') {
@@ -179,14 +192,7 @@ Deno.serve(async (req) => {
       } else if (m.role === 'assistant' || m.role === 'model') {
         const parts: any[] = []
         if (m.content) parts.push({ text: m.content })
-        if (m.tool_calls) {
-          parts.push(...m.tool_calls.map((tc: any) => ({
-            function_call: { name: tc.function.name, args: JSON.parse(tc.function.arguments) }
-          })))
-        }
         contents.push({ role: 'model', parts })
-      } else if (m.role === 'tool' || m.role === 'function') {
-        contents.push({ role: 'function', parts: [{ function_response: { name: m.name, response: { content: m.content } } }] })
       }
     })
 
@@ -198,29 +204,61 @@ Deno.serve(async (req) => {
         {
           contents: currentContents,
           tools,
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          generationConfig: { temperature: 0.1, maxOutputTokens: 300 }
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 500, thinkingConfig: { thinkingBudget: 0 } }
         },
         geminiKey
       )
 
       const candidate = data.candidates?.[0]
-      const parts = candidate?.content?.parts || []
-      currentContents.push(candidate.content)
+      if (!candidate) break
 
-      const toolCalls = parts.filter((p: any) => p.function_call)
+      const content = candidate.content
+      const parts: any[] = content?.parts || []
+      console.log(`Iter ${i}: finishReason=${candidate.finishReason}, parts=${JSON.stringify(parts.map((p: any) => Object.keys(p)))}`)
+
+      if (content) currentContents.push(content)
+
+      // Gemini 2.5 usa camelCase: functionCall / functionResponse
+      // Filtrar thought parts (pensamiento interno del modelo)
+      const toolCalls = parts.filter((p: any) => p.functionCall && !p.thought)
+      // Solo partes de texto real, no pensamiento interno
+      const textPart = parts.find((p: any) => p.text && !p.thought)
+
       if (toolCalls.length > 0) {
+        const toolResults: any[] = []
         for (const tc of toolCalls) {
-          const result = await ejecutarTool(tc.function_call.name, tc.function_call.args, supabase)
-          currentContents.push({
-            role: 'function',
-            parts: [{ function_response: { name: tc.function_call.name, response: { content: result } } }]
+          const result = await ejecutarTool(tc.functionCall.name, tc.functionCall.args, supabase)
+          console.log(`Tool ${tc.functionCall.name}: ${result.substring(0, 100)}`)
+          toolResults.push({
+            functionResponse: {
+              name: tc.functionCall.name,
+              response: { content: result }
+            }
           })
         }
+        // Las respuestas de herramientas se envían con role 'user' en Gemini
+        currentContents.push({ role: 'user', parts: toolResults })
       } else {
-        finalReply = parts.find((p: any) => p.text)?.text || ''
+        finalReply = textPart?.text || ''
+        console.log(`Final reply (${finalReply.length} chars): ${finalReply.substring(0, 80)}`)
         break
       }
+    }
+
+    // Fallback si el loop agotó iteraciones sin texto (forzar respuesta sin tools)
+    if (!finalReply) {
+      console.log('Loop agotado sin texto. Intentando respuesta sin herramientas...')
+      const fallback = await callGeminiWithRetry(
+        {
+          contents: currentContents,
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 300, thinkingConfig: { thinkingBudget: 0 } }
+        },
+        geminiKey
+      )
+      const fbParts: any[] = fallback.candidates?.[0]?.content?.parts || []
+      finalReply = fbParts.find((p: any) => p.text && !p.thought)?.text || 'No pude obtener una respuesta. Intenta de nuevo.'
     }
 
     return new Response(JSON.stringify({ reply: finalReply }), {
@@ -230,7 +268,7 @@ Deno.serve(async (req) => {
   } catch (e: any) {
     console.error('Fatal Error:', e.message)
     return new Response(JSON.stringify({ error: e.message }), {
-      status: 200, // Devolvemos 200 con el error en el body para que el front no muera
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
