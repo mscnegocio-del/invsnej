@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   ScanLine, Copy, Check, FileJson, FileSpreadsheet, ChevronLeft, ChevronRight,
@@ -56,8 +56,12 @@ function estadoBadgeVariant(estado: string): 'success' | 'warning' | 'destructiv
 
 export function Search() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { trabajadores, ubicaciones, sedes } = useCatalogs()
   const { sedeActiva } = useSede()
+
+  const initialLoadRef = useRef(true)
+  const [pendingSearch, setPendingSearch] = useState(false)
 
   const [codigo, setCodigo] = useState('')
   const [idTrabajador, setIdTrabajador] = useState<number | ''>('')
@@ -107,6 +111,49 @@ export function Search() {
       prev.map((b) => (b.id === bienId ? { ...b, ...updates } : b))
     )
   }
+
+  const writeFiltersToUrl = () => {
+    const sp = new URLSearchParams()
+    if (codigo.trim()) sp.set('codigo', codigo.trim())
+    if (idTrabajador !== '') sp.set('trabajador', String(idTrabajador))
+    if (textoUbicacion.trim()) sp.set('ubicacion', textoUbicacion.trim())
+    if (textoMarca.trim()) sp.set('marca', textoMarca.trim())
+    if (textoModelo.trim()) sp.set('modelo', textoModelo.trim())
+    if (nombreChips.length > 0) sp.set('nombres', nombreChips.join('|'))
+    if (todasLasSedes) sp.set('todas', '1')
+    if (page > 0) sp.set('p', String(page))
+    setSearchParams(sp, { replace: true })
+  }
+
+  // Restaurar filtros desde URL al montar (al volver desde detalle)
+  useEffect(() => {
+    if (!initialLoadRef.current) return
+    initialLoadRef.current = false
+    const sp = searchParams
+    const keys = ['codigo', 'trabajador', 'ubicacion', 'marca', 'modelo', 'nombres', 'todas', 'p']
+    if (!keys.some((k) => sp.has(k))) return
+
+    setCodigo(sp.get('codigo') || '')
+    const trab = sp.get('trabajador')
+    setIdTrabajador(trab ? Number(trab) : '')
+    setTextoUbicacion(sp.get('ubicacion') || '')
+    setTextoMarca(sp.get('marca') || '')
+    setTextoModelo(sp.get('modelo') || '')
+    const nombres = sp.get('nombres')
+    setNombreChips(nombres ? nombres.split('|').filter(Boolean) : [])
+    setTodasLasSedes(sp.get('todas') === '1')
+    setPage(Number(sp.get('p') || '0'))
+    if ((sp.get('p') ? Number(sp.get('p')) : 0) > 0 || keys.some((k) => k !== 'p' && sp.has(k))) {
+      setPendingSearch(true)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ejecuta búsqueda pendiente tras el flush de estado
+  useEffect(() => {
+    if (!pendingSearch) return
+    setPendingSearch(false)
+    void handleSearch()
+  }, [pendingSearch]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const q = nombreDraft.trim()
@@ -192,6 +239,7 @@ export function Search() {
 
   const handleSearch = async (event?: FormEvent) => {
     if (event) event.preventDefault()
+    writeFiltersToUrl()
     setError(null); setLoading(true)
 
     let query = supabase.from('bienes')
@@ -225,11 +273,11 @@ export function Search() {
     setTotal(typeof count === 'number' ? count : null)
   }
 
-  const handleSubmit = (event: FormEvent) => { setPage(0); handleSearch(event) }
+  const handleSubmit = (event: FormEvent) => { event.preventDefault(); setPage(0); setPendingSearch(true) }
 
-  const handleNextPage = () => { setPage((prev) => prev + 1); setTimeout(() => void handleSearch(), 0) }
-  const handlePrevPage = () => { setPage((prev) => Math.max(0, prev - 1)); setTimeout(() => void handleSearch(), 0) }
-  const handleCodeScanned = (code: string) => { setCodigo(code.trim()); setPage(0); setTimeout(() => void handleSearch(), 0) }
+  const handleNextPage = () => { setPage((prev) => prev + 1); setPendingSearch(true) }
+  const handlePrevPage = () => { setPage((prev) => Math.max(0, prev - 1)); setPendingSearch(true) }
+  const handleCodeScanned = (code: string) => { setCodigo(code.trim()); setPage(0); setPendingSearch(true) }
 
   const totalPages = total !== null ? Math.ceil(total / PAGE_SIZE) : null
 
