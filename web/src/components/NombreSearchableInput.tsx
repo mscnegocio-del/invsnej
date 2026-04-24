@@ -37,9 +37,13 @@ export function NombreSearchableInput({
   const [buscando, setBuscando] = useState(false)
   const [sinResultados, setSinResultados] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Solo buscar cuando el usuario escribe manualmente, no en cambios programáticos
+  // (query params, autofill desde SIGA por código, selección de sugerencia)
+  const userTypedRef = useRef(false)
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!userTypedRef.current) return
 
     const trimmed = value.trim()
     if (trimmed.length < MIN_CHARS) {
@@ -57,7 +61,7 @@ export function NombreSearchableInput({
         .from('siga_bienes')
         .select('descripcion, marca, modelo, serie, orden_compra, valor')
         .ilike('descripcion', `%${trimmed}%`)
-        .limit(MAX_RESULTS)
+        .limit(50)
 
       setBuscando(false)
 
@@ -66,10 +70,12 @@ export function NombreSearchableInput({
         return
       }
 
+      // Deduplicar por descripcion (siga_bienes tiene una fila por código patrimonial)
       const rows = (data ?? []) as SigaSugerencia[]
-      setSugerencias(rows)
-      setSinResultados(rows.length === 0)
-      setOpen(rows.length > 0 || rows.length === 0)
+      const unique = Array.from(new Map(rows.map((r) => [r.descripcion, r])).values()).slice(0, MAX_RESULTS)
+      setSugerencias(unique)
+      setSinResultados(unique.length === 0)
+      setOpen(true)
     }, DEBOUNCE_MS)
 
     return () => {
@@ -78,6 +84,7 @@ export function NombreSearchableInput({
   }, [value])
 
   const handleSelect = (row: SigaSugerencia) => {
+    userTypedRef.current = false
     onChange(row.descripcion)
     onSelect(row)
     setOpen(false)
@@ -95,7 +102,7 @@ export function NombreSearchableInput({
               id="form-nombre"
               type="text"
               value={value}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={(e) => { userTypedRef.current = true; onChange(e.target.value) }}
               onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}
               placeholder="Ej. Escritorio de oficina, Laptop Dell…"
               autoComplete="off"
