@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { BienResumen } from '../types'
 import { supabase } from '../lib/supabaseClient'
@@ -38,25 +38,29 @@ export function QuickEditBienDialog({ target, onClose, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   // Estados para cada campo
-  const [nuevoEstado, setNuevoEstado] = useState(target?.bien.estado || '')
-  const [nuevoIdTrabajador, setNuevoIdTrabajador] = useState<number | null | ''>(
-    target?.bien.id_trabajador || ''
-  )
+  const [nuevoEstado, setNuevoEstado] = useState('')
+  const [nuevoIdTrabajador, setNuevoIdTrabajador] = useState<number | null | ''>('')
   const [nuevoIdUbicacion, setNuevoIdUbicacion] = useState<number | null>(null)
 
-  // Inicializar ubicación (nombre → id)
-  if (target?.campo === 'ubicacion' && nuevoIdUbicacion === null) {
+  // Sincronizar estado local cuando cambia el target (abrir dialog con distinto bien/campo)
+  useEffect(() => {
+    if (!target) return
+    setError(null)
+    setNuevoEstado(target.bien.estado || '')
+    setNuevoIdTrabajador(target.bien.id_trabajador ?? '')
     if (target.bien.ubicacion) {
       const asNum = Number(target.bien.ubicacion)
       if (!Number.isNaN(asNum)) {
         const ubic = ubicaciones.find(u => u.id === asNum)
-        setNuevoIdUbicacion(ubic?.id || null)
+        setNuevoIdUbicacion(ubic?.id ?? null)
       } else {
         const ubic = ubicaciones.find(u => u.nombre === target.bien.ubicacion)
-        setNuevoIdUbicacion(ubic?.id || null)
+        setNuevoIdUbicacion(ubic?.id ?? null)
       }
+    } else {
+      setNuevoIdUbicacion(null)
     }
-  }
+  }, [target, ubicaciones])
 
   if (!target) {
     return null
