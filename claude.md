@@ -179,17 +179,17 @@ web/src/
 - **Configuración:** `PopoverContent` con `z-50`, `align="start"`, `sideOffset={8}`, `avoidCollisions={true}` para evitar que se superponga con otros campos en filtros (especialmente en móvil).
 - **Archivo:** `web/src/components/TrabajadorSearchableSelect.tsx` (línea 116)
 
-### Chat IA — Asistente de inventario (2026-04-17, mejorado 2026-04-24)
+### Chat IA — Asistente de inventario (2026-04-17, actualizado 2026-04-24, Gemini 2.5 Flash)
 
 - **Feature:** Panel lateral derecho (Sheet) con chat IA para consultas de bienes en lenguaje natural.
-- **Modelo:** `gemini-2.5-flash` vía Google Gemini API con billing (único disponible para nuevas cuentas a abril 2026).
+- **Modelo:** `gemini-2.5-flash` vía Google Gemini API con billing (requiere cuenta con billing activo).
 - **Arquitectura:** Frontend → Supabase Edge Function `ai-chat` → Gemini API → consultas Supabase service_role.
 - **Archivos:**
-  - `supabase/functions/ai-chat/index.ts` — Edge Function con camelCase (Gemini 2.5), retry logic (exponential backoff), MAX_ITERACIONES = 5, maxOutputTokens = 500, thinkingConfig deshabilitado
+  - `supabase/functions/ai-chat/index.ts` — Edge Function con camelCase (Gemini API format), retry logic (exponential backoff), MAX_ITERACIONES = 5 (soporta multi-turn tool calls), maxOutputTokens = 500, thinkingConfig deshabilitado (optimiza tokens)
   - `web/src/hooks/useAIChat.ts` — hook, historial en memoria (se pierde al cerrar/recargar)
   - `web/src/components/AIChatPanel.tsx` — panel Sheet lado derecho, Badge "Beta", AlertDialog confirmación antes de limpiar
   - `web/src/components/Layout.tsx` — icono Bot en header móvil, bottom nav (item "IA") y sidebar desktop, Badge "Beta"
-- **Variable de entorno requerida en Supabase Secrets:** `GEMINI_API_KEY=...` (con billing/quota)
+- **Variable de entorno requerida en Supabase Secrets:** `GEMINI_API_KEY=...` (requiere plan con billing/quota)
 - **Tools disponibles:** `buscar_bien_por_codigo`, `buscar_bienes`, `contar_bienes`, `listar_bienes_por_responsable`
 - **Solo lectura:** el asistente no puede editar ni crear bienes.
 - **Historial:** solo durante la sesión/ventana abierta; se pierde al recargar.
@@ -300,7 +300,7 @@ Patrón: estado `target/confirmAction/showDialog` → botón setea estado → Al
 - **Variables de entorno:**
   - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
   - `VITE_TURNSTILE_SITE_KEY` (opcional, si CAPTCHA activo en Supabase Auth)
-  - En Supabase Secrets: `GROQ_API_KEY` (para Edge Function ai-chat), `PASSKEY_EXTRA_HOSTS` (hosts adicionales para WebAuthn)
+  - En Supabase Secrets: `GEMINI_API_KEY` (para Edge Function ai-chat con Gemini 2.5 Flash), `PASSKEY_EXTRA_HOSTS` (hosts adicionales para WebAuthn)
 
 ## Sprint completado (2026-04-23)
 
@@ -331,22 +331,54 @@ Patrón: estado `target/confirmAction/showDialog` → botón setea estado → Al
 - Layout.tsx: `overflow-hidden` movido a div interior para mostrar botón toggle
 - Chat IA: Problema de confusión de contexto entre trabajadores (Milton vs Yaranga) → resuelto con mejoras en SYSTEM_PROMPT
 
-**Chat IA — Groq optimizado (2026-04-23):**
-- ✅ Deployada en Supabase usando Groq (llama-3.1-8b-instant)
-- ✅ Agentic loop con **3 iteraciones máximas** (reducido de 4 → ~25% menos llamadas)
-- ✅ `max_tokens: 800` (reducido de 1024 → menos tokens de salida facturados)
+**Chat IA — Gemini 2.5 Flash (2026-04-24):**
+- ✅ Migrado a Google Gemini 2.5 Flash (único modelo disponible con billing a abril 2026)
+- ✅ Agentic loop con **5 iteraciones máximas** (soporta 2-3 tool calls + respuesta final)
+- ✅ `maxOutputTokens: 500` (optimizado para respuestas concisas)
+- ✅ `thinkingConfig: { thinkingBudget: 0 }` para deshabilitar thinking (simplifica estructura, ahorra tokens)
+- ✅ camelCase en API: `functionCall`, `functionResponse`, `functionDeclarations`, `systemInstruction`
 - ✅ Historial truncado a últimos 8 mensajes (evita que conversaciones largas inflen el costo)
 - ✅ Mantiene contexto en conversaciones multi-turno
 - ✅ 4 tools disponibles: buscar exacto, búsqueda filtrada, conteos, listar por responsable
-- ✅ Ahorro estimado: ~33% menos tokens vs versión anterior
-- ⚠️ Requiere `GROQ_API_KEY` en Supabase Secrets
-- ℹ️ El prompt caching (Anthropic) no está disponible en Groq — no es aplicable
+- ✅ Deduplicación de thought parts en respuestas (si thinking estuviese habilitado)
+- ✅ Retry automático en 429 con exponential backoff (1s, 2s, 4s)
+- ⚠️ Requiere `GEMINI_API_KEY` con billing activo en Supabase Secrets
+- ℹ️ Prompt caching no está disponible en Gemini API — no es aplicable
 
 **Cambios CLAUDE.md:**
 - Actualizado con todos los patrones implementados
 - Detalles técnicos de cada mejora
 - Fixes y pitfalls conocidos
 - Status y configuración del Chat IA
+
+## Mejoras (2026-04-27)
+
+#### BienDetail rediseño: layout 2 columnas
+- **Desktop (lg+):** Grid `lg:grid-cols-2 lg:items-start` — detalle del bien a la izquierda, historial de cambios a la derecha (consulta paralela sin scroll).
+- **Móvil:** una columna, orden natural. Detalle completo, luego historial.
+- **Sección "Datos SIGA PJ" colapsable en móvil:** 
+  - Botón con `ChevronDown` rotatorio (chevron solo visible `lg:hidden`)
+  - Cerrada por defecto en móvil (`sigaOpen=false`)
+  - Siempre abierta en desktop (`lg:block` para contenido)
+  - `setState` toggle con animación `transition-transform`
+- **Contenedor:** ampliado a `lg:max-w-6xl` para soportar 2 columnas
+- **Archivo:** `web/src/pages/BienDetail.tsx`
+
+#### QuickEditBienDialog: precarga estado actual
+- **Problema:** Al abrir dialog para editar Estado/Responsable/Ubicación, el campo no mostraba el valor actual (p. ej. "Regular").
+- **Causa:** `useState` se inicializaba solo en primer render; cuando `target` cambiaba (nuevo bien/campo), el estado local no se resincronizaba.
+- **Solución:** Agregado `useEffect` con dependencia `[target, ubicaciones]` que sincroniza:
+  - `nuevoEstado` ← `target.bien.estado`
+  - `nuevoIdTrabajador` ← `target.bien.id_trabajador`
+  - `nuevoIdUbicacion` ← resolución de nombre a ID (idéntico a lógica anterior)
+  - `setError(null)` para limpiar errores previos
+- **Impacto:** Dialog precarga correctamente; usuario ve qué va a cambiar.
+- **Archivo:** `web/src/components/QuickEditBienDialog.tsx`
+
+**Variables de entorno actualizadas (2026-04-27):**
+- `GEMINI_API_KEY` reemplaza `GROQ_API_KEY`
+- `VITE_TURNSTILE_SITE_KEY` opcional (si CAPTCHA activo en Supabase Auth)
+- `PASSKEY_EXTRA_HOSTS` para orígenes WebAuthn adicionales
 
 ## Fixes (2026-04-24)
 
