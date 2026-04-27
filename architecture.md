@@ -318,3 +318,18 @@ Usado en `BienForm.tsx` para SIGA lookup:
    - **Verificado:** Rol `consulta` ya tiene acceso sin restricción — Layout renderiza botón para todos los roles, `ai-chat` usa `service_role`
    - **Status:** Funcionando correctamente sin cambios necesarios
 
+## Mejoras (2026-04-27)
+
+1. **Rediseño BienDetail.tsx: layout 2 columnas en desktop**
+   - **Desktop (lg+):** Grid de 2 columnas (`lg:grid-cols-2 lg:items-start`) — detalle a la izquierda, historial de cambios a la derecha. Contenedor ampliado a `lg:max-w-6xl`.
+   - **Móvil:** una sola columna, orden natural: detalle completo, luego historial.
+   - **Sección SIGA PJ colapsable en móvil:** botón con chevron rotatorio (cerrado por defecto en móvil, siempre visible en desktop con `lg:block`).
+   - **Archivo:** `web/src/pages/BienDetail.tsx`
+
+2. **QuickEditBienDialog: precarga estado actual al abrir**
+   - **Problema:** Al abrir dialog de edición rápida, el campo no mostraba el valor actual (p. ej. "Regular" en Estado)
+   - **Causa:** `useState` se inicializaba solo en el primer render; cuando `target` cambiaba, el estado local no se resincronizaba
+   - **Solución:** Agregado `useEffect` que sincroniza `nuevoEstado`, `nuevoIdTrabajador` y `nuevoIdUbicacion` cada vez que `target` cambia
+   - **Impacto:** Dialog precarga correctamente el valor actual de cada campo
+   - **Archivo:** `web/src/components/QuickEditBienDialog.tsx`
+

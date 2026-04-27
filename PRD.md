@@ -92,57 +92,75 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | RF-32 | Normalizar IDs antiguos de ubicación a nombres en exportación | Alta |
 | RF-33 | Exportación resuelve nombres de responsables (no IDs) | Alta |
 
-### 3.6 Datos maestros
+### 3.6 Vista de detalle de bien (BienDetail)
 
 | ID   | Requisito | Prioridad |
 |------|-----------|-----------|
-| RF-34 | Cargar trabajadores desde Supabase | Alta |
-| RF-35 | Cargar ubicaciones desde Supabase | Alta |
-| RF-36 | Cache de trabajadores y ubicaciones en frontend (TTL 15 min) | Media |
-| RF-37 | Select de responsable es buscable por nombre | Alta |
+| RF-34 | **Desktop:** layout en 2 columnas — detalle a la izquierda, historial de cambios a la derecha | Media |
+| RF-35 | **Móvil:** detalle completo en una columna, sección "Datos SIGA PJ" colapsable (cerrada por defecto) | Media |
+| RF-36 | Historial muestra cambios con usuario, timestamp, campo afectado, valor anterior → nuevo | Alta |
+| RF-37 | Avatar del usuario que hizo el cambio en historial | Media |
+| RF-38 | Botones Editar (si permisos) y Eliminar (si admin) con confirmación | Alta |
 
-### 3.7 PWA y deploy
-
-| ID   | Requisito | Prioridad |
-|------|-----------|-----------|
-| RF-38 | Instalable como PWA en móvil | Media |
-| RF-39 | Deploy en Vercel | Alta |
-| RF-40 | Service worker para precaching | Media |
-
-### 3.8 Asistente IA (Chat)
+### 3.7 Datos maestros
 
 | ID   | Requisito | Prioridad |
 |------|-----------|-----------|
-| RF-52 | Panel chat lateral (Sheet) con icono Bot en header/sidebar/bottom-nav | Alta |
-| RF-53 | Entrada de usuario con Textarea (Shift+Enter para nueva línea, Enter envía) | Alta |
-| RF-54 | Historial de conversación visible durante la sesión (se pierde al recargar) | Media |
-| RF-55 | Typing indicator (3 puntos rebotando) mientras el asistente procesa | Media |
-| RF-56 | 4 sugerencias de ejemplo al abrir chat vacío | Media |
-| RF-57 | Botón limpiar conversación (icono papelera) | Media |
-| RF-58 | Soporte para 4 tools: buscar por código exacto, búsqueda filtrada, conteos, listar por responsable | Alta |
-| RF-59 | Contexto multi-turno: si usuario preguntó por "Milton" antes, preguntas sin nombre se asumen de Milton | Alta |
-| RF-60 | Ambigüedad: asistente pregunta aclaración en lugar de adivinar trabajadores | Alta |
-| RF-61 | Asistente no puede crear, editar ni eliminar bienes (solo lectura) | Alta |
-| RF-62 | Respuestas en español, claras y concisas | Alta |
-| RF-63 | Acceso: todos los roles (admin, operador, consulta) pueden usar el chat | Alta |
-| RF-64 | Edge Function `ai-chat` usa Groq API con modelo llama-3.1-8b-instant | Alta |
-| RF-65 | Agentic loop: máximo 4 iteraciones por pregunta para optimizar tokens | Alta |
+| RF-39 | Cargar trabajadores desde Supabase | Alta |
+| RF-40 | Cargar ubicaciones desde Supabase | Alta |
+| RF-41 | Cache de trabajadores y ubicaciones en frontend (TTL 15 min) | Media |
+| RF-42 | Select de responsable es buscable por nombre | Alta |
 
-### 3.9 Autenticación y seguridad
+### 3.8 PWA y deploy
 
 | ID   | Requisito | Prioridad |
 |------|-----------|-----------|
-| RF-41 | Mostrar pantalla de login antes de acceder al sistema | Alta |
-| RF-42 | Permitir primer acceso por correo (OTP o enlace; producto usa **OTP** como flujo principal) | Alta |
-| RF-43 | Tras primer acceso exitoso, invitar a registrar una passkey/WebAuthn en el mismo dispositivo | Alta |
-| RF-44 | Permitir siguientes accesos con passkey/WebAuthn cuando el dispositivo/navegador lo soporte | Alta |
-| RF-45 | Proteger rutas privadas: Home, Scan, Registro, Search, Detail, Editar | Alta |
-| RF-46 | Cerrar sesión explícitamente desde interfaz y limpiar estado local sensible | Alta |
-| RF-47 | Bloquear temporalmente intentos excesivos por usuario/IP y mostrar mensaje claro | Alta |
-| RF-48 | Registrar eventos de seguridad básicos (login ok, login fallido, bloqueo) | Media |
-| RF-49 | Ofrecer **OTP por correo** (u otro fallback sin passkey) cuando la passkey no exista, falle o no esté disponible en el dispositivo | Alta |
-| RF-50 | UX de error no técnica: mensajes claros para enlace expirado, passkey no disponible o autenticación cancelada | Alta |
-| RF-51 | Permitir registrar o volver a registrar passkey desde una sesión autenticada | Media |
+| RF-43 | Instalable como PWA en móvil | Media |
+| RF-44 | Deploy en Vercel | Alta |
+| RF-45 | Service worker para precaching | Media |
+
+### 3.9 Asistente IA (Chat)
+
+| ID   | Requisito | Prioridad |
+|------|-----------|-----------|
+| RF-46 | Panel chat lateral (Sheet) con icono Bot en header/sidebar/bottom-nav | Alta |
+| RF-47 | Entrada de usuario con Textarea (Shift+Enter para nueva línea, Enter envía) | Alta |
+| RF-48 | Historial de conversación visible durante la sesión (se pierde al recargar) | Media |
+| RF-49 | Typing indicator (3 puntos rebotando) mientras el asistente procesa | Media |
+| RF-50 | 4 sugerencias de ejemplo al abrir chat vacío | Media |
+| RF-51 | Botón limpiar conversación (icono papelera) | Media |
+| RF-52 | Soporte para 4 tools: buscar por código exacto, búsqueda filtrada, conteos, listar por responsable | Alta |
+| RF-53 | Contexto multi-turno: si usuario preguntó por "Milton" antes, preguntas sin nombre se asumen de Milton | Alta |
+| RF-54 | Ambigüedad: asistente pregunta aclaración en lugar de adivinar trabajadores | Alta |
+| RF-55 | Asistente no puede crear, editar ni eliminar bienes (solo lectura) | Alta |
+| RF-56 | Respuestas en español, claras y concisas | Alta |
+| RF-57 | Acceso: todos los roles (admin, operador, consulta) pueden usar el chat | Alta |
+| RF-58 | Edge Function `ai-chat` usa Gemini 2.5 Flash API con billing | Alta |
+| RF-59 | Agentic loop: máximo 5 iteraciones por pregunta para soportar multi-turn tool calls | Alta |
+
+### 3.10 Edición rápida de bienes
+
+| ID   | Requisito | Prioridad |
+|------|-----------|-----------|
+| RF-60 | Menú ⋮ en cada resultado de búsqueda con opciones: Ver detalle, Editar estado, Editar responsable, Editar ubicación | Media |
+| RF-61 | Dialog QuickEditBienDialog precarga el valor actual del campo a editar | Alta |
+| RF-62 | Actualiza Supabase e historial sin recargar resultados | Alta |
+
+### 3.11 Autenticación y seguridad
+
+| ID   | Requisito | Prioridad |
+|------|-----------|-----------|
+| RF-63 | Mostrar pantalla de login antes de acceder al sistema | Alta |
+| RF-64 | Permitir primer acceso por correo (OTP o enlace; producto usa **OTP** como flujo principal) | Alta |
+| RF-65 | Tras primer acceso exitoso, invitar a registrar una passkey/WebAuthn en el mismo dispositivo | Alta |
+| RF-66 | Permitir siguientes accesos con passkey/WebAuthn cuando el dispositivo/navegador lo soporte | Alta |
+| RF-67 | Proteger rutas privadas: Home, Scan, Registro, Search, Detail, Editar | Alta |
+| RF-68 | Cerrar sesión explícitamente desde interfaz y limpiar estado local sensible | Alta |
+| RF-69 | Bloquear temporalmente intentos excesivos por usuario/IP y mostrar mensaje claro | Alta |
+| RF-70 | Registrar eventos de seguridad básicos (login ok, login fallido, bloqueo) | Media |
+| RF-71 | Ofrecer **OTP por correo** (u otro fallback sin passkey) cuando la passkey no exista, falle o no esté disponible en el dispositivo | Alta |
+| RF-72 | UX de error no técnica: mensajes claros para enlace expirado, passkey no disponible o autenticación cancelada | Alta |
+| RF-73 | Permitir registrar o volver a registrar passkey desde una sesión autenticada | Media |
 
 ---
 
@@ -285,6 +303,16 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 - Se libera automáticamente al cerrar
 - CameraContext centraliza manejo del stream
 
+### 5. Vista de detalle responsive (2026-04-27)
+- **Desktop:** layout en 2 columnas — datos del bien a la izquierda, historial de cambios a la derecha (para consulta paralela)
+- **Móvil:** una sola columna, datos básicos siempre visibles, sección "Datos SIGA PJ" colapsable para ahorrar espacio
+- **Chevron rotatorio** en encabezado de SIGA PJ indica estado abierto/cerrado en móvil
+
+### 6. Edición rápida sin recargar (2026-04-27)
+- Menú ⋮ en resultados de búsqueda para editar un campo por vez (Estado, Responsable, Ubicación)
+- Dialog precarga el valor actual — no hay confusión sobre qué cambiar
+- Actualiza Supabase e historial sin refrescar la lista — experiencia fluida
+
 ---
 
 ## 9. Restricciones conocidas
@@ -309,3 +337,22 @@ Personal de inventario que usa smartphone para registrar y gestionar bienes en c
 | Magic link expirado/fallido | % de intentos fallidos por enlace vencido o inválido | <= 10% |
 | Intentos bloqueados | Cantidad de bloqueos temporales por abuso en ventana definida | Monitoreado; tendencia estable o a la baja |
 | Reintento exitoso tras error | % de usuarios que corrigen y logran login tras un fallo inicial | >= 70% |
+
+---
+
+## 11. Historial de cambios
+
+### Versión 2026-04-27
+- **BienDetail rediseño:** layout 2 columnas en desktop (detalle + historial lado a lado), SIGA PJ colapsable en móvil
+- **QuickEditBienDialog precarga:** dialog ahora muestra el valor actual del campo antes de editar (fix sincronización con useEffect)
+- **Edición rápida mejorada:** acceso directo desde búsqueda con menú ⋮
+
+### Versión 2026-04-24
+- **CORS fix en admin-users:** Edge Function ahora soporta PATCH y OPTIONS (permite aprobar/rechazar usuarios)
+- **Error handling mejorado:** mensajes de error incluyen detalles del servidor para diagnóstico
+
+### Versión 2026-04-23
+- **Chat IA con Gemini:** integración de Google Gemini 2.5 Flash con agentic loop (máx. 5 iteraciones), 4 tools especializadas
+- **Sidebar colapsable:** toggle en desktop para expandir/contraer (persistido en localStorage)
+- **Filtros móvil:** búsqueda avanzada bajo botón colapsable en pantallas < lg
+- **Búsqueda con URL:** filtros guardados en parámetros de query para navegación consistente
