@@ -351,7 +351,36 @@ Patrón: estado `target/confirmAction/showDialog` → botón setea estado → Al
 - Fixes y pitfalls conocidos
 - Status y configuración del Chat IA
 
-## Mejoras (2026-04-27)
+## Mejoras (2026-04-27) — actualizado
+
+#### BienForm: UX móvil y layout desktop
+
+##### UbicacionSelect — combobox con creación inline
+- **Cambio:** Reemplazado `<Select>` simple por combobox con búsqueda (mismo patrón que `TrabajadorSearchableSelect`).
+- **Crear inline:** Si el texto buscado no existe en el catálogo, aparece `+ Crear "Nombre"` al final de la lista. Un click hace `insert` en la tabla `ubicaciones`, llama `reload()` y selecciona el nuevo ID automáticamente.
+- **Restricción:** La opción de crear solo aparece si `canEdit` (`admin` / `operador`); rol `consulta` solo puede seleccionar.
+- **UX:** Sin modales extra ni botones separados — flujo en un solo campo, cero context switch en móvil.
+- **Archivo:** `web/src/components/UbicacionSelect.tsx`
+
+##### BienForm — sección SIGA colapsable en móvil
+- **Comportamiento:** Botón header con `ChevronDown` rotatorio (solo visible `lg:hidden`). En desktop (`lg:`) el contenido siempre es visible con `lg:block`.
+- **Estado inicial:** `sigaOpen = tieneSiga || modo === 'edit'`
+  - Create sin datos SIGA → cerrada (usuario no ve los 5 campos extra en el primer scroll)
+  - Create con scan SIGA → abierta (datos pre-llenados visibles para confirmación)
+  - Edit → abierta siempre (puede haber datos que editar)
+- **Implementación:** `<fieldset>` reemplazado por `<div>` + `<button type="button">` para evitar conflicto de event bubbling con el submit del form.
+- **Archivo:** `web/src/components/BienForm.tsx`
+
+##### BienForm — grid 2 columnas en desktop
+- **Layout desktop (`md:grid-cols-2`):**
+  - Fila 1: Código patrimonial (50%) + Estado (50%)
+  - Fila 2: Nombre del bien (100%) — ancho completo para autocomplete SIGA
+  - Fila 3: Responsable (50%) + Ubicación (50%)
+  - Fila 4: Sección SIGA (colapsable móvil, siempre abierta desktop)
+- **Nombre a ancho completo:** campo principal con autocomplete; un popover en 50% quedaría estrecho en desktop y rompe jerarquía visual.
+- **Archivo:** `web/src/components/BienForm.tsx`
+
+
 
 #### BienDetail rediseño: layout 2 columnas
 - **Desktop (lg+):** Grid `lg:grid-cols-2 lg:items-start` — detalle del bien a la izquierda, historial de cambios a la derecha (consulta paralela sin scroll).

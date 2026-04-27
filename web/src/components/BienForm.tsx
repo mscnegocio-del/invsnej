@@ -1,8 +1,9 @@
 import type { FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Loader2, Database } from 'lucide-react'
+import { Loader2, Database, ChevronDown } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { cn } from '../lib/utils'
 import { TrabajadorSearchableSelect } from './TrabajadorSearchableSelect'
 import { UbicacionSelect } from './UbicacionSelect'
 import { NombreSearchableInput } from './NombreSearchableInput'
@@ -66,6 +67,7 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSaveConfirm, setShowSaveConfirm] = useState(false)
+  const [sigaOpen, setSigaOpen] = useState(() => tieneSiga || modo === 'edit')
 
   // Ref para debounce del lookup SIGA por código patrimonial
   const sigaLookupRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -274,77 +276,94 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="space-y-1.5">
-          <Label htmlFor="form-codigo">Código patrimonial *</Label>
-          <Input
-            id="form-codigo"
-            type="text"
-            value={codigo}
-            onChange={(e) => setCodigo(e.target.value)}
-            placeholder="Código leído del código de barras"
-          />
+        {/* Fila 1: Código + Estado (2 columnas en desktop) */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="form-codigo">Código patrimonial *</Label>
+            <Input
+              id="form-codigo"
+              type="text"
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value)}
+              placeholder="Código leído del código de barras"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="form-estado">Estado *</Label>
+            <Select value={estado} onValueChange={setEstado}>
+              <SelectTrigger id="form-estado">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ESTADOS.map((op) => (
+                  <SelectItem key={op} value={op}>{op}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
+        {/* Fila 2: Nombre (ancho completo) */}
         <NombreSearchableInput
           value={nombre}
           onChange={setNombre}
           onSelect={handleNombreSelect}
         />
 
-        <div className="space-y-1.5">
-          <Label htmlFor="form-estado">Estado *</Label>
-          <Select value={estado} onValueChange={setEstado}>
-            <SelectTrigger id="form-estado">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ESTADOS.map((op) => (
-                <SelectItem key={op} value={op}>{op}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Fila 3: Responsable + Ubicación (2 columnas en desktop) */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <TrabajadorSearchableSelect
+            value={idTrabajador}
+            onChange={(v) => setIdTrabajador(v === '' || v === null ? null : v)}
+            label="Responsable *"
+          />
+          <UbicacionSelect value={idUbicacion} onChange={setIdUbicacion} />
         </div>
 
-        <TrabajadorSearchableSelect
-          value={idTrabajador}
-          onChange={(v) => setIdTrabajador(v === '' || v === null ? null : v)}
-          label="Responsable *"
-        />
-        <UbicacionSelect value={idUbicacion} onChange={setIdUbicacion} />
-
-        {/* Sección datos SIGA */}
-        <fieldset className="space-y-3 rounded-xl border border-border p-4">
-          <legend className="flex items-center gap-2 px-1 text-sm font-semibold text-foreground">
+        {/* Fila 4: Datos SIGA — colapsable en móvil, siempre visible en desktop */}
+        <div className="rounded-xl border border-border">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 p-4 text-sm font-semibold text-foreground"
+            onClick={() => setSigaOpen((v) => !v)}
+          >
             <Database className="h-4 w-4 text-muted-foreground" />
             Datos del bien (SIGA)
             {tieneSiga && modo === 'create' && (
               <Badge variant="warning" className="ml-1">Desde SIGA</Badge>
             )}
-          </legend>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="form-marca">Marca</Label>
-              <Input id="form-marca" type="text" value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Ej. HP, Dell, Lenovo" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="form-modelo">Modelo</Label>
-              <Input id="form-modelo" type="text" value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Ej. ProBook 440 G8" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="form-serie">N° Serie</Label>
-              <Input id="form-serie" type="text" value={serie} onChange={(e) => setSerie(e.target.value)} placeholder="Número de serie" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="form-oc">Orden de compra</Label>
-              <Input id="form-oc" type="text" value={ordenCompra} onChange={(e) => setOrdenCompra(e.target.value)} placeholder="Ej. OC-2023-001" />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="form-valor">Valor (S/.)</Label>
-              <Input id="form-valor" type="number" step="0.01" min="0" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej. 3500.00" />
+            <ChevronDown
+              className={cn(
+                'ml-auto h-4 w-4 text-muted-foreground transition-transform lg:hidden',
+                sigaOpen ? 'rotate-180' : 'rotate-0',
+              )}
+            />
+          </button>
+          <div className={cn('px-4 pb-4', sigaOpen ? 'block' : 'hidden', 'lg:block')}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="form-marca">Marca</Label>
+                <Input id="form-marca" type="text" value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Ej. HP, Dell, Lenovo" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="form-modelo">Modelo</Label>
+                <Input id="form-modelo" type="text" value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Ej. ProBook 440 G8" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="form-serie">N° Serie</Label>
+                <Input id="form-serie" type="text" value={serie} onChange={(e) => setSerie(e.target.value)} placeholder="Número de serie" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="form-oc">Orden de compra</Label>
+                <Input id="form-oc" type="text" value={ordenCompra} onChange={(e) => setOrdenCompra(e.target.value)} placeholder="Ej. OC-2023-001" />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="form-valor">Valor (S/.)</Label>
+                <Input id="form-valor" type="number" step="0.01" min="0" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ej. 3500.00" />
+              </div>
             </div>
           </div>
-        </fieldset>
+        </div>
 
         {error && (
           <Alert variant="destructive">
