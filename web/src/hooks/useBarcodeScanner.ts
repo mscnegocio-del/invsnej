@@ -10,6 +10,33 @@ type UseBarcodeScannerOptions = {
 
 const USE_QUAGGA = !('BarcodeDetector' in window)
 
+// Feedback sensorial al detectar un código: vibración corta + beep 880 Hz 80ms.
+// Degrada silenciosamente si el navegador no soporta vibrate o AudioContext.
+let sharedAudioCtx: AudioContext | null = null
+function playSuccessFeedback() {
+  try { navigator.vibrate?.(50) } catch { /* noop */ }
+  try {
+    type AudioCtxCtor = typeof AudioContext
+    const Ctor: AudioCtxCtor | undefined =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: AudioCtxCtor }).webkitAudioContext
+    if (!Ctor) return
+    if (!sharedAudioCtx) sharedAudioCtx = new Ctor()
+    const ctx = sharedAudioCtx
+    if (ctx.state === 'suspended') void ctx.resume()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.frequency.value = 880
+    osc.type = 'sine'
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.09)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.1)
+  } catch { /* noop */ }
+}
+
 type BarcodeDetectorLike = { detect: (src: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>> }
 
 const QUAGGA_READERS = [
@@ -42,6 +69,7 @@ export function useBarcodeScanner({ onCode, containerRef, videoRef }: UseBarcode
         const raw = barcodes?.[0]?.rawValue
         if (raw) {
           lastCodeRef.current = raw
+          playSuccessFeedback()
           onCode(raw)
         }
       }
@@ -63,6 +91,7 @@ export function useBarcodeScanner({ onCode, containerRef, videoRef }: UseBarcode
         const raw = result?.codeResult?.code ?? ''
         if (raw && raw !== lastCodeRef.current) {
           lastCodeRef.current = raw
+          playSuccessFeedback()
           onCode(raw)
         }
       }
@@ -141,6 +170,7 @@ export function useBarcodeScanner({ onCode, containerRef, videoRef }: UseBarcode
               const raw = barcodes[0].rawValue || ''
               if (raw && raw !== lastCodeRef.current) {
                 lastCodeRef.current = raw
+                playSuccessFeedback()
                 onCode(raw)
               }
             }

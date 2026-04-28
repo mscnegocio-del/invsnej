@@ -1,7 +1,7 @@
 import type { FormEvent } from 'react'
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Camera, Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Camera, Loader2, RotateCcw } from 'lucide-react'
 import { BarcodeScanModal } from '../components/BarcodeScanModal'
 import { supabase } from '../lib/supabaseClient'
 import { DuplicateAlert } from '../components/DuplicateAlert'
@@ -13,6 +13,13 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Alert, AlertDescription } from '../components/ui/alert'
+import { Badge } from '../components/ui/badge'
+
+type ChainDefaults = {
+  id_trabajador: number | null
+  id_ubicacion: number | null
+  estado: string | null
+}
 
 export function Scan() {
   const [codigo, setCodigo] = useState('')
@@ -20,10 +27,32 @@ export function Scan() {
   const [bienDuplicado, setBienDuplicado] = useState<BienResumen | null>(null)
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showScanModal, setShowScanModal] = useState(false)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { sedeActiva } = useSede()
-  const { sedes } = useCatalogs()
+  const { sedes, trabajadores, ubicaciones } = useCatalogs()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const isContinuar = searchParams.get('continuar') === '1'
+
+  // Leer defaults del modo encadenado directamente en el inicializador (lazy init, sin useEffect)
+  const [chainDefaults, setChainDefaults] = useState<ChainDefaults | null>(() => {
+    if (!isContinuar) return null
+    try {
+      const raw = sessionStorage.getItem('inv:chain_defaults')
+      return raw ? (JSON.parse(raw) as ChainDefaults) : null
+    } catch { return null }
+  })
+  const [showScanModal, setShowScanModal] = useState(isContinuar)
+
+  // Autofocus en el input al montar
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  const limpiarChain = () => {
+    setChainDefaults(null)
+    try { sessionStorage.removeItem('inv:chain_defaults') } catch { /* noop */ }
+  }
 
   const findSedeNombre = (sedeId: number | null | undefined): string | null => {
     if (!sedeId) return null
@@ -72,6 +101,12 @@ export function Scan() {
         if (siga.valor != null) params.set('siga_valor', String(siga.valor))
         if (siga.descripcion) params.set('siga_descripcion', siga.descripcion)
       }
+      // Propagar defaults del modo continuar
+      if (chainDefaults) {
+        if (chainDefaults.id_trabajador) params.set('chain_trabajador', String(chainDefaults.id_trabajador))
+        if (chainDefaults.id_ubicacion) params.set('chain_ubicacion', String(chainDefaults.id_ubicacion))
+        if (chainDefaults.estado) params.set('chain_estado', chainDefaults.estado)
+      }
 
       navigate(`/registro?${params.toString()}`)
     }
@@ -99,6 +134,35 @@ export function Scan() {
         </p>
       </div>
 
+      {chainDefaults && (() => {
+        const trab = chainDefaults.id_trabajador
+          ? trabajadores.find((t) => t.id === chainDefaults.id_trabajador)?.nombre
+          : null
+        const ubic = chainDefaults.id_ubicacion
+          ? ubicaciones.find((u) => u.id === chainDefaults.id_ubicacion)?.nombre
+          : null
+        return (
+          <Alert className="max-w-xl mx-auto">
+            <AlertDescription className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Continuando con:</span>
+              {trab && <Badge variant="secondary">{trab}</Badge>}
+              {ubic && <Badge variant="secondary">{ubic}</Badge>}
+              {chainDefaults.estado && <Badge variant="secondary">{chainDefaults.estado}</Badge>}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={limpiarChain}
+                className="ml-auto gap-1 h-7"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Limpiar
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )
+      })()}
+
       <Card className="max-w-xl mx-auto">
         <CardContent className="p-6 space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -106,13 +170,16 @@ export function Scan() {
               <Label htmlFor="scan-codigo">Código patrimonial</Label>
               <div className="flex gap-2">
                 <Input
+                  ref={inputRef}
                   id="scan-codigo"
                   type="text"
                   value={codigo}
                   onChange={(e) => setCodigo(e.target.value)}
                   placeholder="Escribe o escanea el código"
                   autoComplete="off"
-                  className="flex-1"
+                  autoCapitalize="characters"
+                  inputMode="text"
+                  className="flex-1 min-h-11"
                 />
                 <Button
                   type="button"
@@ -120,7 +187,7 @@ export function Scan() {
                   size="icon"
                   onClick={() => setShowScanModal(true)}
                   title="Escanear con la cámara"
-                  className="shrink-0"
+                  className="shrink-0 min-h-11 min-w-11"
                 >
                   <Camera className="h-4 w-4" />
                 </Button>
