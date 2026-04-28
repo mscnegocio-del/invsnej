@@ -351,6 +351,42 @@ Patrón: estado `target/confirmAction/showDialog` → botón setea estado → Al
 - Fixes y pitfalls conocidos
 - Status y configuración del Chat IA
 
+## Mejoras (2026-04-28)
+
+### BienForm — "Seguir registrando", draft autosave y barra fija móvil
+
+#### Modo "Seguir registrando" (chainMode)
+- **Feature:** Toggle `Switch` en la barra inferior del formulario (solo `create`). Cuando está activo, al guardar el bien no navega al detalle sino a `/scan?continuar=1`, heredando los campos comunes al siguiente registro.
+- **Persistencia:** Preferencia guardada en `localStorage('inv:bien_form_chain')` — sobrevive recarga.
+- **Herencia de campos:** Query params `chain_trabajador`, `chain_ubicacion`, `chain_estado` — se leen al montar el formulario y se convierten en estado inicial.
+- **sessionStorage:** Al guardar con chainMode activo, guarda `inv:chain_defaults` (`{ id_trabajador, id_ubicacion, estado }`) para que `/scan` lo pase como query al montar el siguiente `BienForm`.
+- **Toast:** `toast.success('Bien guardado · Continúa con el siguiente', { action: { label: 'Ver detalle', onClick: navigate } })` — permite ir al detalle sin perder el flujo.
+- **Constante:** `CHAIN_KEY = 'inv:bien_form_chain'`
+
+#### Draft autosave
+- **Feature:** En `create`, el formulario autoguarda un borrador en `localStorage` con debounce de 500ms. Si el usuario vuelve al mismo código, ve un `Alert` con "Tienes un borrador para [codigo] (hace X min)" y botones **Restaurar** / **Descartar**.
+- **Clave:** `inv:bien_draft:<codigo_patrimonial>` — one-key-per-code, no acumula borradores de todos los bienes.
+- **Tipo:** `DraftPayload` (nombre, estado, idTrabajador, idUbicacion, marca, modelo, serie, ordenCompra, valor, savedAt).
+- **`draftSuppressRef`:** Ref booleana que bloquea el autosave después de restaurar, descartar o guardar exitosamente — evita re-crear el draft inmediatamente.
+- **Limpieza:** `localStorage.removeItem(DRAFT_PREFIX + codigo)` tras submit exitoso o al descartar.
+- **`formatDraftAge(ms)`:** Helper local que devuelve "hace unos segundos / X min / X h / X d".
+- **Detección al montar:** Solo para `create` con código en query params; si el draft existe para ese código, lo ofrece al usuario.
+- **Constante:** `DRAFT_PREFIX = 'inv:bien_draft:'`
+
+#### Barra de acciones fija en móvil
+- **Feature:** El botón "Registrar bien" y el toggle "Seguir registrando" están en una barra fija al pie de pantalla en móvil (`fixed bottom-0 left-0 right-0 z-30`), con `backdrop-blur` y `border-t`.
+- **Safe area iOS:** `pb-[max(env(safe-area-inset-bottom),0.75rem)]` para respetar el home indicator.
+- **Desktop:** La barra vuelve a flujo normal: `lg:static lg:bg-transparent lg:border-0 lg:p-0`.
+- **Compensación scroll:** `pb-24 lg:pb-0` en el `<form>` para que el último campo no quede oculto detrás de la barra fija.
+- **Altura mínima botón:** `min-h-11` en el `<Button>` para facilitar el tap en móvil.
+
+#### Toast en registro exitoso
+- **Sonner:** Añadido `import { toast } from 'sonner'`. Toast en ambos paths de guardado:
+  - `chainMode` activo: `toast.success('Bien guardado · Continúa con el siguiente', { action: … })`
+  - Normal: `toast.success('Bien registrado correctamente')`
+
+**Archivo:** `web/src/components/BienForm.tsx`
+
 ## Mejoras (2026-04-27) — actualizado
 
 #### BienForm: UX móvil y layout desktop

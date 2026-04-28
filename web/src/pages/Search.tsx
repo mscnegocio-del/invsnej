@@ -72,13 +72,17 @@ function saveSavedViews(list: SavedView[]) {
   try { localStorage.setItem(FAVS_KEY, JSON.stringify(list)) } catch { /* noop */ }
 }
 
-function describeQuery(qs: string): string {
+function describeQuery(qs: string, trabajadores: { id: number; nombre: string }[] = []): string {
   const sp = new URLSearchParams(qs)
   const parts: string[] = []
   if (sp.get('codigo')) parts.push(`código=${sp.get('codigo')}`)
   const nombres = sp.get('nombres')
   if (nombres) parts.push(`nombres=${nombres.split('|').slice(0, 2).join(', ')}${nombres.split('|').length > 2 ? '…' : ''}`)
-  if (sp.get('trabajador')) parts.push('responsable')
+  if (sp.get('trabajador')) {
+    const tId = Number(sp.get('trabajador'))
+    const t = trabajadores.find((w) => w.id === tId)
+    parts.push(t ? t.nombre : 'responsable')
+  }
   if (sp.get('ubicacion')) parts.push(`ubic=${sp.get('ubicacion')}`)
   if (sp.get('marca')) parts.push(`marca=${sp.get('marca')}`)
   if (sp.get('modelo')) parts.push(`modelo=${sp.get('modelo')}`)
@@ -559,7 +563,7 @@ export function Search() {
                             variant="outline"
                             className="gap-1 cursor-pointer hover:bg-accent pr-1 group"
                             onClick={() => applyQueryString(v.query)}
-                            title={describeQuery(v.query)}
+                            title={describeQuery(v.query, trabajadores)}
                           >
                             {v.name}
                             <button
@@ -587,9 +591,9 @@ export function Search() {
                             variant="secondary"
                             className="cursor-pointer hover:bg-accent text-xs font-normal max-w-[14rem] truncate"
                             onClick={() => applyQueryString(qs)}
-                            title={describeQuery(qs)}
+                            title={describeQuery(qs, trabajadores)}
                           >
-                            {describeQuery(qs)}
+                            {describeQuery(qs, trabajadores)}
                           </Badge>
                         ))}
                       </div>
