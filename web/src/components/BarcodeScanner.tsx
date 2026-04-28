@@ -79,7 +79,7 @@ export function BarcodeScanner({ onDetected, hideManualInput = false }: Props) {
 
       <div className="flex flex-wrap items-center gap-3">
         {!useQuagga && captureManual != null && (
-          <Button type="button" onClick={captureManual} disabled={capturing} className="gap-2">
+          <Button type="button" onClick={captureManual} disabled={capturing} className="gap-2 min-h-11">
             {capturing
               ? <><Loader2 className="h-4 w-4 animate-spin" /> Leyendo…</>
               : <><Camera className="h-4 w-4" /> Capturar y leer</>
@@ -87,7 +87,7 @@ export function BarcodeScanner({ onDetected, hideManualInput = false }: Props) {
           </Button>
         )}
         {hasTorch && (
-          <Button type="button" variant="secondary" onClick={toggleTorch} className="gap-2">
+          <Button type="button" variant="secondary" onClick={toggleTorch} className="gap-2 min-h-11">
             <Flashlight className="h-4 w-4" />
             {torchOn ? 'Apagar flash' : 'Encender flash'}
           </Button>
@@ -96,12 +96,11 @@ export function BarcodeScanner({ onDetected, hideManualInput = false }: Props) {
           <Button
             type="button"
             variant="ghost"
-            size="sm"
             onClick={cycleRotation}
             title="Rotar vista de cámara"
-            className="gap-1.5"
+            className="gap-1.5 min-h-11 lg:min-h-9"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCw className="h-4 w-4" />
             Rotar ({rotation}°)
           </Button>
         )}
@@ -109,12 +108,11 @@ export function BarcodeScanner({ onDetected, hideManualInput = false }: Props) {
           <Button
             type="button"
             variant="ghost"
-            size="sm"
             onClick={() => setShowManualInput((v) => !v)}
             title="Si la cámara no lee bien, escribe el código a mano"
-            className="gap-1.5"
+            className="gap-1.5 min-h-11 lg:min-h-9"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-4 w-4" />
             Escribir manualmente
           </Button>
         )}

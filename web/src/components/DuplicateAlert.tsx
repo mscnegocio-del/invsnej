@@ -69,38 +69,34 @@ export function DuplicateAlert({ codigo, bien, sedeOrigen, onRegisterAnother, on
 
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
-            size="sm"
             onClick={() => navigate(`/bienes/${bien.id}`)}
-            className="gap-1.5"
+            className="gap-1.5 min-h-11 lg:min-h-9"
           >
-            <Eye className="h-3.5 w-3.5" />
+            <Eye className="h-4 w-4" />
             Ver detalle
           </Button>
           <Button
             variant="outline"
-            size="sm"
             onClick={() => navigate(`/bienes/${bien.id}/editar`)}
-            className="gap-1.5"
+            className="gap-1.5 min-h-11 lg:min-h-9"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-4 w-4" />
             Editar
           </Button>
           <Button
             variant="ghost"
-            size="sm"
             onClick={onRegisterAnother}
-            className="gap-1.5"
+            className="gap-1.5 min-h-11 lg:min-h-9"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-4 w-4" />
             Registrar otro
           </Button>
           <Button
             variant="ghost"
-            size="sm"
             onClick={onCancel}
-            className="ml-auto gap-1.5"
+            className="ml-auto gap-1.5 min-h-11 lg:min-h-9"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-4 w-4" />
             Cancelar
           </Button>
         </div>

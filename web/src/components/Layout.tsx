@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Bot,
   Database,
+  SearchIcon,
 } from 'lucide-react'
 import { useSede } from '../context/SedeContext'
 import { useAuth } from '../context/AuthContext'
@@ -25,6 +26,7 @@ import { Separator } from './ui/separator'
 import { cn } from '../lib/utils'
 import type { AppRole } from '../types'
 import { AIChatPanel } from './AIChatPanel'
+import { CommandPalette } from './CommandPalette'
 
 const navItemsAll: {
   to: string
@@ -65,6 +67,7 @@ export function Layout() {
   const { sedeActiva, limpiarSede } = useSede()
   const { user, perfil, signOut } = useAuth()
   const [chatOpen, setChatOpen] = useState(false)
+  const [cmdOpen, setCmdOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('sidebar_collapsed') === 'true' } catch { return false }
   })
@@ -72,6 +75,18 @@ export function Layout() {
   useEffect(() => {
     try { localStorage.setItem('sidebar_collapsed', String(sidebarCollapsed)) } catch { /* noop */ }
   }, [sidebarCollapsed])
+
+  // Atajo ⌘K / Ctrl+K para abrir CommandPalette
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCmdOpen((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
   const role = perfil?.app_role ?? 'consulta'
   const navItems = navItemsAll.filter((n) => n.roles.includes(role))
   const mainPaths = navItems.map((n) => n.to)
@@ -170,6 +185,15 @@ export function Layout() {
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={() => setCmdOpen(true)}
+                className="shrink-0 text-muted-foreground hover:text-primary"
+                title="Búsqueda rápida (⌘K)"
+              >
+                <SearchIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setChatOpen(true)}
                 className="shrink-0 text-muted-foreground hover:text-primary"
                 title="Asistente IA"
@@ -199,6 +223,15 @@ export function Layout() {
               </div>
               <div className="flex gap-2">
                 <ThemeToggle />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setCmdOpen(true)}
+                  className="shrink-0 text-muted-foreground hover:text-primary"
+                  title="Búsqueda rápida (⌘K)"
+                >
+                  <SearchIcon className="h-4 w-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -260,6 +293,15 @@ export function Layout() {
               <span className="font-bold text-base text-foreground truncate">Inventario</span>
               <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400 shrink-0">Beta</span>
             </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setCmdOpen(true)}
+              className="shrink-0 text-muted-foreground hover:text-primary"
+              title="Búsqueda rápida (⌘K)"
+            >
+              <SearchIcon className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -365,6 +407,7 @@ export function Layout() {
       </nav>
 
       <AIChatPanel open={chatOpen} onOpenChange={setChatOpen} />
+      <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
     </div>
   )
 }

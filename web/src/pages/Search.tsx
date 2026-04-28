@@ -5,14 +5,16 @@ import { toast } from 'sonner'
 import {
   ScanLine, Copy, Check, FileJson, FileSpreadsheet, ChevronLeft, ChevronRight,
   Loader2, X, Search as SearchIcon, MoreHorizontal, Eye, Tag, User, MapPin,
-  Filter, ChevronDown, ChevronUp,
+  Filter, ChevronDown, ChevronUp, Share2, Star, Clock,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { BarcodeScanModal } from '../components/BarcodeScanModal'
 import { TrabajadorSearchableSelect } from '../components/TrabajadorSearchableSelect'
 import { QuickEditBienDialog } from '../components/QuickEditBienDialog'
+import { BulkEditBienDialog } from '../components/BulkEditBienDialog'
 import { useCatalogs } from '../context/CatalogContext'
 import { useSede } from '../context/SedeContext'
+import { useAuth } from '../context/AuthContext'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -26,6 +28,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '../components/ui/dialog'
 import { cn } from '../lib/utils'
 import type { BienResumen } from '../types'
 
@@ -34,6 +39,52 @@ const NOMBRE_SUGGEST_DEBOUNCE_MS = 300
 const NOMBRE_SUGGEST_MIN_CHARS = 2
 const NOMBRE_SUGGEST_FETCH_LIMIT = 40
 const NOMBRE_SUGGEST_SHOW = 18
+
+const RECENT_KEY = 'inv:recent_searches'
+const FAVS_KEY = 'inv:saved_views'
+const RECENT_MAX = 5
+
+type SavedView = { name: string; query: string }
+
+function loadRecent(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY)
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.filter((s) => typeof s === 'string') : []
+  } catch { return [] }
+}
+
+function saveRecent(list: string[]) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)) } catch { /* noop */ }
+}
+
+function loadSavedViews(): SavedView[] {
+  try {
+    const raw = localStorage.getItem(FAVS_KEY)
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.filter((v) => v && typeof v.name === 'string' && typeof v.query === 'string') : []
+  } catch { return [] }
+}
+
+function saveSavedViews(list: SavedView[]) {
+  try { localStorage.setItem(FAVS_KEY, JSON.stringify(list)) } catch { /* noop */ }
+}
+
+function describeQuery(qs: string): string {
+  const sp = new URLSearchParams(qs)
+  const parts: string[] = []
+  if (sp.get('codigo')) parts.push(`código=${sp.get('codigo')}`)
+  const nombres = sp.get('nombres')
+  if (nombres) parts.push(`nombres=${nombres.split('|').slice(0, 2).join(', ')}${nombres.split('|').length > 2 ? '…' : ''}`)
+  if (sp.get('trabajador')) parts.push('responsable')
+  if (sp.get('ubicacion')) parts.push(`ubic=${sp.get('ubicacion')}`)
+  if (sp.get('marca')) parts.push(`marca=${sp.get('marca')}`)
+  if (sp.get('modelo')) parts.push(`modelo=${sp.get('modelo')}`)
+  if (sp.get('todas') === '1') parts.push('todas sedes')
+  return parts.join(' · ') || 'búsqueda vacía'
+}
 
 function parseNombreTerminos(raw: string): string[] {
   return raw.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean)
@@ -59,6 +110,9 @@ export function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { trabajadores, ubicaciones, sedes } = useCatalogs()
   const { sedeActiva } = useSede()
+  const { perfil } = useAuth()
+  const role = perfil?.app_role ?? 'consulta'
+  const canBulkEdit = role === 'admin' || role === 'operador'
 
   const initialLoadRef = useRef(true)
   const [pendingSearch, setPendingSearch] = useState(false)
@@ -92,6 +146,19 @@ export function Search() {
   } | null
   const [quickEdit, setQuickEdit] = useState<QuickEditTarget>(null)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+
+  // Recientes y favoritas
+  const [recent, setRecent] = useState<string[]>(() => loadRecent())
+  const [savedViews, setSavedViews] = useState<SavedView[]>(() => loadSavedViews())
+  const [showSaveViewDialog, setShowSaveViewDialog] = useState(false)
+  const [saveViewName, setSaveViewName] = useState('')
+
+  // Selección masiva
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkEdit, setBulkEdit] = useState<{ campo: 'estado' | 'responsable' | 'ubicacion'; targets: BienResumen[] } | null>(null)
+
+  // Flag para diferenciar código escaneado (eq exacto) vs tipeado (ilike)
+  const codigoFromScanRef = useRef(false)
 
   const findResponsableNombre = (idTrab: number | null) =>
     idTrab ? (trabajadores.find((tr) => tr.id === idTrab)?.nombre ?? null) : null
@@ -247,7 +314,15 @@ export function Search() {
       .is('eliminado_at', null)
 
     if (sedeActiva && !todasLasSedes) query = query.eq('sede_id', sedeActiva.id)
-    if (codigo.trim()) query = query.eq('codigo_patrimonial', codigo.trim())
+    if (codigo.trim()) {
+      // Si el código vino de un scan, búsqueda exacta (rápida e indexada).
+      // Si fue tipeado manualmente, usar ilike para tolerar variaciones (ej. PRE-001 ↔ PRE-0001).
+      if (codigoFromScanRef.current) {
+        query = query.eq('codigo_patrimonial', codigo.trim())
+      } else {
+        query = query.ilike('codigo_patrimonial', `%${escapeIlikeTerm(codigo.trim())}%`)
+      }
+    }
     if (idTrabajador !== '') query = query.eq('id_trabajador', idTrabajador)
     if (textoUbicacion.trim()) query = query.ilike('ubicacion', `%${textoUbicacion.trim()}%`)
     if (textoMarca.trim()) query = query.ilike('marca', `%${escapeIlikeTerm(textoMarca.trim())}%`)
@@ -273,11 +348,131 @@ export function Search() {
     setTotal(typeof count === 'number' ? count : null)
   }
 
-  const handleSubmit = (event: FormEvent) => { event.preventDefault(); setPage(0); setPendingSearch(true) }
+  // Persistir la búsqueda actual en el listado de recientes (max 5, dedupe por query string)
+  const pushRecent = () => {
+    const sp = new URLSearchParams()
+    if (codigo.trim()) sp.set('codigo', codigo.trim())
+    if (idTrabajador !== '') sp.set('trabajador', String(idTrabajador))
+    if (textoUbicacion.trim()) sp.set('ubicacion', textoUbicacion.trim())
+    if (textoMarca.trim()) sp.set('marca', textoMarca.trim())
+    if (textoModelo.trim()) sp.set('modelo', textoModelo.trim())
+    if (nombreChips.length > 0) sp.set('nombres', nombreChips.join('|'))
+    if (todasLasSedes) sp.set('todas', '1')
+    const qs = sp.toString()
+    if (!qs) return
+    setRecent((prev) => {
+      const next = [qs, ...prev.filter((s) => s !== qs)].slice(0, RECENT_MAX)
+      saveRecent(next)
+      return next
+    })
+  }
 
-  const handleNextPage = () => { setPage((prev) => prev + 1); setPendingSearch(true) }
-  const handlePrevPage = () => { setPage((prev) => Math.max(0, prev - 1)); setPendingSearch(true) }
-  const handleCodeScanned = (code: string) => { setCodigo(code.trim()); setPage(0); setPendingSearch(true) }
+  const applyQueryString = (qs: string) => {
+    const sp = new URLSearchParams(qs)
+    setCodigo(sp.get('codigo') || '')
+    const trab = sp.get('trabajador')
+    setIdTrabajador(trab ? Number(trab) : '')
+    setTextoUbicacion(sp.get('ubicacion') || '')
+    setTextoMarca(sp.get('marca') || '')
+    setTextoModelo(sp.get('modelo') || '')
+    const nombres = sp.get('nombres')
+    setNombreChips(nombres ? nombres.split('|').filter(Boolean) : [])
+    setTodasLasSedes(sp.get('todas') === '1')
+    setPage(0)
+    codigoFromScanRef.current = false
+    setSelectedIds(new Set())
+    setPendingSearch(true)
+  }
+
+  const handleShareSearch = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      toast.success('Enlace de búsqueda copiado')
+    } catch { toast.error('No se pudo copiar el enlace') }
+  }
+
+  const handleSaveView = () => {
+    const name = saveViewName.trim()
+    if (!name) return
+    const sp = new URLSearchParams()
+    if (codigo.trim()) sp.set('codigo', codigo.trim())
+    if (idTrabajador !== '') sp.set('trabajador', String(idTrabajador))
+    if (textoUbicacion.trim()) sp.set('ubicacion', textoUbicacion.trim())
+    if (textoMarca.trim()) sp.set('marca', textoMarca.trim())
+    if (textoModelo.trim()) sp.set('modelo', textoModelo.trim())
+    if (nombreChips.length > 0) sp.set('nombres', nombreChips.join('|'))
+    if (todasLasSedes) sp.set('todas', '1')
+    const qs = sp.toString()
+    setSavedViews((prev) => {
+      const next = [{ name, query: qs }, ...prev.filter((v) => v.name !== name)].slice(0, 20)
+      saveSavedViews(next)
+      return next
+    })
+    setShowSaveViewDialog(false)
+    setSaveViewName('')
+    toast.success(`Vista "${name}" guardada`)
+  }
+
+  const handleDeleteSavedView = (name: string) => {
+    setSavedViews((prev) => {
+      const next = prev.filter((v) => v.name !== name)
+      saveSavedViews(next)
+      return next
+    })
+  }
+
+  const hasActiveFilters =
+    codigo.trim() !== '' ||
+    idTrabajador !== '' ||
+    textoUbicacion.trim() !== '' ||
+    textoMarca.trim() !== '' ||
+    textoModelo.trim() !== '' ||
+    nombreChips.length > 0
+
+  const toggleSelected = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const selectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      const allSelected = resultados.every((b) => next.has(b.id))
+      if (allSelected) {
+        resultados.forEach((b) => next.delete(b.id))
+      } else {
+        resultados.forEach((b) => next.add(b.id))
+      }
+      return next
+    })
+  }
+
+  const selectedTargets = (): BienResumen[] =>
+    resultados.filter((b) => selectedIds.has(b.id))
+
+  const handleBulkSaved = (ids: number[], updates: Partial<BienResumen>) => {
+    setResultados((prev) => prev.map((b) => (ids.includes(b.id) ? { ...b, ...updates } : b)))
+    setSelectedIds(new Set())
+    setBulkEdit(null)
+    toast.success(`${ids.length} bien${ids.length === 1 ? '' : 'es'} actualizado${ids.length === 1 ? '' : 's'}`)
+  }
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault(); setPage(0); setSelectedIds(new Set())
+    pushRecent()
+    setPendingSearch(true)
+  }
+
+  const handleNextPage = () => { setPage((prev) => prev + 1); setSelectedIds(new Set()); setPendingSearch(true) }
+  const handlePrevPage = () => { setPage((prev) => Math.max(0, prev - 1)); setSelectedIds(new Set()); setPendingSearch(true) }
+  const handleCodeScanned = (code: string) => {
+    setCodigo(code.trim()); setPage(0); setSelectedIds(new Set())
+    codigoFromScanRef.current = true
+    setPendingSearch(true)
+  }
 
   const totalPages = total !== null ? Math.ceil(total / PAGE_SIZE) : null
 
@@ -350,6 +545,58 @@ export function Search() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {(recent.length > 0 || savedViews.length > 0) && (
+                <div className="space-y-2 mb-4">
+                  {savedViews.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
+                        <Star className="h-3 w-3" /> Mis vistas
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {savedViews.map((v) => (
+                          <Badge
+                            key={v.name}
+                            variant="outline"
+                            className="gap-1 cursor-pointer hover:bg-accent pr-1 group"
+                            onClick={() => applyQueryString(v.query)}
+                            title={describeQuery(v.query)}
+                          >
+                            {v.name}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteSavedView(v.name) }}
+                              className="rounded-full hover:bg-destructive/20 p-0.5 opacity-50 group-hover:opacity-100 transition-opacity"
+                              aria-label={`Eliminar vista ${v.name}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {recent.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
+                        <Clock className="h-3 w-3" /> Recientes
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {recent.map((qs) => (
+                          <Badge
+                            key={qs}
+                            variant="secondary"
+                            className="cursor-pointer hover:bg-accent text-xs font-normal max-w-[14rem] truncate"
+                            onClick={() => applyQueryString(qs)}
+                            title={describeQuery(qs)}
+                          >
+                            {describeQuery(qs)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="search-codigo">Código patrimonial</Label>
@@ -357,8 +604,8 @@ export function Search() {
                     <Input
                       id="search-codigo"
                       value={codigo}
-                      onChange={(e) => setCodigo(e.target.value)}
-                      placeholder="Código exacto"
+                      onChange={(e) => { setCodigo(e.target.value); codigoFromScanRef.current = false }}
+                      placeholder="Código (parcial o exacto)"
                       className="flex-1"
                     />
                     <Button
@@ -496,9 +743,21 @@ export function Search() {
                   </label>
                 </div>
 
-                <Button type="submit" disabled={loading} className="w-full gap-2">
+                <Button type="submit" disabled={loading} className="w-full gap-2 min-h-11">
                   {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Buscando…</> : <><SearchIcon className="h-4 w-4" />Buscar</>}
                 </Button>
+
+                {hasActiveFilters && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowSaveViewDialog(true)}
+                    className="w-full gap-2"
+                  >
+                    <Star className="h-4 w-4" />
+                    Guardar esta vista
+                  </Button>
+                )}
               </form>
             </CardContent>
           </Card>
@@ -529,7 +788,16 @@ export function Search() {
                     {total !== null ? ` · ${total.toLocaleString()} bienes` : ''}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleShareSearch}
+                    className="gap-1.5 h-8 text-xs"
+                    title="Copiar enlace a esta búsqueda"
+                  >
+                    <Share2 className="h-3.5 w-3.5" /> Compartir
+                  </Button>
                   <Button
                     variant={copied ? 'secondary' : 'ghost'}
                     size="sm"
@@ -552,7 +820,24 @@ export function Search() {
               {/* Lista móvil */}
               <div className="lg:hidden divide-y divide-border border border-border rounded-2xl overflow-hidden bg-card">
                 {resultados.map((b) => (
-                  <div key={b.id} className="flex items-stretch hover:bg-muted/50 transition-colors">
+                  <div key={b.id} className={cn(
+                    'flex items-stretch hover:bg-muted/50 transition-colors',
+                    selectedIds.has(b.id) && 'bg-primary/5'
+                  )}>
+                    {canBulkEdit && (
+                      <label
+                        className="flex items-center px-3 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(b.id)}
+                          onChange={() => toggleSelected(b.id)}
+                          className="h-4 w-4 rounded border-input accent-primary"
+                          aria-label={`Seleccionar ${b.codigo_patrimonial}`}
+                        />
+                      </label>
+                    )}
                     <button
                       type="button"
                       onClick={() => navigate(`/bienes/${b.id}`)}
@@ -600,6 +885,17 @@ export function Search() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      {canBulkEdit && (
+                        <TableHead className="w-10">
+                          <input
+                            type="checkbox"
+                            checked={resultados.length > 0 && resultados.every((b) => selectedIds.has(b.id))}
+                            onChange={selectAllOnPage}
+                            className="h-4 w-4 rounded border-input accent-primary"
+                            aria-label="Seleccionar todos los de la página"
+                          />
+                        </TableHead>
+                      )}
                       <TableHead className="whitespace-nowrap">Código</TableHead>
                       <TableHead className="min-w-[12rem]">Nombre</TableHead>
                       <TableHead>Estado</TableHead>
@@ -621,8 +917,22 @@ export function Search() {
                           aria-label={`Ver bien ${b.codigo_patrimonial ?? b.id}`}
                           onClick={() => navigate(`/bienes/${b.id}`)}
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/bienes/${b.id}`) } }}
-                          className={cn('cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring')}
+                          className={cn(
+                            'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                            selectedIds.has(b.id) && 'bg-primary/5',
+                          )}
                         >
+                          {canBulkEdit && (
+                            <TableCell className="align-top" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(b.id)}
+                                onChange={() => toggleSelected(b.id)}
+                                className="h-4 w-4 rounded border-input accent-primary"
+                                aria-label={`Seleccionar ${b.codigo_patrimonial}`}
+                              />
+                            </TableCell>
+                          )}
                           <TableCell className="font-semibold whitespace-nowrap align-top">{b.codigo_patrimonial}</TableCell>
                           <TableCell className="align-top">{b.nombre_mueble_equipo || 'Sin nombre'}</TableCell>
                           <TableCell className="align-top">
@@ -686,8 +996,19 @@ export function Search() {
           )}
 
           {!loading && !error && resultados.length === 0 && total === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
               <p className="text-sm">No se encontraron bienes con esos filtros.</p>
+              {codigo.trim() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/scan?codigo=${encodeURIComponent(codigo.trim())}`)}
+                  className="gap-2"
+                >
+                  <ScanLine className="h-4 w-4" />
+                  ¿Registrar bien con código {codigo.trim()}?
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -728,6 +1049,86 @@ export function Search() {
         onClose={() => setQuickEdit(null)}
         onSaved={handleQuickEditSaved}
       />
+
+      <BulkEditBienDialog
+        bulk={bulkEdit}
+        onClose={() => setBulkEdit(null)}
+        onSaved={handleBulkSaved}
+      />
+
+      {/* Barra fija de acciones masivas */}
+      {canBulkEdit && selectedIds.size > 0 && (
+        <div className={cn(
+          'fixed bottom-0 left-0 right-0 z-40 md:left-64',
+          'bg-background/95 backdrop-blur border-t border-border',
+          'px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]',
+          'flex flex-wrap items-center gap-2 transition-all duration-200',
+        )}>
+          <span className="text-sm font-semibold text-foreground mr-1">
+            {selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => setBulkEdit({ campo: 'estado', targets: selectedTargets() })}
+          >
+            <Tag className="h-4 w-4" /> Estado
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => setBulkEdit({ campo: 'responsable', targets: selectedTargets() })}
+          >
+            <User className="h-4 w-4" /> Responsable
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => setBulkEdit({ campo: 'ubicacion', targets: selectedTargets() })}
+          >
+            <MapPin className="h-4 w-4" /> Ubicación
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="ml-auto gap-1.5 text-muted-foreground"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <X className="h-4 w-4" /> Limpiar
+          </Button>
+        </div>
+      )}
+
+      {/* Dialog guardar vista */}
+      <Dialog open={showSaveViewDialog} onOpenChange={setShowSaveViewDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Guardar vista</DialogTitle>
+            <DialogDescription>
+              Ponle un nombre para encontrarla rápidamente después.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={saveViewName}
+              onChange={(e) => setSaveViewName(e.target.value)}
+              placeholder="Ej: Mis bienes en Almacén"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveView() } }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveViewDialog(false)}>Cancelar</Button>
+            <Button onClick={handleSaveView} disabled={!saveViewName.trim()}>
+              <Star className="h-4 w-4 mr-2" /> Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 

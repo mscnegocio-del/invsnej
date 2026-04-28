@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Loader2, Database, ChevronDown } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { cn } from '../lib/utils'
@@ -16,6 +17,7 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Alert, AlertDescription } from './ui/alert'
 import { Badge } from './ui/badge'
+import { Switch } from './ui/switch'
 import {
   Select,
   SelectContent,
@@ -28,6 +30,22 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from './ui/alert-dialog'
 import type { BienDetalle } from '../types'
+
+const CHAIN_KEY = 'inv:bien_form_chain'
+const DRAFT_PREFIX = 'inv:bien_draft:'
+
+type DraftPayload = {
+  nombre: string
+  estado: string
+  idTrabajador: number | null
+  idUbicacion: number | null
+  marca: string
+  modelo: string
+  serie: string
+  ordenCompra: string
+  valor: string
+  savedAt: number
+}
 
 type Props = {
   initialCodigo?: string
@@ -53,12 +71,22 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const sigaDescripcion = searchParams.get('siga_descripcion') ?? ''
   const tieneSiga = !!(sigaMarca || sigaModelo || sigaSerie || sigaOC || sigaValor)
 
+  // Defaults heredados del modo "Seguir registrando"
+  const chainTrabajador = searchParams.get('chain_trabajador')
+  const chainUbicacion = searchParams.get('chain_ubicacion')
+  const chainEstado = searchParams.get('chain_estado')
+  const initialTrabajador = chainTrabajador ? Number(chainTrabajador) : null
+  const initialUbicacion = chainUbicacion ? Number(chainUbicacion) : null
+  const initialEstado = chainEstado && (ESTADOS as readonly string[]).includes(chainEstado)
+    ? chainEstado
+    : ESTADOS[0]
+
   const [codigo, setCodigo] = useState(initialCodigo ?? codigoFromQuery)
   const [nombre, setNombre] = useState(sigaDescripcion)
   const [tipo, setTipo] = useState('')
-  const [estado, setEstado] = useState<string>(ESTADOS[0])
-  const [idTrabajador, setIdTrabajador] = useState<number | null>(null)
-  const [idUbicacion, setIdUbicacion] = useState<number | null>(null)
+  const [estado, setEstado] = useState<string>(initialEstado)
+  const [idTrabajador, setIdTrabajador] = useState<number | null>(initialTrabajador)
+  const [idUbicacion, setIdUbicacion] = useState<number | null>(initialUbicacion)
   const [marca, setMarca] = useState(sigaMarca)
   const [modelo, setModelo] = useState(sigaModelo)
   const [serie, setSerie] = useState(sigaSerie)
@@ -68,9 +96,22 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [showSaveConfirm, setShowSaveConfirm] = useState(false)
   const [sigaOpen, setSigaOpen] = useState(() => tieneSiga || modo === 'edit')
+  const [chainMode, setChainMode] = useState<boolean>(() => {
+    try { return localStorage.getItem(CHAIN_KEY) === 'true' } catch { return false }
+  })
+  const [draftAvailable, setDraftAvailable] = useState<DraftPayload | null>(null)
 
   // Ref para debounce del lookup SIGA por código patrimonial
   const sigaLookupRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Ref para debounce del autoguardado de draft
+  const draftSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Marca para evitar persistir draft tras restaurar/descartar/guardar
+  const draftSuppressRef = useRef(false)
+
+  // Persistir preferencia de "Seguir registrando"
+  useEffect(() => {
+    try { localStorage.setItem(CHAIN_KEY, String(chainMode)) } catch { /* noop */ }
+  }, [chainMode])
 
   // Cargar bien en modo edit
   useEffect(() => {
@@ -126,6 +167,59 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
     loadBien()
     return () => { cancelled = true }
   }, [modo, bienId, ubicaciones])
+
+  // Detectar draft existente al montar create-mode con código en query
+  useEffect(() => {
+    if (modo !== 'create') return
+    const trimmed = codigo.trim()
+    if (!trimmed) return
+    try {
+      const raw = localStorage.getItem(DRAFT_PREFIX + trimmed)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as DraftPayload
+      if (parsed && typeof parsed === 'object') setDraftAvailable(parsed)
+    } catch { /* noop */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modo])
+
+  // Autoguardado de draft (debounce 500ms) — solo create-mode con código presente
+  useEffect(() => {
+    if (modo !== 'create') return
+    if (draftSuppressRef.current) return
+    const trimmed = codigo.trim()
+    if (!trimmed) return
+    if (draftSaveRef.current) clearTimeout(draftSaveRef.current)
+    draftSaveRef.current = setTimeout(() => {
+      const payload: DraftPayload = {
+        nombre, estado, idTrabajador, idUbicacion,
+        marca, modelo, serie, ordenCompra, valor,
+        savedAt: Date.now(),
+      }
+      try { localStorage.setItem(DRAFT_PREFIX + trimmed, JSON.stringify(payload)) } catch { /* noop */ }
+    }, 500)
+    return () => { if (draftSaveRef.current) clearTimeout(draftSaveRef.current) }
+  }, [modo, codigo, nombre, estado, idTrabajador, idUbicacion, marca, modelo, serie, ordenCompra, valor])
+
+  const restoreDraft = (d: DraftPayload) => {
+    setNombre(d.nombre || '')
+    setEstado(d.estado || ESTADOS[0])
+    setIdTrabajador(d.idTrabajador ?? null)
+    setIdUbicacion(d.idUbicacion ?? null)
+    setMarca(d.marca || '')
+    setModelo(d.modelo || '')
+    setSerie(d.serie || '')
+    setOrdenCompra(d.ordenCompra || '')
+    setValor(d.valor || '')
+    setDraftAvailable(null)
+  }
+
+  const discardDraft = () => {
+    const trimmed = codigo.trim()
+    if (trimmed) {
+      try { localStorage.removeItem(DRAFT_PREFIX + trimmed) } catch { /* noop */ }
+    }
+    setDraftAvailable(null)
+  }
 
   // Lookup SIGA por código patrimonial exacto (solo en modo create, silencioso)
   useEffect(() => {
@@ -212,6 +306,28 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
         valor_despues: nombre.trim(), usuario_id: user?.id ?? null,
         usuario_email: user?.email ?? null, accion: 'creacion',
       })
+
+      // Limpiar draft del código recién guardado
+      draftSuppressRef.current = true
+      try { localStorage.removeItem(DRAFT_PREFIX + codigo.trim()) } catch { /* noop */ }
+
+      if (chainMode) {
+        // Continuar registrando: persistir defaults y volver al escaneo
+        try {
+          sessionStorage.setItem('inv:chain_defaults', JSON.stringify({
+            id_trabajador: idTrabajador,
+            id_ubicacion: idUbicacion,
+            estado,
+          }))
+        } catch { /* noop */ }
+        toast.success('Bien guardado · Continúa con el siguiente', {
+          action: { label: 'Ver detalle', onClick: () => navigate(`/bienes/${nuevoId}`) },
+        })
+        navigate('/scan?continuar=1', { replace: true })
+        return
+      }
+
+      toast.success('Bien registrado correctamente')
       navigate(`/bienes/${nuevoId}`, { replace: true })
     } else {
       const { data: anterior } = await supabase
@@ -273,9 +389,34 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
     await executeSubmit()
   }
 
+  const formatDraftAge = (ms: number): string => {
+    const diff = Date.now() - ms
+    if (diff < 60_000) return 'hace unos segundos'
+    if (diff < 3_600_000) return `hace ${Math.round(diff / 60_000)} min`
+    if (diff < 86_400_000) return `hace ${Math.round(diff / 3_600_000)} h`
+    return `hace ${Math.round(diff / 86_400_000)} d`
+  }
+
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5 pb-24 lg:pb-0">
+        {modo === 'create' && draftAvailable && (
+          <Alert>
+            <AlertDescription className="flex flex-wrap items-center gap-3">
+              <span className="text-sm">
+                Tienes un borrador para <strong>{codigo.trim()}</strong> ({formatDraftAge(draftAvailable.savedAt)}).
+              </span>
+              <div className="flex gap-2 ml-auto">
+                <Button type="button" size="sm" onClick={() => restoreDraft(draftAvailable)}>
+                  Restaurar
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={discardDraft}>
+                  Descartar
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Fila 1: Código + Estado (2 columnas en desktop) */}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
@@ -371,16 +512,37 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
           </Alert>
         )}
 
-        <Button type="submit" disabled={loading} className="w-full">
-          {loading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Guardando…
-            </>
-          ) : (
-            modo === 'create' ? 'Registrar bien' : 'Guardar cambios'
+        <div className={cn(
+          'fixed bottom-0 left-0 right-0 z-30 -mx-0 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]',
+          'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75 border-t border-border space-y-2',
+          'lg:static lg:bg-transparent lg:border-0 lg:p-0 lg:m-0 lg:backdrop-blur-none',
+        )}>
+          {modo === 'create' && (
+            <label className="flex items-center justify-between gap-3 text-sm cursor-pointer lg:max-w-md lg:mx-auto">
+              <span className="flex flex-col">
+                <span className="font-medium text-foreground">Seguir registrando</span>
+                <span className="text-xs text-muted-foreground">
+                  Mantiene responsable, ubicación y estado para el siguiente bien
+                </span>
+              </span>
+              <Switch
+                checked={chainMode}
+                onCheckedChange={setChainMode}
+                aria-label="Seguir registrando"
+              />
+            </label>
           )}
-        </Button>
+          <Button type="submit" disabled={loading} className="w-full min-h-11">
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Guardando…
+              </>
+            ) : (
+              modo === 'create' ? 'Registrar bien' : 'Guardar cambios'
+            )}
+          </Button>
+        </div>
       </form>
 
       {/* AlertDialog de confirmación — solo en modo edit */}
