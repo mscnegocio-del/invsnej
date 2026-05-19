@@ -513,8 +513,9 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
         )}
 
         <div className={cn(
-          'fixed bottom-0 left-0 right-0 z-30 -mx-0 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]',
+          'fixed bottom-14 left-0 right-0 z-[60] -mx-0 px-4 pt-3 pb-3',
           'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75 border-t border-border space-y-2',
+          'md:bottom-0 md:pb-[max(env(safe-area-inset-bottom),0.75rem)]',
           'lg:static lg:bg-transparent lg:border-0 lg:p-0 lg:m-0 lg:backdrop-blur-none',
         )}>
           {modo === 'create' && (
