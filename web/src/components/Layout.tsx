@@ -387,7 +387,7 @@ export function Layout() {
                   className={cn('h-5 w-5', isActive && 'stroke-[2.5px]')}
                   aria-hidden
                 />
-                <span className="text-[10px] font-medium">{label}</span>
+                <span className="text-[10px] font-medium whitespace-nowrap">{label}</span>
               </Link>
             )
           })}
