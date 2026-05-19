@@ -471,3 +471,15 @@ Patrón: estado `target/confirmAction/showDialog` → botón setea estado → Al
 - **Verificado:** Rol `consulta` ya tiene acceso al chat (sin restricción de código ni RLS).
 - **Detalle:** Layout.tsx renderiza botón Bot para todos los roles; `ai-chat` Edge Function usa `service_role` y no valida `app_role`.
 - **Status:** Funcionando correctamente.
+
+## Fixes (2026-05-19)
+
+### Botón "Guardar cambios" invisible en móvil (EditarBien)
+- **Problema:** Al editar un bien desde móvil, el botón "Guardar cambios" no aparecía en pantalla.
+- **Causa raíz 1:** La barra de acción fija del formulario tenía `z-30` y `bottom-0`, igual que el nav inferior del Layout que usa `z-50`. El nav tapaba completamente la barra del formulario.
+- **Causa raíz 2:** El ítem "SIGA PJ" del nav inferior tiene texto con espacio, que se partía en **dos líneas** en pantallas de ~390px (7 ítems, ~56px de ancho por ítem). Esto inflaba el nav a ~68px, más alto que el primer fix `bottom-14` (56px).
+- **Solución:**
+  1. `BienForm.tsx`: `bottom-0 z-30` → `bottom-20 z-[60]` en la barra de acción móvil. `md:bottom-0` restaura la posición cuando el nav inferior está oculto (≥ 768px).
+  2. `Layout.tsx`: Añadido `whitespace-nowrap` al `<span>` de labels del nav inferior — evita que cualquier label se parta en 2 líneas e infle la altura del nav.
+- **Pitfall:** `bottom-14` (56px) no es suficiente si el nav tiene items con texto en 2 líneas. Usar `bottom-20` (80px) deja margen de seguridad.
+- **Archivos:** `web/src/components/BienForm.tsx` (línea 516), `web/src/components/Layout.tsx` (línea 390)
