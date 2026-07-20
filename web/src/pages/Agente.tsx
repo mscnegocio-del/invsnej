@@ -163,6 +163,16 @@ export function Agente() {
 
       {/* Entrada */}
       <div className="pt-3 border-t border-border shrink-0">
+        {!voz.listening && voz.autoStopReason && (
+          <div className="mb-2 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            <MicOff className="h-3.5 w-3.5 shrink-0" />
+            <p className="flex-1 min-w-0">
+              {voz.autoStopReason === 'inactividad' && 'Micrófono apagado por inactividad (1 min sin voz). Lo dictado quedó en el campo.'}
+              {voz.autoStopReason === 'limite' && 'Micrófono apagado: se alcanzó el límite de 3 minutos de dictado continuo.'}
+              {voz.autoStopReason === 'segundo_plano' && 'Micrófono apagado al salir de la app.'}
+            </p>
+          </div>
+        )}
         {voz.listening && (
           <div className="mb-2 flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2">
             <span className="relative flex h-2.5 w-2.5 shrink-0">
