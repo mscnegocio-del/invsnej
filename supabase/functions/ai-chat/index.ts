@@ -59,6 +59,21 @@ const tools = [
         },
       },
       {
+        name: 'proponer_edicion_bien',
+        description:
+          'Propone editar un bien (estado, ubicación y/o responsable). NO edita: muestra una tarjeta de confirmación al usuario, quien decide en pantalla. Usar cuando el usuario pida cambiar/actualizar/editar/reasignar un bien.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            codigo: { type: 'STRING', description: 'Código patrimonial del bien a editar' },
+            estado: { type: 'STRING', description: 'Nuevo estado: Nuevo|Bueno|Regular|Malo|Muy malo' },
+            ubicacion: { type: 'STRING', description: 'Nueva ubicación (texto)' },
+            nombre_responsable: { type: 'STRING', description: 'Nombre del nuevo responsable' },
+          },
+          required: ['codigo'],
+        },
+      },
+      {
         name: 'listar_bienes_por_responsable',
         description: 'Lista bienes asignados a un trabajador',
         parameters: {
@@ -74,9 +89,10 @@ const tools = [
   }
 ]
 
-const SYSTEM_PROMPT = `Eres asistente de inventario patrimonial. Solo consultas, no puedes editar ni crear bienes. Responde en español, breve y directo.
+const SYSTEM_PROMPT = `Eres asistente de inventario patrimonial. Respondes en español, breve y directo.
 Para saludos o preguntas generales responde DIRECTAMENTE sin usar herramientas.
 Usa herramientas SOLO cuando el usuario pregunta sobre bienes, inventario, responsables o ubicaciones específicas.
+EDICIONES: si el usuario pide cambiar estado, ubicación o responsable de un bien, usa proponer_edicion_bien. Tú NUNCA editas directamente: la herramienta muestra una tarjeta de confirmación y el usuario decide en pantalla. Tras proponer, di que revise y confirme en la tarjeta; NUNCA afirmes que el cambio ya se aplicó. No puedes crear ni eliminar bienes.
 SINÓNIMOS: laptop/PC, impresora, proyector, escritorio, silla, televisor, teléfono, vehículo.`
 
 async function callGeminiWithRetry(body: any, geminiKey: string) {
@@ -123,6 +139,9 @@ type AgentCard =
   | { tipo: 'bien'; payload: any }
   | { tipo: 'lista'; payload: { resultados: any[]; total: number } }
   | { tipo: 'conteo'; payload: { total: number; filtros: Record<string, unknown> } }
+  | { tipo: 'confirmacion'; payload: { bien: any; cambios: any[] } }
+
+const ESTADOS_VALIDOS = ['Nuevo', 'Bueno', 'Regular', 'Malo', 'Muy malo']
 
 async function ejecutarTool(
   nombre: string,
@@ -197,6 +216,87 @@ async function ejecutarTool(
       return {
         paraModelo: JSON.stringify({ total: count || 0, error: error?.message }),
         card: error ? undefined : { tipo: 'conteo', payload: { total: count || 0, filtros: args } },
+      }
+    }
+    if (nombre === 'proponer_edicion_bien') {
+      const { data: bien, error } = await supabase
+        .from('bienes')
+        .select('id, codigo_patrimonial, nombre_mueble_equipo, estado, ubicacion, id_trabajador, trabajadores(nombre)')
+        .eq('codigo_patrimonial', args.codigo)
+        .is('eliminado_at', null)
+        .maybeSingle()
+      if (error) return { paraModelo: JSON.stringify({ error: error.message }) }
+      if (!bien) return { paraModelo: JSON.stringify({ error: `No existe bien con código ${args.codigo}` }) }
+
+      const cambios: any[] = []
+
+      if (args.estado) {
+        const estadoNorm = ESTADOS_VALIDOS.find(
+          (e) => e.toLowerCase() === String(args.estado).trim().toLowerCase()
+        )
+        if (!estadoNorm) {
+          return { paraModelo: JSON.stringify({ error: `Estado inválido. Válidos: ${ESTADOS_VALIDOS.join(', ')}` }) }
+        }
+        if (estadoNorm !== bien.estado) {
+          cambios.push({
+            campo: 'estado',
+            valor_antes: bien.estado,
+            valor_despues: estadoNorm,
+            update: { estado: estadoNorm },
+          })
+        }
+      }
+
+      if (args.ubicacion) {
+        const nuevaUbicacion = String(args.ubicacion).trim()
+        if (nuevaUbicacion && nuevaUbicacion !== bien.ubicacion) {
+          cambios.push({
+            campo: 'ubicacion',
+            valor_antes: bien.ubicacion || null,
+            valor_despues: nuevaUbicacion,
+            update: { ubicacion: nuevaUbicacion },
+          })
+        }
+      }
+
+      if (args.nombre_responsable) {
+        const tokens = String(args.nombre_responsable).trim().split(/\s+/).filter((t: string) => t.length > 1)
+        let trabQ = supabase.from('trabajadores').select('id, nombre')
+        for (const tk of tokens) trabQ = trabQ.ilike('nombre', `%${tk}%`)
+        const { data: trab } = await trabQ
+        if (!trab || trab.length === 0) {
+          return { paraModelo: JSON.stringify({ error: `No se encontró trabajador que coincida con "${args.nombre_responsable}"` }) }
+        }
+        if (trab.length > 1) {
+          return {
+            paraModelo: JSON.stringify({
+              error: 'Coinciden varios trabajadores; pide al usuario precisar el nombre',
+              coincidencias: trab.slice(0, 5).map((t: any) => t.nombre),
+            }),
+          }
+        }
+        if (trab[0].id !== bien.id_trabajador) {
+          cambios.push({
+            campo: 'responsable',
+            valor_antes: (bien as any).trabajadores?.nombre || null,
+            valor_despues: trab[0].nombre,
+            update: { id_trabajador: trab[0].id },
+          })
+        }
+      }
+
+      if (cambios.length === 0) {
+        return { paraModelo: JSON.stringify({ mensaje: 'No hay cambios: los valores propuestos son iguales a los actuales (o no se indicó qué cambiar)' }) }
+      }
+
+      return {
+        paraModelo: JSON.stringify({
+          propuesta_mostrada: true,
+          bien: bien.codigo_patrimonial,
+          cambios: cambios.map((c) => ({ campo: c.campo, de: c.valor_antes, a: c.valor_despues })),
+          nota: 'El usuario debe confirmar en la tarjeta en pantalla. No afirmes que ya se aplicó.',
+        }),
+        card: { tipo: 'confirmacion', payload: { bien, cambios } },
       }
     }
     return { paraModelo: JSON.stringify({ error: 'Tool no encontrada' }) }

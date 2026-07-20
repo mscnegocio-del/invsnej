@@ -1,10 +1,12 @@
 # Estado actual — invsnej
-> Última actualización: 2026-07-20 (sesión 2: Fase 1 desplegada + fix de voz)
+> Última actualización: 2026-07-20 (sesión 2: Fase 1 en producción, protecciones de mic, inicio Fase 2)
 
 ## ✅ Completado
 - [x] Modo Agente Fase 1 EN PRODUCCIÓN (PR #5 mergeado): página `/agente` con voz y
       tarjetas ricas; Edge Function `ai-chat` v34 desplegada devolviendo `{ reply, cards }`
 - [x] Fix de dictado (PR #6 mergeado): dictado continuo, texto acumulado editable, botón Detener
+- [x] Protección de micrófono olvidado (PR #8 mergeado): inactividad 60 s, tope 3 min,
+      apagado en segundo plano, aviso en UI
 - [x] App de inventario en producción (Vercel `invsnej` + Supabase `inventario`), ~1900+ bienes
 - [x] CRUD de bienes, escaneo de barras (BarcodeDetector + Quagga2), duplicados, exports
 - [x] Multi-sede (`sedes`), catálogo SIGA (`siga_bienes`), historial (`bien_historial`)
@@ -16,10 +18,14 @@
 - [x] Verificado acceso MCP a Supabase (`hegtvsuscaaifqqhbbxq`) y Vercel (`prj_NUeYWSxaqzw5GgGrWrP13cjTvLSx`)
 
 ## 🔄 En progreso
-- [ ] Protección de micrófono olvidado (en PR abierto): auto-apagado por inactividad (60 s
-      sin voz), tope duro de 3 min de dictado continuo, y apagado al pasar la app a segundo
-      plano — con aviso ámbar en la UI explicando por qué se apagó. Tras merge: validar en
-      móvil real (Chrome Android / Safari iOS).
+- [ ] Fase 2 — ediciones con confirmación (en PR abierto): tool `proponer_edicion_bien` en
+      `ai-chat` (NO escribe; propone estado/ubicación/responsable y devuelve card
+      `confirmacion`), `ConfirmacionCard` en frontend con Confirmar/Cancelar. La escritura se
+      ejecuta CLIENT-SIDE con la sesión del usuario (RLS manda; rol consulta no puede) +
+      registro en `bien_historial`, reutilizando el patrón de QuickEditBienDialog.
+      Pendiente tras merge: desplegar `ai-chat` (nueva versión) y probar en producción.
+- [ ] Fase 2 restante: registro de bienes por voz/chat (quizá vía enlace a /registro
+      prellenado) — aún no implementado
 
 ## ⚠️ Decisiones de esta sesión
 - El Modo Agente usará la **API de Gemini ya existente** (Edge Function `ai-chat`), NO Anthropic
@@ -34,6 +40,6 @@
   (la usan solo las Edge Functions con service_role, pero queda expuesta a la anon key)
 
 ## 📌 Próximos pasos (próxima sesión)
-- Merge del PR #6 y validar el dictado corregido en campo (frases largas con pausas)
-- Recoger más feedback de la Fase 1 (tarjetas, sugerencias, calidad de respuestas de Gemini)
-- Iniciar Fase 2: tools de escritura con confirmación visual (Épica E2 en process/tasks.md)
+- Merge del PR de Fase 2, desplegar `ai-chat` y probar edición por voz en producción
+- Completar Fase 2: registro de bienes desde el chat
+- Luego Fase 3: exports/reportes desde el chat (Épica E3)
