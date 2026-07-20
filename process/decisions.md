@@ -7,6 +7,7 @@
 | Fases: 1 lectura+voz+tarjetas → 2 escritura con confirmación → 3 exports | 2026-07-20 | Lanzar escritura desde el inicio | Valor rápido sin riesgo; las acciones destructivas requieren confirmación visual |
 | Voz con Web Speech API del navegador | 2026-07-20 | STT de pago (Google/OpenAI/Deepgram) | Gratis, suficiente en móvil para español; swappable después |
 | Dictado nunca auto-envía: acumula en el campo de texto, editable, con Detener explícito | 2026-07-20 | Enviar al detectar pausa (primera versión) | Feedback de campo: las pausas naturales cortaban el mensaje y no había control visible |
+| Micrófono con auto-apagado: 60 s sin voz, tope 3 min, y al pasar a segundo plano | 2026-07-20 | Dejarlo activo hasta acción del usuario | Un mic olvidado transcribiría el entorno indefinidamente (privacidad + batería); una consulta nunca requiere más de 3 min |
 | Respuestas estructuradas `{ reply, data? }` desde la Edge Function | 2026-07-20 | Solo texto plano | Permite UI generativa (tarjetas de bienes) sin parsear texto |
 | Gemini 2.5 Flash, temperature 0.1, thinkingBudget 0, máx 5 iteraciones de tools | pre-2026-07 | — | Ya en producción en `ai-chat`; rápido y barato |
 | Auth sin contraseña: OTP correo + passkeys; aprobación manual de usuarios | pre-2026-07 | Contraseñas, SSO | Ver PRD.md §2; resistente a phishing, simple en móvil |

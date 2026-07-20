@@ -4,6 +4,7 @@
 ## ✅ Completado
 - [x] Modo Agente Fase 1 EN PRODUCCIÓN (PR #5 mergeado): página `/agente` con voz y
       tarjetas ricas; Edge Function `ai-chat` v34 desplegada devolviendo `{ reply, cards }`
+- [x] Fix de dictado (PR #6 mergeado): dictado continuo, texto acumulado editable, botón Detener
 - [x] App de inventario en producción (Vercel `invsnej` + Supabase `inventario`), ~1900+ bienes
 - [x] CRUD de bienes, escaneo de barras (BarcodeDetector + Quagga2), duplicados, exports
 - [x] Multi-sede (`sedes`), catálogo SIGA (`siga_bienes`), historial (`bien_historial`)
@@ -15,10 +16,10 @@
 - [x] Verificado acceso MCP a Supabase (`hegtvsuscaaifqqhbbxq`) y Vercel (`prj_NUeYWSxaqzw5GgGrWrP13cjTvLSx`)
 
 ## 🔄 En progreso
-- [ ] Fix de dictado por voz (PR #6, pendiente de merge): primer feedback de campo — el mic
-      enviaba al detectar pausa y no había botón de detener visible. Ahora: dictado continuo
-      con reanudación automática, texto acumulado en el campo (editable) y barra "Detener".
-      Tras merge: volver a probar en móvil real (Chrome Android / Safari iOS).
+- [ ] Protección de micrófono olvidado (en PR abierto): auto-apagado por inactividad (60 s
+      sin voz), tope duro de 3 min de dictado continuo, y apagado al pasar la app a segundo
+      plano — con aviso ámbar en la UI explicando por qué se apagó. Tras merge: validar en
+      móvil real (Chrome Android / Safari iOS).
 
 ## ⚠️ Decisiones de esta sesión
 - El Modo Agente usará la **API de Gemini ya existente** (Edge Function `ai-chat`), NO Anthropic

@@ -8,8 +8,10 @@
 5. [x] Enlace "Agente" en la navegación (Layout, todos los roles)
 6. [x] Desplegar Edge Function `ai-chat` actualizada (v34, activa)
 7. [x] Deploy frontend en producción (PR #5 mergeado, Vercel READY)
-8. [ ] Fix voz tras feedback de campo (PR #6): dictado continuo, texto editable, botón Detener
-9. [ ] Validar dictado corregido en móvil real y recoger más feedback de la Fase 1
+8. [x] Fix voz tras feedback de campo (PR #6 mergeado): dictado continuo, texto editable, botón Detener
+9. [ ] Protección de micrófono olvidado: timeout de inactividad (60 s), tope de sesión (3 min),
+       apagado en segundo plano, con aviso en la UI
+10. [ ] Validar dictado corregido en móvil real y recoger más feedback de la Fase 1
 
 ## Épica E2: Modo Agente — Fase 2 (acciones con confirmación) ⏳
 - Tools de escritura: editar estado/ubicación/responsable, registrar bien
