@@ -6,8 +6,10 @@
 3. [x] Extender `ai-chat` para devolver datos estructurados junto al texto (`{ reply, cards }`)
 4. [x] Renderizar tarjetas en el chat: ficha de bien, lista de resultados, conteo (`AgentCards.tsx`)
 5. [x] Enlace "Agente" en la navegación (Layout, todos los roles)
-6. [ ] Desplegar Edge Function `ai-chat` actualizada
-7. [ ] Probar en producción con casos reales de campo
+6. [x] Desplegar Edge Function `ai-chat` actualizada (v34, activa)
+7. [x] Deploy frontend en producción (PR #5 mergeado, Vercel READY)
+8. [ ] Fix voz tras feedback de campo (PR #6): dictado continuo, texto editable, botón Detener
+9. [ ] Validar dictado corregido en móvil real y recoger más feedback de la Fase 1
 
 ## Épica E2: Modo Agente — Fase 2 (acciones con confirmación) ⏳
 - Tools de escritura: editar estado/ubicación/responsable, registrar bien

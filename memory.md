@@ -1,7 +1,9 @@
 # Estado actual — invsnej
-> Última actualización: 2026-07-20
+> Última actualización: 2026-07-20 (sesión 2: Fase 1 desplegada + fix de voz)
 
 ## ✅ Completado
+- [x] Modo Agente Fase 1 EN PRODUCCIÓN (PR #5 mergeado): página `/agente` con voz y
+      tarjetas ricas; Edge Function `ai-chat` v34 desplegada devolviendo `{ reply, cards }`
 - [x] App de inventario en producción (Vercel `invsnej` + Supabase `inventario`), ~1900+ bienes
 - [x] CRUD de bienes, escaneo de barras (BarcodeDetector + Quagga2), duplicados, exports
 - [x] Multi-sede (`sedes`), catálogo SIGA (`siga_bienes`), historial (`bien_historial`)
@@ -13,17 +15,17 @@
 - [x] Verificado acceso MCP a Supabase (`hegtvsuscaaifqqhbbxq`) y Vercel (`prj_NUeYWSxaqzw5GgGrWrP13cjTvLSx`)
 
 ## 🔄 En progreso
-- [ ] Modo Agente Fase 1: **código implementado** (rama `claude/harness-setup-mcp-access-1b5deu`, PR #4):
-      ruta `/agente` (página completa con voz Web Speech API es-PE), tarjetas ricas
-      (`AgentCards.tsx`: ficha de bien, lista, conteo), `ai-chat` devuelve `{ reply, cards }`.
-      Pendiente: merge del PR y **desplegar la Edge Function `ai-chat`**
-      (`supabase functions deploy ai-chat` o vía MCP) — el cambio es retrocompatible
-      (AIChatPanel ignora `cards`). Luego probar en producción.
+- [ ] Fix de dictado por voz (PR #6, pendiente de merge): primer feedback de campo — el mic
+      enviaba al detectar pausa y no había botón de detener visible. Ahora: dictado continuo
+      con reanudación automática, texto acumulado en el campo (editable) y barra "Detener".
+      Tras merge: volver a probar en móvil real (Chrome Android / Safari iOS).
 
 ## ⚠️ Decisiones de esta sesión
 - El Modo Agente usará la **API de Gemini ya existente** (Edge Function `ai-chat`), NO Anthropic
 - Se construye como evolución de `ai-chat`/`AIChatPanel`, no como sistema paralelo
 - Fases: 1) solo lectura + voz + tarjetas ricas, 2) acciones con confirmación, 3) exports/reportes
+- UX de voz: el dictado NUNCA se envía solo — se acumula en el campo de texto y el usuario
+  revisa/edita y envía; detener es siempre acción explícita del usuario
 
 ## 🔴 Bloqueantes
 - Ninguno. Nota de seguridad pendiente de decidir: la tabla `auth_webauthn_challenges` tiene
@@ -31,6 +33,6 @@
   (la usan solo las Edge Functions con service_role, pero queda expuesta a la anon key)
 
 ## 📌 Próximos pasos (próxima sesión)
-- Implementar Fase 1 del Modo Agente: ruta `/agente`, UI conversacional a pantalla completa,
-  entrada por voz (Web Speech API), respuestas con tarjetas de bienes reutilizando componentes
-- Extender `ai-chat` para devolver datos estructurados (no solo texto) que el frontend renderice
+- Merge del PR #6 y validar el dictado corregido en campo (frases largas con pausas)
+- Recoger más feedback de la Fase 1 (tarjetas, sugerencias, calidad de respuestas de Gemini)
+- Iniciar Fase 2: tools de escritura con confirmación visual (Épica E2 en process/tasks.md)
