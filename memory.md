@@ -13,8 +13,12 @@
 - [x] Verificado acceso MCP a Supabase (`hegtvsuscaaifqqhbbxq`) y Vercel (`prj_NUeYWSxaqzw5GgGrWrP13cjTvLSx`)
 
 ## 🔄 En progreso
-- [ ] Modo Agente (`/agente`): definición aprobada por el usuario, pendiente implementar Fase 1
-      (ver process/tasks.md — Épica E1)
+- [ ] Modo Agente Fase 1: **código implementado** (rama `claude/harness-setup-mcp-access-1b5deu`, PR #4):
+      ruta `/agente` (página completa con voz Web Speech API es-PE), tarjetas ricas
+      (`AgentCards.tsx`: ficha de bien, lista, conteo), `ai-chat` devuelve `{ reply, cards }`.
+      Pendiente: merge del PR y **desplegar la Edge Function `ai-chat`**
+      (`supabase functions deploy ai-chat` o vía MCP) — el cambio es retrocompatible
+      (AIChatPanel ignora `cards`). Luego probar en producción.
 
 ## ⚠️ Decisiones de esta sesión
 - El Modo Agente usará la **API de Gemini ya existente** (Edge Function `ai-chat`), NO Anthropic

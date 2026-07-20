@@ -16,6 +16,7 @@ import {
   RefreshCw,
   ClipboardList,
   Bot,
+  Sparkles,
   Database,
   SearchIcon,
 } from 'lucide-react'
@@ -37,6 +38,7 @@ const navItemsAll: {
   { to: '/', label: 'Inicio', Icon: Home, roles: ['admin', 'operador', 'consulta'] },
   { to: '/scan', label: 'Escanear', Icon: ScanLine, roles: ['admin', 'operador'] },
   { to: '/search', label: 'Buscar', Icon: Search, roles: ['admin', 'operador', 'consulta'] },
+  { to: '/agente', label: 'Agente', Icon: Sparkles, roles: ['admin', 'operador', 'consulta'] },
   { to: '/siga-pj', label: 'SIGA PJ', Icon: Database, roles: ['admin', 'operador', 'consulta'] },
   { to: '/trabajadores', label: 'Trabajadores', Icon: Users, roles: ['admin'] },
   { to: '/admin', label: 'Administración', Icon: Shield, roles: ['admin'] },

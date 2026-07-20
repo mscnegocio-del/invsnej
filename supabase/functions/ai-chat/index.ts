@@ -118,7 +118,17 @@ async function callGeminiWithRetry(body: any, geminiKey: string) {
   throw lastError || new Error('Gemini API: Max retries exceeded')
 }
 
-async function ejecutarTool(nombre: string, args: any, supabase: any): Promise<string> {
+// Tarjeta estructurada que el frontend renderiza como UI (ficha, lista o conteo)
+type AgentCard =
+  | { tipo: 'bien'; payload: any }
+  | { tipo: 'lista'; payload: { resultados: any[]; total: number } }
+  | { tipo: 'conteo'; payload: { total: number; filtros: Record<string, unknown> } }
+
+async function ejecutarTool(
+  nombre: string,
+  args: any,
+  supabase: any
+): Promise<{ paraModelo: string; card?: AgentCard }> {
   try {
     if (nombre === 'buscar_bien_por_codigo') {
       const { data, error } = await supabase
@@ -127,8 +137,11 @@ async function ejecutarTool(nombre: string, args: any, supabase: any): Promise<s
         .eq('codigo_patrimonial', args.codigo)
         .is('eliminado_at', null)
         .maybeSingle()
-      if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ resultado: data || null })
+      if (error) return { paraModelo: JSON.stringify({ error: error.message }) }
+      return {
+        paraModelo: JSON.stringify({ resultado: data || null }),
+        card: data ? { tipo: 'bien', payload: data } : undefined,
+      }
     }
     if (nombre === 'buscar_bienes' || nombre === 'listar_bienes_por_responsable') {
       const limit = Math.min(args.limit ?? 10, 50)
@@ -147,12 +160,18 @@ async function ejecutarTool(nombre: string, args: any, supabase: any): Promise<s
         for (const tk of tokens) trabQ = trabQ.ilike('nombre', `%${tk}%`)
         const { data: trab } = await trabQ
         const ids = (trab || []).map((t: any) => t.id)
-        if (ids.length === 0) return JSON.stringify({ resultados: [], total: 0 })
+        if (ids.length === 0) return { paraModelo: JSON.stringify({ resultados: [], total: 0 }) }
         query = query.in('id_trabajador', ids)
       }
       const { data, error } = await query
-      if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ resultados: data?.slice(0, 10) || [], total: data?.length || 0 })
+      if (error) return { paraModelo: JSON.stringify({ error: error.message }) }
+      const resultados = data?.slice(0, 10) || []
+      return {
+        paraModelo: JSON.stringify({ resultados, total: data?.length || 0 }),
+        card: resultados.length > 0
+          ? { tipo: 'lista', payload: { resultados, total: data?.length || 0 } }
+          : undefined,
+      }
     }
     if (nombre === 'contar_bienes') {
       let query = supabase.from('bienes').select('id', { count: 'exact', head: true }).is('eliminado_at', null)
@@ -166,15 +185,23 @@ async function ejecutarTool(nombre: string, args: any, supabase: any): Promise<s
         for (const tk of tokens) trabQ = trabQ.ilike('nombre', `%${tk}%`)
         const { data: trab } = await trabQ
         const ids = (trab || []).map((t: any) => t.id)
-        if (ids.length === 0) return JSON.stringify({ total: 0 })
+        if (ids.length === 0) {
+          return {
+            paraModelo: JSON.stringify({ total: 0 }),
+            card: { tipo: 'conteo', payload: { total: 0, filtros: args } },
+          }
+        }
         query = query.in('id_trabajador', ids)
       }
       const { count, error } = await query
-      return JSON.stringify({ total: count || 0, error: error?.message })
+      return {
+        paraModelo: JSON.stringify({ total: count || 0, error: error?.message }),
+        card: error ? undefined : { tipo: 'conteo', payload: { total: count || 0, filtros: args } },
+      }
     }
-    return JSON.stringify({ error: 'Tool no encontrada' })
+    return { paraModelo: JSON.stringify({ error: 'Tool no encontrada' }) }
   } catch (e: any) {
-    return JSON.stringify({ error: e.message })
+    return { paraModelo: JSON.stringify({ error: e.message }) }
   }
 }
 
@@ -205,6 +232,7 @@ Deno.serve(async (req) => {
 
     let finalReply = ''
     let currentContents = [...contents]
+    const cards: AgentCard[] = []
 
     for (let i = 0; i < MAX_ITERACIONES; i++) {
       const data = await callGeminiWithRetry(
@@ -235,12 +263,13 @@ Deno.serve(async (req) => {
       if (toolCalls.length > 0) {
         const toolResults: any[] = []
         for (const tc of toolCalls) {
-          const result = await ejecutarTool(tc.functionCall.name, tc.functionCall.args, supabase)
-          console.log(`Tool ${tc.functionCall.name}: ${result.substring(0, 100)}`)
+          const { paraModelo, card } = await ejecutarTool(tc.functionCall.name, tc.functionCall.args, supabase)
+          console.log(`Tool ${tc.functionCall.name}: ${paraModelo.substring(0, 100)}`)
+          if (card) cards.push(card)
           toolResults.push({
             functionResponse: {
               name: tc.functionCall.name,
-              response: { content: result }
+              response: { content: paraModelo }
             }
           })
         }
@@ -268,7 +297,7 @@ Deno.serve(async (req) => {
       finalReply = fbParts.find((p: any) => p.text && !p.thought)?.text || 'No pude obtener una respuesta. Intenta de nuevo.'
     }
 
-    return new Response(JSON.stringify({ reply: finalReply }), {
+    return new Response(JSON.stringify({ reply: finalReply, cards }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 

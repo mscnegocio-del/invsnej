@@ -1,11 +1,17 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
+export type AgentCard =
+  | { tipo: 'bien'; payload: Record<string, unknown> }
+  | { tipo: 'lista'; payload: { resultados: Record<string, unknown>[]; total: number } }
+  | { tipo: 'conteo'; payload: { total: number; filtros: Record<string, unknown> } }
+
 export type ChatMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  cards?: AgentCard[]
 }
 
 type ApiMessage = {
@@ -59,6 +65,7 @@ export function useAIChat() {
         role: 'assistant',
         content: reply,
         timestamp: new Date(),
+        cards: Array.isArray(res.data?.cards) ? (res.data.cards as AgentCard[]) : undefined,
       }
 
       setMessages((prev) => [...prev, assistantMsg])
