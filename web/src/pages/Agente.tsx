@@ -36,8 +36,9 @@ export function Agente() {
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  // El dictado se acumula en el campo de texto; el usuario revisa y envía
   const voz = useSpeechRecognition((texto) => {
-    void sendMessage(texto)
+    setInput((prev) => (prev ? `${prev} ${texto}` : texto))
   })
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export function Agente() {
 
   const handleSend = () => {
     if (!input.trim() || loading) return
+    if (voz.listening) voz.stop()
     void sendMessage(input)
     setInput('')
   }
@@ -147,14 +149,6 @@ export function Agente() {
           </div>
         ))}
 
-        {voz.listening && (
-          <div className="flex justify-end">
-            <div className="max-w-[80%] rounded-2xl rounded-br-sm bg-primary/10 px-4 py-2.5 text-sm text-muted-foreground italic">
-              {voz.interim || 'Escuchando…'}
-            </div>
-          </div>
-        )}
-
         {loading && <TypingIndicator />}
 
         {(error || voz.error) && (
@@ -169,6 +163,26 @@ export function Agente() {
 
       {/* Entrada */}
       <div className="pt-3 border-t border-border shrink-0">
+        {voz.listening && (
+          <div className="mb-2 flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-destructive" />
+            </span>
+            <p className="flex-1 min-w-0 truncate text-xs text-muted-foreground italic">
+              {voz.interim || 'Escuchando… habla con calma, toca el micrófono rojo para detener'}
+            </p>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={voz.stop}
+              className="h-7 px-2 text-xs shrink-0"
+            >
+              <MicOff className="h-3.5 w-3.5 mr-1" />
+              Detener
+            </Button>
+          </div>
+        )}
         <div className="flex gap-2 items-end">
           {voz.supported && (
             <Button
@@ -186,10 +200,10 @@ export function Agente() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={voz.listening ? 'Escuchando…' : 'Pide lo que necesites…'}
+            placeholder={voz.listening ? 'Dictando… lo que digas aparecerá aquí' : 'Pide lo que necesites…'}
             rows={1}
             className="flex-1 min-w-0 resize-none min-h-[40px] max-h-[120px] text-base sm:text-sm"
-            disabled={loading || voz.listening}
+            disabled={loading}
           />
           <Button
             size="icon"

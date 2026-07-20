@@ -17,17 +17,21 @@ function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null
 }
 
-export function useSpeechRecognition(onFinalResult: (texto: string) => void) {
+// Dictado continuo: acumula texto final vía onSegment y solo termina cuando el
+// usuario detiene el micrófono (o el navegador corta por silencio prolongado).
+export function useSpeechRecognition(onSegment: (texto: string) => void) {
   const [listening, setListening] = useState(false)
   const [interim, setInterim] = useState('')
   const [error, setError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
-  const onFinalRef = useRef(onFinalResult)
-  onFinalRef.current = onFinalResult
+  const stopRequestedRef = useRef(false)
+  const onSegmentRef = useRef(onSegment)
+  onSegmentRef.current = onSegment
 
   const supported = getSpeechRecognition() !== null
 
   const stop = useCallback(() => {
+    stopRequestedRef.current = true
     recognitionRef.current?.stop()
   }, [])
 
@@ -36,10 +40,11 @@ export function useSpeechRecognition(onFinalResult: (texto: string) => void) {
     if (!Ctor || listening) return
     setError(null)
     setInterim('')
+    stopRequestedRef.current = false
 
     const rec = new Ctor()
     rec.lang = 'es-PE'
-    rec.continuous = false
+    rec.continuous = true
     rec.interimResults = true
 
     rec.onresult = (event: any) => {
@@ -50,11 +55,8 @@ export function useSpeechRecognition(onFinalResult: (texto: string) => void) {
         if (r.isFinal) finalText += r[0].transcript
         else interimText += r[0].transcript
       }
-      if (interimText) setInterim(interimText)
-      if (finalText.trim()) {
-        setInterim('')
-        onFinalRef.current(finalText.trim())
-      }
+      setInterim(interimText)
+      if (finalText.trim()) onSegmentRef.current(finalText.trim())
     }
     rec.onerror = (event: any) => {
       if (event.error === 'not-allowed') setError('Permiso de micrófono denegado')
@@ -63,9 +65,27 @@ export function useSpeechRecognition(onFinalResult: (texto: string) => void) {
       }
     }
     rec.onend = () => {
-      setListening(false)
-      setInterim('')
       recognitionRef.current = null
+      setInterim('')
+      // Algunos navegadores cortan solos tras unos segundos de silencio;
+      // si el usuario no pidió detener, reanudar para mantener el dictado activo.
+      if (!stopRequestedRef.current) {
+        try {
+          const again = new Ctor()
+          again.lang = rec.lang
+          again.continuous = true
+          again.interimResults = true
+          again.onresult = rec.onresult
+          again.onerror = rec.onerror
+          again.onend = rec.onend
+          recognitionRef.current = again
+          again.start()
+          return
+        } catch {
+          /* si falla la reanudación, terminar normalmente */
+        }
+      }
+      setListening(false)
     }
 
     recognitionRef.current = rec
@@ -73,7 +93,13 @@ export function useSpeechRecognition(onFinalResult: (texto: string) => void) {
     rec.start()
   }, [listening])
 
-  useEffect(() => () => recognitionRef.current?.abort(), [])
+  useEffect(
+    () => () => {
+      stopRequestedRef.current = true
+      recognitionRef.current?.abort()
+    },
+    []
+  )
 
   return { supported, listening, interim, error, start, stop }
 }
