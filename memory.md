@@ -36,8 +36,12 @@
       botón "Inicio" explícito, ⌘K con grupo "Secciones" (`web/src/lib/navSections.ts`)
 
 ## 🔄 En progreso
-- [ ] Fase 2 restante: registro de bienes por voz/chat (quizá vía enlace a /registro
-      prellenado) — aún no implementado
+- [ ] Fase 2 restante — registro de bienes por chat: IMPLEMENTADO en rama
+      `claude/lee-agents-docs-rd38um` (pendiente PR/merge). Edge Function `ai-chat` v36 ya
+      desplegada con tool `proponer_registro_bien` (valida código duplicado, resuelve
+      responsable/ubicación); frontend: tarjeta "Registro propuesto" (`RegistroCard`) con
+      botón que abre `/registro` prellenado vía params `pre_*` en `BienForm`. El agente
+      nunca inserta: el guardado pasa por el formulario real (validación + RLS).
 
 ## ⚠️ Decisiones de esta sesión
 - `/agente-v2` PROBADO EN CAMPO y funciona correctamente, pero QUEDA OCULTO (sin enlace
