@@ -158,6 +158,18 @@ export function BienDetail() {
   const ejecutarDelete = async () => {
     if (!id || !bien) return
     setDeleting(true)
+    // Primero la eliminación real: si falla, no debe quedar un registro de "Baja"
+    // en el historial sin que el bien se haya eliminado de verdad.
+    const { error: supaError } = await supabase
+      .from('bienes')
+      .update({ eliminado_at: new Date().toISOString() })
+      .eq('id', id)
+    if (supaError) {
+      console.error(supaError)
+      setDeleting(false)
+      setError('No se pudo eliminar el bien. Intenta nuevamente.')
+      return
+    }
     const { error: histErr } = await supabase.from('bien_historial').insert({
       bien_id: bien.id,
       campo: 'eliminacion',
@@ -167,22 +179,8 @@ export function BienDetail() {
       usuario_email: user?.email ?? null,
       accion: 'eliminacion',
     })
-    if (histErr) {
-      console.error(histErr)
-      setDeleting(false)
-      setError('No se pudo registrar la eliminación. Intenta nuevamente.')
-      return
-    }
-    const { error: supaError } = await supabase
-      .from('bienes')
-      .update({ eliminado_at: new Date().toISOString() })
-      .eq('id', id)
     setDeleting(false)
-    if (supaError) {
-      console.error(supaError)
-      setError('No se pudo eliminar el bien. Intenta nuevamente.')
-      return
-    }
+    if (histErr) console.error(histErr)
     navigate('/', { replace: true })
   }
 
