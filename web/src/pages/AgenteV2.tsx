@@ -116,21 +116,32 @@ function RegistroPropuestoCard({ payload }: { payload: RegistroPropuesto }) {
   const params = new URLSearchParams()
   params.set('retorno', '/agente-v2')
   if (payload.codigo) params.set('codigo', payload.codigo)
-  params.set('pre_nombre', payload.nombre)
   if (payload.tipo) params.set('pre_tipo', payload.tipo)
   if (payload.estado) params.set('pre_estado', payload.estado)
-  if (payload.marca) params.set('pre_marca', payload.marca)
-  if (payload.modelo) params.set('pre_modelo', payload.modelo)
-  if (payload.serie) params.set('pre_serie', payload.serie)
-  if (payload.orden_compra) params.set('pre_oc', payload.orden_compra)
-  if (payload.valor != null) params.set('pre_valor', String(payload.valor))
   if (payload.id_trabajador != null) params.set('pre_trabajador', String(payload.id_trabajador))
   if (payload.id_ubicacion != null) params.set('pre_ubicacion', String(payload.id_ubicacion))
+  // Código coincidió en SIGA: datos técnicos van como siga_* (igual que el registro
+  // manual en Scan.tsx), priorizados por BienForm sobre cualquier otro valor.
+  if (payload.desde_siga) {
+    params.set('siga_descripcion', payload.nombre)
+    if (payload.marca) params.set('siga_marca', payload.marca)
+    if (payload.modelo) params.set('siga_modelo', payload.modelo)
+    if (payload.serie) params.set('siga_serie', payload.serie)
+    if (payload.orden_compra) params.set('siga_oc', payload.orden_compra)
+    if (payload.valor != null) params.set('siga_valor', String(payload.valor))
+  } else {
+    params.set('pre_nombre', payload.nombre)
+    if (payload.marca) params.set('pre_marca', payload.marca)
+    if (payload.modelo) params.set('pre_modelo', payload.modelo)
+    if (payload.serie) params.set('pre_serie', payload.serie)
+    if (payload.orden_compra) params.set('pre_oc', payload.orden_compra)
+    if (payload.valor != null) params.set('pre_valor', String(payload.valor))
+  }
 
   return (
     <div className="av2-panel warn">
       <div className="av2-confirm-title">
-        <span>⚠ Registro propuesto</span>
+        <span>⚠ Registro propuesto{payload.desde_siga ? ' · Desde SIGA' : ''}</span>
       </div>
       <div className="av2-nombre">{payload.nombre}</div>
       {detalles.map(([label, valor]) => (

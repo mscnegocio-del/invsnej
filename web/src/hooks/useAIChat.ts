@@ -38,6 +38,7 @@ export type RegistroPropuesto = {
   nombre_responsable?: string
   id_ubicacion?: number
   ubicacion_nombre?: string
+  desde_siga?: boolean
 }
 
 export type AgentCard =

@@ -115,7 +115,7 @@ const SYSTEM_PROMPT = `Eres asistente de inventario patrimonial. Respondes en es
 Para saludos o preguntas generales responde DIRECTAMENTE sin usar herramientas.
 Usa herramientas SOLO cuando el usuario pregunta sobre bienes, inventario, responsables o ubicaciones específicas.
 EDICIONES: si el usuario pide cambiar estado, ubicación o responsable de un bien, usa proponer_edicion_bien. Tú NUNCA editas directamente: la herramienta muestra una tarjeta de confirmación y el usuario decide en pantalla. Tras proponer, di que revise y confirme en la tarjeta; NUNCA afirmes que el cambio ya se aplicó.
-REGISTROS: si el usuario pide registrar/agregar/dar de alta un bien NUEVO, usa proponer_registro_bien con los datos que mencione (basta el nombre). Tú NUNCA creas el bien: la tarjeta abre el formulario de registro prellenado y el usuario completa (código, responsable) y guarda ahí. Tras proponer, di que abra el formulario desde la tarjeta; NUNCA afirmes que ya se registró. No puedes eliminar bienes.
+REGISTROS: si el usuario pide registrar/agregar/dar de alta un bien NUEVO, usa proponer_registro_bien con los datos que mencione (basta el nombre). Si el usuario da el código patrimonial, la herramienta consulta SIGA automáticamente y esos datos (marca, modelo, serie, OC, valor) mandan sobre lo que el usuario haya dicho; si la respuesta indica datos_desde_siga, menciónalo brevemente. Tú NUNCA creas el bien: la tarjeta abre el formulario de registro prellenado y el usuario completa (código, responsable) y guarda ahí. Tras proponer, di que abra el formulario desde la tarjeta; NUNCA afirmes que ya se registró. No puedes eliminar bienes.
 SINÓNIMOS: laptop/PC, impresora, proyector, escritorio, silla, televisor, teléfono, vehículo.`
 
 async function callGeminiWithRetry(body: any, geminiKey: string) {
@@ -179,6 +179,7 @@ type RegistroPropuesto = {
   nombre_responsable?: string
   id_ubicacion?: number
   ubicacion_nombre?: string
+  desde_siga?: boolean
 }
 
 const ESTADOS_VALIDOS = ['Nuevo', 'Bueno', 'Regular', 'Malo', 'Muy malo']
@@ -343,7 +344,11 @@ async function ejecutarTool(
       const propuesta: RegistroPropuesto = { nombre: String(args.nombre).trim() }
       if (!propuesta.nombre) return { paraModelo: JSON.stringify({ error: 'Falta el nombre del bien' }) }
 
-      // Código: si viene, verificar que no exista ya (duplicado)
+      let siga: { descripcion?: string; marca?: string; modelo?: string; serie?: string; orden_compra?: string; valor?: number } | null = null
+
+      // Código: si viene, verificar que no exista ya (duplicado) y, como en el
+      // registro manual (ver Scan.tsx), consultar SIGA — es la fuente autorizada
+      // de marca/modelo/serie/OC/valor/descripción para ese código específico.
       if (args.codigo) {
         const codigo = String(args.codigo).trim()
         const { data: existente } = await supabase
@@ -361,6 +366,16 @@ async function ejecutarTool(
           }
         }
         propuesta.codigo = codigo
+
+        const { data: sigaData } = await supabase
+          .from('siga_bienes')
+          .select('descripcion, marca, modelo, serie, orden_compra, valor')
+          .eq('codigo_patrimonial', codigo)
+          .maybeSingle()
+        if (sigaData) {
+          siga = sigaData
+          propuesta.desde_siga = true
+        }
       }
 
       if (args.estado) {
@@ -403,17 +418,24 @@ async function ejecutarTool(
       }
 
       if (args.tipo) propuesta.tipo = String(args.tipo).trim()
-      if (args.marca) propuesta.marca = String(args.marca).trim()
-      if (args.modelo) propuesta.modelo = String(args.modelo).trim()
-      if (args.serie) propuesta.serie = String(args.serie).trim()
-      if (args.orden_compra) propuesta.orden_compra = String(args.orden_compra).trim()
-      if (typeof args.valor === 'number' && args.valor >= 0) propuesta.valor = args.valor
+
+      // Datos técnicos: si el código coincidió en SIGA, esos datos mandan
+      // (son los del catálogo oficial); si no, se usa lo que dijo el usuario.
+      if (siga?.descripcion) propuesta.nombre = siga.descripcion
+      propuesta.marca = siga?.marca || (args.marca ? String(args.marca).trim() : undefined)
+      propuesta.modelo = siga?.modelo || (args.modelo ? String(args.modelo).trim() : undefined)
+      propuesta.serie = siga?.serie || (args.serie ? String(args.serie).trim() : undefined)
+      propuesta.orden_compra = siga?.orden_compra || (args.orden_compra ? String(args.orden_compra).trim() : undefined)
+      propuesta.valor = siga?.valor ?? (typeof args.valor === 'number' && args.valor >= 0 ? args.valor : undefined)
 
       return {
         paraModelo: JSON.stringify({
           propuesta_mostrada: true,
           datos: propuesta,
-          nota: 'El usuario debe abrir el formulario desde la tarjeta, completar lo que falte (código, responsable) y guardar. No afirmes que ya se registró.',
+          datos_desde_siga: !!siga,
+          nota: siga
+            ? 'El código coincidió con un registro en SIGA: los datos técnicos (marca, modelo, serie, OC, valor y/o nombre) se completaron desde ahí. Menciónalo brevemente. El usuario debe abrir el formulario desde la tarjeta, revisar, completar lo que falte (responsable) y guardar. No afirmes que ya se registró.'
+            : 'El usuario debe abrir el formulario desde la tarjeta, completar lo que falte (código, responsable) y guardar. No afirmes que ya se registró.',
         }),
         card: { tipo: 'registro', payload: propuesta },
       }

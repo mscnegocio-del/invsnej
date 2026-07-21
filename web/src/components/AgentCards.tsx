@@ -272,16 +272,28 @@ function registroUrl(p: RegistroPropuesto, retorno: string): string {
   const params = new URLSearchParams()
   params.set('retorno', retorno)
   if (p.codigo) params.set('codigo', p.codigo)
-  params.set('pre_nombre', p.nombre)
   if (p.tipo) params.set('pre_tipo', p.tipo)
   if (p.estado) params.set('pre_estado', p.estado)
-  if (p.marca) params.set('pre_marca', p.marca)
-  if (p.modelo) params.set('pre_modelo', p.modelo)
-  if (p.serie) params.set('pre_serie', p.serie)
-  if (p.orden_compra) params.set('pre_oc', p.orden_compra)
-  if (p.valor != null) params.set('pre_valor', String(p.valor))
   if (p.id_trabajador != null) params.set('pre_trabajador', String(p.id_trabajador))
   if (p.id_ubicacion != null) params.set('pre_ubicacion', String(p.id_ubicacion))
+  // Si el código coincidió en SIGA, los datos técnicos van como siga_* — igual que
+  // el registro manual (Scan.tsx) — para que BienForm muestre el badge "Desde SIGA"
+  // y priorice estos valores sobre cualquier otro dato.
+  if (p.desde_siga) {
+    params.set('siga_descripcion', p.nombre)
+    if (p.marca) params.set('siga_marca', p.marca)
+    if (p.modelo) params.set('siga_modelo', p.modelo)
+    if (p.serie) params.set('siga_serie', p.serie)
+    if (p.orden_compra) params.set('siga_oc', p.orden_compra)
+    if (p.valor != null) params.set('siga_valor', String(p.valor))
+  } else {
+    params.set('pre_nombre', p.nombre)
+    if (p.marca) params.set('pre_marca', p.marca)
+    if (p.modelo) params.set('pre_modelo', p.modelo)
+    if (p.serie) params.set('pre_serie', p.serie)
+    if (p.orden_compra) params.set('pre_oc', p.orden_compra)
+    if (p.valor != null) params.set('pre_valor', String(p.valor))
+  }
   return `/registro?${params.toString()}`
 }
 
@@ -307,6 +319,9 @@ function RegistroCard({ payload }: { payload: RegistroPropuesto }) {
         <p className="text-xs font-semibold text-foreground flex-1 min-w-0 truncate">
           Registro propuesto
         </p>
+        {payload.desde_siga && (
+          <Badge variant="warning" className="shrink-0">Desde SIGA</Badge>
+        )}
       </div>
       <p className="text-sm font-medium text-foreground">{payload.nombre}</p>
       {detalles.length > 0 && (
