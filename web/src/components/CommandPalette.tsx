@@ -4,6 +4,8 @@ import { Building2, MapPin, User } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useCatalogs } from '../context/CatalogContext'
 import { useSede } from '../context/SedeContext'
+import { useAuth } from '../context/AuthContext'
+import { navSections } from '../lib/navSections'
 import {
   CommandDialog, CommandInput, CommandList, CommandEmpty,
   CommandGroup, CommandItem, CommandSeparator,
@@ -39,6 +41,9 @@ export function CommandPalette({ open, onOpenChange }: Props) {
   const navigate = useNavigate()
   const { trabajadores, ubicaciones } = useCatalogs()
   const { sedeActiva } = useSede()
+  const { perfil } = useAuth()
+  const role = perfil?.app_role ?? 'consulta'
+  const secciones = navSections.filter((s) => s.roles.includes(role))
 
   const [query, setQuery] = useState('')
   const [bienes, setBienes] = useState<BienHit[]>([])
@@ -110,6 +115,11 @@ export function CommandPalette({ open, onOpenChange }: Props) {
     navigate(`/search?ubicacion=${encodeURIComponent(nombre)}`)
   }
 
+  const handleSelectSeccion = (to: string) => {
+    onOpenChange(false)
+    navigate(to)
+  }
+
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput
@@ -118,9 +128,24 @@ export function CommandPalette({ open, onOpenChange }: Props) {
         onValueChange={setQuery}
       />
       <CommandList>
+        <CommandGroup heading="Secciones">
+          {secciones.map(({ to, label, Icon }) => (
+            <CommandItem
+              key={to}
+              value={`seccion-${label}`}
+              onSelect={() => handleSelectSeccion(to)}
+              className="gap-3 cursor-pointer"
+            >
+              <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="text-sm">{label}</span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+        <CommandSeparator />
+
         {query.trim().length < 2 && (
           <CommandEmpty className="text-muted-foreground text-sm py-8">
-            Escribe al menos 2 caracteres para buscar.
+            Escribe al menos 2 caracteres para buscar bienes, responsables o ubicaciones.
           </CommandEmpty>
         )}
 

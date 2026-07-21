@@ -13,12 +13,23 @@ invsnej/
 │   └── admin-users/        ← gestión de usuarios (invitar, aprobar, suspender)
 └── web/                    ← app Vite + React 19
     └── src/
-        ├── pages/          ← Home, Scan, Registro, Search, BienDetail, EditarBien,
-        │                     Trabajadores, SigaPJ, Admin, Login, Security, SedeSelector, AuthCallback
-        ├── components/     ← AIChatPanel, BarcodeScanner/Modal, BienForm, guards, ui/ (shadcn)
-        ├── hooks/          ← useAIChat, useBarcodeScanner, useWebAuthn
-        ├── context/, lib/, types.ts
+        ├── pages/          ← Home (hub único), Scan, Registro, Search, BienDetail, EditarBien,
+        │                     Trabajadores, SigaPJ, Admin, Login, Security, SedeSelector,
+        │                     AuthCallback, Agente, AgenteV2 (+ agente-v2.css)
+        ├── components/     ← AIChatPanel, AgentCards, BarcodeScanner/Modal, BienForm,
+        │                     CommandPalette (⌘K, incluye "Secciones"), Layout (sin sidebar/
+        │                     bottom-nav — barra superior única), guards, ui/ (shadcn)
+        ├── hooks/          ← useAIChat, useSpeechRecognition, useBarcodeScanner, useWebAuthn
+        ├── context/, lib/ (incl. navSections.ts), types.ts
 ```
+
+## Navegación (post-rediseño 2026-07-21)
+No hay sidebar de escritorio ni bottom-nav de móvil. `Layout.tsx` es una sola barra
+superior (igual en ambos breakpoints) con: logo → Home, botón "Inicio" (Link a `/`, visible
+solo fuera de Home — reemplaza el `navigate(-1)` anterior), ⌘K, chat IA, tema, sede, usuario,
+salir. **Home es el hub único**: todas las secciones son tarjetas ahí. `web/src/lib/
+navSections.ts` es la fuente de las rutas para el grupo "Secciones" de `CommandPalette`
+(⌘K), filtrado por rol — es el mecanismo de navegación rápida para desktop.
 
 ## Flujo del chat IA actual (base del Modo Agente)
 1. `AIChatPanel` (UI) → `useAIChat` → `supabase.functions.invoke('ai-chat', { messages })`

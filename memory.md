@@ -1,5 +1,5 @@
 # Estado actual — invsnej
-> Última actualización: 2026-07-20 (sesión 2: Fase 1+2 en producción, /agente-v2 experimental HUD)
+> Última actualización: 2026-07-21 (sesión 2: Fase 1+2 en producción, /agente-v2 experimental, Home como hub único)
 
 ## ✅ Completado
 - [x] Modo Agente Fase 1 EN PRODUCCIÓN (PR #5 mergeado): página `/agente` con voz y
@@ -36,6 +36,18 @@
       permanente, o se descarta tras feedback? Pendiente de uso real en campo.
 - [ ] Fase 2 restante: registro de bienes por voz/chat (quizá vía enlace a /registro
       prellenado) — aún no implementado
+- [ ] Rediseño de navegación (en PR abierto): se eliminó el sidebar de escritorio y el
+      bottom-nav de móvil (`navItemsAll` en Layout.tsx). Home es ahora el único hub
+      (agregada tarjeta SIGA PJ que faltaba). Layout.tsx quedó con una sola barra superior
+      (móvil y escritorio) con: logo→Home, botón "Inicio" explícito (Link a "/", no
+      `navigate(-1)`) visible solo fuera de Home, ⌘K, chat IA, tema, sede, usuario, salir.
+      ⌘K (CommandPalette) ahora incluye grupo "Secciones" con TODAS las rutas
+      (`web/src/lib/navSections.ts`, filtrado por rol) — es el reemplazo del menú para
+      power users en desktop. Verificado: build+typecheck+lint limpios en archivos
+      tocados; app arranca contra Supabase real sin errores (login se ve bien; no se
+      pudo probar Home/CommandPalette post-login por falta de credenciales de sesión —
+      falta validar en campo). El flujo de "Seguir registrando" en /scan sigue intacto
+      (encadena registros sin volver a Home, confirmado por el usuario que ya lo usan).
 
 ## ⚠️ Decisiones de esta sesión
 - El Modo Agente usará la **API de Gemini ya existente** (Edge Function `ai-chat`), NO Anthropic
@@ -50,7 +62,9 @@
   (la usan solo las Edge Functions con service_role, pero queda expuesta a la anon key)
 
 ## 📌 Próximos pasos (próxima sesión)
-- Merge de `/agente-v2` y probarlo en campo (móvil real, luz de sol, con guantes, etc.)
+- Merge del rediseño de navegación y validar en campo: header sin sidebar/bottom-nav,
+  botón "Inicio", ⌘K con secciones, tarjetas de Home (incluida SIGA PJ nueva)
+- Probar `/agente-v2` en campo (móvil real, luz de sol, con guantes, etc.)
 - Recoger feedback comparando `/agente` (shadcn) vs `/agente-v2` (HUD) y decidir si uno
   reemplaza al otro o coexisten
 - Completar Fase 2: registro de bienes desde el chat
