@@ -21,6 +21,34 @@ import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import type { AgentCard, CambioPropuesto, RegistroPropuesto } from '../hooks/useAIChat'
+import iconLaptop from '../assets/icons/bienes/laptop.png'
+import iconDesktopComputer from '../assets/icons/bienes/desktop-computer.png'
+import iconPrinter from '../assets/icons/bienes/printer.png'
+import iconFilmProjector from '../assets/icons/bienes/film-projector.png'
+import iconChair from '../assets/icons/bienes/chair.png'
+import iconTelevision from '../assets/icons/bienes/television.png'
+import iconMobilePhone from '../assets/icons/bienes/mobile-phone.png'
+import iconAutomobile from '../assets/icons/bienes/automobile.png'
+import iconPackage from '../assets/icons/bienes/package.png'
+
+// Coincide por palabra clave con los sinónimos de tipo que ya usa el
+// SYSTEM_PROMPT de ai-chat (laptop/PC, impresora, proyector, silla,
+// televisor, teléfono, vehículo). Sin match → ícono genérico de bien.
+const TIPO_ICONOS: [RegExp, string][] = [
+  [/laptop|port[aá]til|notebook/i, iconLaptop],
+  [/impresora/i, iconPrinter],
+  [/proyector/i, iconFilmProjector],
+  [/\bsilla/i, iconChair],
+  [/televisor|\btv\b/i, iconTelevision],
+  [/tel[eé]fono|celular|smartphone/i, iconMobilePhone],
+  [/veh[ií]culo|autom[oó]vil|\bauto\b|\bcarro\b/i, iconAutomobile],
+  [/computadora|\bcpu\b|\btorre\b/i, iconDesktopComputer],
+]
+
+function iconoBien(...textos: (string | null | undefined)[]): string {
+  const texto = textos.filter(Boolean).join(' ')
+  return TIPO_ICONOS.find(([re]) => re.test(texto))?.[1] ?? iconPackage
+}
 
 const ESTADO_STYLES: Record<string, string> = {
   Nuevo: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
@@ -46,11 +74,14 @@ function responsableDe(item: Record<string, unknown>): string | null {
 
 function BienCard({ bien }: { bien: Record<string, unknown> }) {
   const responsable = responsableDe(bien)
+  const icono = iconoBien(bien.nombre_mueble_equipo as string, bien.tipo_mueble_equipo as string)
   return (
     <Link
       to={`/bienes/${bien.id}`}
-      className="block rounded-xl border border-border bg-card p-3 hover:bg-muted/50 transition-colors"
+      className="flex items-start gap-2.5 rounded-xl border border-border bg-card p-3 hover:bg-muted/50 transition-colors"
     >
+      <img src={icono} alt="" className="h-9 w-9 shrink-0 object-contain" />
+      <div className="flex-1 min-w-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">
@@ -86,6 +117,7 @@ function BienCard({ bien }: { bien: Record<string, unknown> }) {
       <p className="mt-2 text-[10px] text-primary flex items-center gap-0.5 font-medium">
         Ver detalle <ChevronRight className="h-3 w-3" />
       </p>
+      </div>
     </Link>
   )
 }
@@ -105,6 +137,11 @@ function ListaCard({ payload }: { payload: { resultados: Record<string, unknown>
               to={`/bienes/${item.id}`}
               className="flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition-colors"
             >
+              <img
+                src={iconoBien(item.nombre_mueble_equipo as string)}
+                alt=""
+                className="h-5 w-5 shrink-0 object-contain"
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-foreground truncate">
                   {String(item.nombre_mueble_equipo ?? '')}
@@ -127,10 +164,15 @@ function ListaCard({ payload }: { payload: { resultados: Record<string, unknown>
 
 function ConteoCard({ payload }: { payload: { total: number; filtros: Record<string, unknown> } }) {
   const filtros = Object.entries(payload.filtros || {}).filter(([, v]) => v !== undefined && v !== null && v !== '')
+  const tipoConsultado = [payload.filtros?.nombre, payload.filtros?.tipo].filter(Boolean).join(' ') as string
   return (
     <div className="rounded-xl border border-border bg-card p-3 flex items-center gap-3">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-        <Sigma className="h-5 w-5 text-primary" />
+        {tipoConsultado ? (
+          <img src={iconoBien(tipoConsultado)} alt="" className="h-7 w-7 object-contain" />
+        ) : (
+          <Sigma className="h-5 w-5 text-primary" />
+        )}
       </div>
       <div className="min-w-0">
         <p className="text-2xl font-bold leading-none text-foreground">{payload.total}</p>
