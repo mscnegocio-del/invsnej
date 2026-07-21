@@ -71,27 +71,49 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const sigaDescripcion = searchParams.get('siga_descripcion') ?? ''
   const tieneSiga = !!(sigaMarca || sigaModelo || sigaSerie || sigaOC || sigaValor)
 
+  // Prellenado desde el Agente (tarjeta "Registro propuesto")
+  const preNombre = searchParams.get('pre_nombre') ?? ''
+  const preTipo = searchParams.get('pre_tipo') ?? ''
+  const preEstado = searchParams.get('pre_estado')
+  const preMarca = searchParams.get('pre_marca') ?? ''
+  const preModelo = searchParams.get('pre_modelo') ?? ''
+  const preSerie = searchParams.get('pre_serie') ?? ''
+  const preOC = searchParams.get('pre_oc') ?? ''
+  const preValor = searchParams.get('pre_valor') ?? ''
+  const preTrabajador = searchParams.get('pre_trabajador')
+  const preUbicacion = searchParams.get('pre_ubicacion')
+
   // Defaults heredados del modo "Seguir registrando"
   const chainTrabajador = searchParams.get('chain_trabajador')
   const chainUbicacion = searchParams.get('chain_ubicacion')
   const chainEstado = searchParams.get('chain_estado')
-  const initialTrabajador = chainTrabajador ? Number(chainTrabajador) : null
-  const initialUbicacion = chainUbicacion ? Number(chainUbicacion) : null
+  const initialTrabajador = chainTrabajador
+    ? Number(chainTrabajador)
+    : preTrabajador
+      ? Number(preTrabajador)
+      : null
+  const initialUbicacion = chainUbicacion
+    ? Number(chainUbicacion)
+    : preUbicacion
+      ? Number(preUbicacion)
+      : null
   const initialEstado = chainEstado && (ESTADOS as readonly string[]).includes(chainEstado)
     ? chainEstado
-    : ESTADOS[0]
+    : preEstado && (ESTADOS as readonly string[]).includes(preEstado)
+      ? preEstado
+      : ESTADOS[0]
 
   const [codigo, setCodigo] = useState(initialCodigo ?? codigoFromQuery)
-  const [nombre, setNombre] = useState(sigaDescripcion)
-  const [tipo, setTipo] = useState('')
+  const [nombre, setNombre] = useState(sigaDescripcion || preNombre)
+  const [tipo, setTipo] = useState(preTipo)
   const [estado, setEstado] = useState<string>(initialEstado)
   const [idTrabajador, setIdTrabajador] = useState<number | null>(initialTrabajador)
   const [idUbicacion, setIdUbicacion] = useState<number | null>(initialUbicacion)
-  const [marca, setMarca] = useState(sigaMarca)
-  const [modelo, setModelo] = useState(sigaModelo)
-  const [serie, setSerie] = useState(sigaSerie)
-  const [ordenCompra, setOrdenCompra] = useState(sigaOC)
-  const [valor, setValor] = useState(sigaValor)
+  const [marca, setMarca] = useState(sigaMarca || preMarca)
+  const [modelo, setModelo] = useState(sigaModelo || preModelo)
+  const [serie, setSerie] = useState(sigaSerie || preSerie)
+  const [ordenCompra, setOrdenCompra] = useState(sigaOC || preOC)
+  const [valor, setValor] = useState(sigaValor || preValor)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSaveConfirm, setShowSaveConfirm] = useState(false)

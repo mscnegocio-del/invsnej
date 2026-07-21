@@ -8,11 +8,28 @@ export type CambioPropuesto = {
   update: Record<string, unknown>
 }
 
+export type RegistroPropuesto = {
+  nombre: string
+  codigo?: string
+  tipo?: string
+  estado?: string
+  marca?: string
+  modelo?: string
+  serie?: string
+  orden_compra?: string
+  valor?: number
+  id_trabajador?: number
+  nombre_responsable?: string
+  id_ubicacion?: number
+  ubicacion_nombre?: string
+}
+
 export type AgentCard =
   | { tipo: 'bien'; payload: Record<string, unknown> }
   | { tipo: 'lista'; payload: { resultados: Record<string, unknown>[]; total: number } }
   | { tipo: 'conteo'; payload: { total: number; filtros: Record<string, unknown> } }
   | { tipo: 'confirmacion'; payload: { bien: Record<string, unknown>; cambios: CambioPropuesto[] } }
+  | { tipo: 'registro'; payload: RegistroPropuesto }
 
 export type ChatMessage = {
   id: string
