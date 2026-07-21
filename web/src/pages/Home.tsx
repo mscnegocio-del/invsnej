@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ScanLine, Search, Users, Settings, ShieldCheck, Fingerprint, Sparkles, ArrowRight } from 'lucide-react'
+import { ScanLine, Search, Users, Settings, ShieldCheck, Fingerprint, Sparkles, ArrowRight, Database } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { listPasskeys } from '../lib/passkeysApi'
@@ -67,6 +67,13 @@ export function Home() {
       icon: Search,
       title: 'Buscar bienes',
       description: 'Filtra por código, nombre, responsable o ubicación.',
+      accent: 'teal',
+    },
+    {
+      to: '/siga-pj',
+      icon: Database,
+      title: 'SIGA PJ',
+      description: 'Catálogo de referencia cargado desde SIGA.',
       accent: 'teal',
       wide: !canEdit,
     },
