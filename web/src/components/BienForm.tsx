@@ -82,6 +82,9 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
   const preValor = searchParams.get('pre_valor') ?? ''
   const preTrabajador = searchParams.get('pre_trabajador')
   const preUbicacion = searchParams.get('pre_ubicacion')
+  // Página del Agente a la que volver tras guardar (solo rutas conocidas)
+  const retornoParam = searchParams.get('retorno')
+  const retornoAgente = retornoParam === '/agente' || retornoParam === '/agente-v2' ? retornoParam : null
 
   // Defaults heredados del modo "Seguir registrando"
   const chainTrabajador = searchParams.get('chain_trabajador')
@@ -350,6 +353,11 @@ export function BienForm({ initialCodigo, modo = 'create', bienId }: Props) {
       }
 
       toast.success('Bien registrado correctamente')
+      if (retornoAgente) {
+        // Volver al Agente: allí se muestra la confirmación con la ficha del bien
+        navigate(`${retornoAgente}?registrado=${nuevoId}`, { replace: true })
+        return
+      }
       navigate(`/bienes/${nuevoId}`, { replace: true })
     } else {
       const { data: anterior } = await supabase

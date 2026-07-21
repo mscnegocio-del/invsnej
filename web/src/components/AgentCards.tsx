@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import {
   Hash,
   MapPin,
@@ -268,8 +268,9 @@ function ConfirmacionCard({
   )
 }
 
-function registroUrl(p: RegistroPropuesto): string {
+function registroUrl(p: RegistroPropuesto, retorno: string): string {
   const params = new URLSearchParams()
+  params.set('retorno', retorno)
   if (p.codigo) params.set('codigo', p.codigo)
   params.set('pre_nombre', p.nombre)
   if (p.tipo) params.set('pre_tipo', p.tipo)
@@ -286,6 +287,7 @@ function registroUrl(p: RegistroPropuesto): string {
 
 function RegistroCard({ payload }: { payload: RegistroPropuesto }) {
   const { canEdit } = useAuth()
+  const location = useLocation()
   const detalles: [string, string][] = []
   if (payload.codigo) detalles.push(['Código', payload.codigo])
   if (payload.tipo) detalles.push(['Tipo', payload.tipo])
@@ -320,7 +322,7 @@ function RegistroCard({ payload }: { payload: RegistroPropuesto }) {
       {canEdit ? (
         <div className="pt-1 space-y-1">
           <Button asChild size="sm" className="h-8 w-full">
-            <Link to={registroUrl(payload)}>
+            <Link to={registroUrl(payload, location.pathname)}>
               <PackagePlus className="h-3.5 w-3.5 mr-1" />
               Abrir formulario prellenado
             </Link>
