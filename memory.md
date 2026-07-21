@@ -10,6 +10,9 @@
 - [x] Fase 2 — ediciones con confirmación (PR #9 mergeado + `ai-chat` v35 desplegada):
       tool `proponer_edicion_bien`, `ConfirmacionCard` con Confirmar/Cancelar, escritura
       client-side con RLS, registro en `bien_historial`
+- [x] Tarjeta destacada "Pregúntale al inventario" en Home (en PR abierto), enlaza a
+      `/agente` (NO a v2, que sigue en pruebas) — el Agente ya no está escondido en el
+      menú lateral, es lo primero visible al entrar
 - [x] `/agente-v2` EXPERIMENTAL (en PR abierto): rediseño visual estilo Jarvis/HUD —
       núcleo circular como control de voz (ancla fija arriba, no se mueve con el scroll),
       historial en su propio contenedor con degradado en el borde superior (mask-image;
