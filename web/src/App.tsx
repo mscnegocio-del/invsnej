@@ -16,6 +16,7 @@ import { Security } from './pages/Security'
 import { Trabajadores } from './pages/Trabajadores'
 import { SigaPJ } from './pages/SigaPJ'
 import { Agente } from './pages/Agente'
+import { AgenteV2 } from './pages/AgenteV2'
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/siga-pj" element={<SigaPJ />} />
             <Route path="/agente" element={<Agente />} />
+            <Route path="/agente-v2" element={<AgenteV2 />} />
             <Route path="/bienes/:id" element={<BienDetail />} />
             <Route
               path="/scan"

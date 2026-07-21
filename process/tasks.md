@@ -19,8 +19,16 @@
 2. [x] `ConfirmacionCard`: diff antes→después, Confirmar/Cancelar, ejecución client-side con
        la sesión del usuario (RLS respeta rol; `canEdit` oculta Confirmar a rol consulta) +
        inserción en `bien_historial` por campo
-3. [ ] Desplegar `ai-chat` con la nueva tool y probar edición por chat/voz en producción
+3. [x] Desplegar `ai-chat` v35 con la nueva tool; probado en producción
 4. [ ] Registro de bienes desde el chat (evaluar: proponer registro vs enlace a /registro prellenado)
+
+## Épica E1b: `/agente-v2` — rediseño visual HUD (experimental) 🔄
+1. [x] Prototipo visual validado con el usuario (núcleo circular, esquinas cortadas, ámbar
+       solo para confirmaciones, orbe anclado + scroll con degradado, responsivo con clamp())
+2. [x] Implementado como ruta paralela `/agente-v2`, CSS aislado (`agente-v2.css`, scoped `.av2`),
+       reutilizando `useAIChat`/`useSpeechRecognition`/lógica de confirmación reales
+3. [ ] Probar en campo y decidir: ¿reemplaza `/agente`, queda como alterna, o se descarta?
+4. [ ] Si se adopta: retemar vía shadcn (tokens `--radius`, paleta) en vez de CSS aislado
 
 ## Épica E3: Modo Agente — Fase 3 (exports/reportes) ⏳
 - Generar CSV/JSON desde el chat ("mándame los bienes en mal estado de la sede 2")

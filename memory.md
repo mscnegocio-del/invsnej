@@ -1,5 +1,5 @@
 # Estado actual — invsnej
-> Última actualización: 2026-07-20 (sesión 2: Fase 1 en producción, protecciones de mic, inicio Fase 2)
+> Última actualización: 2026-07-20 (sesión 2: Fase 1+2 en producción, /agente-v2 experimental HUD)
 
 ## ✅ Completado
 - [x] Modo Agente Fase 1 EN PRODUCCIÓN (PR #5 mergeado): página `/agente` con voz y
@@ -7,6 +7,17 @@
 - [x] Fix de dictado (PR #6 mergeado): dictado continuo, texto acumulado editable, botón Detener
 - [x] Protección de micrófono olvidado (PR #8 mergeado): inactividad 60 s, tope 3 min,
       apagado en segundo plano, aviso en UI
+- [x] Fase 2 — ediciones con confirmación (PR #9 mergeado + `ai-chat` v35 desplegada):
+      tool `proponer_edicion_bien`, `ConfirmacionCard` con Confirmar/Cancelar, escritura
+      client-side con RLS, registro en `bien_historial`
+- [x] `/agente-v2` EXPERIMENTAL (en PR abierto): rediseño visual estilo Jarvis/HUD —
+      núcleo circular como control de voz (ancla fija arriba, no se mueve con el scroll),
+      historial en su propio contenedor con degradado en el borde superior (mask-image;
+      no permanente — al scrollear arriba el historial se ve completo), paneles con
+      esquinas cortadas, ámbar reservado solo a confirmaciones. Reutiliza 100% la lógica
+      real (`useAIChat`, `useSpeechRecognition`, escritura+historial) — es un tema visual
+      alterno, no un sistema paralelo. CSS aislado bajo `.av2` (`agente-v2.css`) para no
+      afectar el resto de la app. Convive con `/agente` (shadcn) para comparar en vivo.
 - [x] App de inventario en producción (Vercel `invsnej` + Supabase `inventario`), ~1900+ bienes
 - [x] CRUD de bienes, escaneo de barras (BarcodeDetector + Quagga2), duplicados, exports
 - [x] Multi-sede (`sedes`), catálogo SIGA (`siga_bienes`), historial (`bien_historial`)
@@ -18,12 +29,8 @@
 - [x] Verificado acceso MCP a Supabase (`hegtvsuscaaifqqhbbxq`) y Vercel (`prj_NUeYWSxaqzw5GgGrWrP13cjTvLSx`)
 
 ## 🔄 En progreso
-- [ ] Fase 2 — ediciones con confirmación (en PR abierto): tool `proponer_edicion_bien` en
-      `ai-chat` (NO escribe; propone estado/ubicación/responsable y devuelve card
-      `confirmacion`), `ConfirmacionCard` en frontend con Confirmar/Cancelar. La escritura se
-      ejecuta CLIENT-SIDE con la sesión del usuario (RLS manda; rol consulta no puede) +
-      registro en `bien_historial`, reutilizando el patrón de QuickEditBienDialog.
-      Pendiente tras merge: desplegar `ai-chat` (nueva versión) y probar en producción.
+- [ ] Decidir destino de `/agente-v2`: ¿reemplaza a `/agente`, queda como alterna
+      permanente, o se descarta tras feedback? Pendiente de uso real en campo.
 - [ ] Fase 2 restante: registro de bienes por voz/chat (quizá vía enlace a /registro
       prellenado) — aún no implementado
 
@@ -40,6 +47,8 @@
   (la usan solo las Edge Functions con service_role, pero queda expuesta a la anon key)
 
 ## 📌 Próximos pasos (próxima sesión)
-- Merge del PR de Fase 2, desplegar `ai-chat` y probar edición por voz en producción
+- Merge de `/agente-v2` y probarlo en campo (móvil real, luz de sol, con guantes, etc.)
+- Recoger feedback comparando `/agente` (shadcn) vs `/agente-v2` (HUD) y decidir si uno
+  reemplaza al otro o coexisten
 - Completar Fase 2: registro de bienes desde el chat
 - Luego Fase 3: exports/reportes desde el chat (Épica E3)
