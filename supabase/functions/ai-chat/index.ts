@@ -33,7 +33,9 @@ const tools = [
             marca: { type: 'STRING', description: 'Marca' },
             modelo: { type: 'STRING', description: 'Modelo' },
             estado: { type: 'STRING', description: 'Nuevo|Bueno|Regular|Malo|Muy malo' },
-            ubicacion: { type: 'STRING', description: 'Ubicación parcial' },
+            ubicacion: { type: 'STRING', description: 'Ambiente/ubicación dentro de una sede (ej. "Oficina 201", "Almacén"), NO el nombre de una sede' },
+            sede: { type: 'STRING', description: 'Nombre de una sede (local/edificio, ej. "Modulo Penal SNEJ"), si el usuario la menciona explícitamente y es distinta de la sede activa' },
+            todas_sedes: { type: 'BOOLEAN', description: 'true si el usuario pide explícitamente buscar en todas las sedes, sin limitarse a la activa' },
             orden_compra: { type: 'STRING', description: 'Orden de compra' },
             nombre_responsable: { type: 'STRING', description: 'Nombre del responsable' },
             limit: { type: 'NUMBER', description: 'Máx resultados (def 10, max 50)' },
@@ -51,7 +53,9 @@ const tools = [
             tipo: { type: 'STRING', description: 'Tipo' },
             marca: { type: 'STRING', description: 'Marca' },
             estado: { type: 'STRING', description: 'Nuevo|Bueno|Regular|Malo|Muy malo' },
-            ubicacion: { type: 'STRING', description: 'Ubicación' },
+            ubicacion: { type: 'STRING', description: 'Ambiente/ubicación dentro de una sede (ej. "Oficina 201", "Almacén"), NO el nombre de una sede' },
+            sede: { type: 'STRING', description: 'Nombre de una sede (local/edificio, ej. "Modulo Penal SNEJ"), si el usuario la menciona explícitamente y es distinta de la sede activa' },
+            todas_sedes: { type: 'BOOLEAN', description: 'true si el usuario pide explícitamente contar en todas las sedes, sin limitarse a la activa' },
             orden_compra: { type: 'STRING', description: 'Orden de compra' },
             nombre_responsable: { type: 'STRING', description: 'Nombre del responsable' },
           },
@@ -102,6 +106,8 @@ const tools = [
           type: 'OBJECT',
           properties: {
             nombre_responsable: { type: 'STRING', description: 'Nombre del trabajador' },
+            sede: { type: 'STRING', description: 'Nombre de una sede, si el usuario la menciona explícitamente y es distinta de la sede activa' },
+            todas_sedes: { type: 'BOOLEAN', description: 'true si el usuario pide explícitamente buscar en todas las sedes' },
             limit: { type: 'NUMBER', description: 'Máx resultados (def 20)' },
           },
           required: ['nombre_responsable'],
@@ -116,7 +122,8 @@ Para saludos o preguntas generales responde DIRECTAMENTE sin usar herramientas.
 Usa herramientas SOLO cuando el usuario pregunta sobre bienes, inventario, responsables o ubicaciones específicas.
 EDICIONES: si el usuario pide cambiar estado, ubicación o responsable de un bien, usa proponer_edicion_bien. Tú NUNCA editas directamente: la herramienta muestra una tarjeta de confirmación y el usuario decide en pantalla. Tras proponer, di que revise y confirme en la tarjeta; NUNCA afirmes que el cambio ya se aplicó.
 REGISTROS: si el usuario pide registrar/agregar/dar de alta un bien NUEVO, usa proponer_registro_bien con los datos que mencione (basta el nombre). Si el usuario da el código patrimonial, la herramienta consulta SIGA automáticamente y esos datos (marca, modelo, serie, OC, valor) mandan sobre lo que el usuario haya dicho; si la respuesta indica datos_desde_siga, menciónalo brevemente. Tú NUNCA creas el bien: la tarjeta abre el formulario de registro prellenado y el usuario completa (código, responsable) y guarda ahí. Tras proponer, di que abra el formulario desde la tarjeta; NUNCA afirmes que ya se registró. No puedes eliminar bienes.
-SINÓNIMOS: laptop/PC, impresora, proyector, escritorio, silla, televisor, teléfono, vehículo.`
+SINÓNIMOS: laptop/PC, impresora, proyector, escritorio, silla, televisor, teléfono, vehículo.
+SEDE vs UBICACIÓN: "sede" es el local/edificio completo (ej. "Modulo Penal SNEJ"); "ubicación" es el ambiente específico dentro de una sede (ej. "Oficina 201", "Almacén"). Si el usuario nombra una sede, usa el parámetro sede, NUNCA ubicacion. Por defecto las búsquedas y conteos se limitan a la sede activa del usuario; si pide "todas las sedes" o "en toda la institución", usa todas_sedes=true.`
 
 async function callGeminiWithRetry(body: any, geminiKey: string) {
   const maxRetries = 3
@@ -184,10 +191,40 @@ type RegistroPropuesto = {
 
 const ESTADOS_VALIDOS = ['Nuevo', 'Bueno', 'Regular', 'Malo', 'Muy malo']
 
+// Resuelve a qué sede limitar la consulta: todas_sedes desactiva el filtro,
+// un nombre de sede explícito lo resuelve contra la tabla `sedes`, y sin
+// ninguno de los dos se usa la sede activa del usuario (mismo comportamiento
+// que Search.tsx: filtrado por sede_id salvo que se pida "todas las sedes").
+async function resolverSedeId(
+  supabase: any,
+  args: { sede?: string; todas_sedes?: boolean },
+  sedeIdActiva: number | null
+): Promise<{ sedeId: number | null; error?: string }> {
+  if (args.todas_sedes) return { sedeId: null }
+  if (args.sede) {
+    const { data: sedes } = await supabase
+      .from('sedes')
+      .select('id, nombre')
+      .or(`nombre.ilike.%${args.sede}%,codigo.ilike.%${args.sede}%`)
+    if (!sedes || sedes.length === 0) {
+      return { sedeId: null, error: `No se encontró ninguna sede que coincida con "${args.sede}"` }
+    }
+    if (sedes.length > 1) {
+      return {
+        sedeId: null,
+        error: `Coinciden varias sedes con "${args.sede}": ${sedes.map((s: any) => s.nombre).join(', ')}. Pide al usuario precisar.`,
+      }
+    }
+    return { sedeId: sedes[0].id }
+  }
+  return { sedeId: sedeIdActiva }
+}
+
 async function ejecutarTool(
   nombre: string,
   args: any,
-  supabase: any
+  supabase: any,
+  sedeIdActiva: number | null
 ): Promise<{ paraModelo: string; card?: AgentCard }> {
   try {
     if (nombre === 'buscar_bien_por_codigo') {
@@ -204,12 +241,16 @@ async function ejecutarTool(
       }
     }
     if (nombre === 'buscar_bienes' || nombre === 'listar_bienes_por_responsable') {
+      const { sedeId, error: sedeError } = await resolverSedeId(supabase, args, sedeIdActiva)
+      if (sedeError) return { paraModelo: JSON.stringify({ error: sedeError }) }
+
       const limit = Math.min(args.limit ?? 10, 50)
       let query = supabase
         .from('bienes')
         .select('id, codigo_patrimonial, nombre_mueble_equipo, estado, ubicacion, trabajadores(nombre)')
         .is('eliminado_at', null)
         .limit(limit)
+      if (sedeId != null) query = query.eq('sede_id', sedeId)
       if (args.nombre) query = query.ilike('nombre_mueble_equipo', `%${args.nombre}%`)
       if (args.tipo) query = query.ilike('tipo_mueble_equipo', `%${args.tipo}%`)
       if (args.estado) query = query.eq('estado', args.estado)
@@ -234,7 +275,11 @@ async function ejecutarTool(
       }
     }
     if (nombre === 'contar_bienes') {
+      const { sedeId, error: sedeError } = await resolverSedeId(supabase, args, sedeIdActiva)
+      if (sedeError) return { paraModelo: JSON.stringify({ error: sedeError }) }
+
       let query = supabase.from('bienes').select('id', { count: 'exact', head: true }).is('eliminado_at', null)
+      if (sedeId != null) query = query.eq('sede_id', sedeId)
       if (args.nombre) query = query.ilike('nombre_mueble_equipo', `%${args.nombre}%`)
       if (args.tipo) query = query.ilike('tipo_mueble_equipo', `%${args.tipo}%`)
       if (args.estado) query = query.eq('estado', args.estado)
@@ -456,7 +501,8 @@ Deno.serve(async (req) => {
 
     if (!geminiKey) throw new Error('Falta GEMINI_API_KEY')
 
-    const { messages } = await req.json()
+    const { messages, sede_id } = await req.json()
+    const sedeIdActiva: number | null = typeof sede_id === 'number' ? sede_id : null
     const supabase = createClient(supabaseUrl!, serviceKey!)
 
     // Mapeo a formato Gemini (camelCase)
@@ -504,7 +550,7 @@ Deno.serve(async (req) => {
       if (toolCalls.length > 0) {
         const toolResults: any[] = []
         for (const tc of toolCalls) {
-          const { paraModelo, card } = await ejecutarTool(tc.functionCall.name, tc.functionCall.args, supabase)
+          const { paraModelo, card } = await ejecutarTool(tc.functionCall.name, tc.functionCall.args, supabase, sedeIdActiva)
           console.log(`Tool ${tc.functionCall.name}: ${paraModelo.substring(0, 100)}`)
           if (card) cards.push(card)
           toolResults.push({

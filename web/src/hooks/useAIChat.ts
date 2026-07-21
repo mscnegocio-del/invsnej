@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { useSede } from '../context/SedeContext'
 
 // Historial persistido en localStorage para sobrevivir navegaciones (ir a /registro
 // desde una tarjeta y volver al Agente) y también reapertura de la app en móvil:
@@ -65,6 +66,7 @@ type ApiMessage = {
 }
 
 export function useAIChat() {
+  const { sedeActiva } = useSede()
   const [messages, setMessages] = useState<ChatMessage[]>(loadStoredMessages)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,7 +102,7 @@ export function useAIChat() {
       }))
 
       const res = await supabase.functions.invoke('ai-chat', {
-        body: { messages: historial },
+        body: { messages: historial, sede_id: sedeActiva?.id ?? null },
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
 
@@ -126,7 +128,7 @@ export function useAIChat() {
     } finally {
       setLoading(false)
     }
-  }, [messages, loading])
+  }, [messages, loading, sedeActiva])
 
   // Inserta un mensaje del asistente sin llamar al modelo
   // (p. ej. la confirmación al volver de /registro)
