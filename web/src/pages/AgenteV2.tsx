@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Mic, MicOff, Send, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
-import { useAIChat, type AgentCard, type CambioPropuesto } from '../hooks/useAIChat'
+import { useAIChat, type AgentCard, type CambioPropuesto, type RegistroPropuesto } from '../hooks/useAIChat'
+import { useRegistroRetorno } from '../hooks/useRegistroRetorno'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
@@ -98,6 +99,59 @@ function ConfirmCard({ payload }: { payload: { bien: Record<string, unknown>; ca
   )
 }
 
+function RegistroPropuestoCard({ payload }: { payload: RegistroPropuesto }) {
+  const { canEdit } = useAuth()
+  const detalles: [string, string][] = []
+  if (payload.codigo) detalles.push(['Código', payload.codigo])
+  if (payload.tipo) detalles.push(['Tipo', payload.tipo])
+  if (payload.estado) detalles.push(['Estado', payload.estado])
+  if (payload.marca) detalles.push(['Marca', payload.marca])
+  if (payload.modelo) detalles.push(['Modelo', payload.modelo])
+  if (payload.serie) detalles.push(['N° Serie', payload.serie])
+  if (payload.orden_compra) detalles.push(['Orden de compra', payload.orden_compra])
+  if (payload.valor != null) detalles.push(['Valor', `S/. ${payload.valor}`])
+  if (payload.nombre_responsable) detalles.push(['Responsable', payload.nombre_responsable])
+  if (payload.ubicacion_nombre) detalles.push(['Ubicación', payload.ubicacion_nombre])
+
+  const params = new URLSearchParams()
+  params.set('retorno', '/agente-v2')
+  if (payload.codigo) params.set('codigo', payload.codigo)
+  params.set('pre_nombre', payload.nombre)
+  if (payload.tipo) params.set('pre_tipo', payload.tipo)
+  if (payload.estado) params.set('pre_estado', payload.estado)
+  if (payload.marca) params.set('pre_marca', payload.marca)
+  if (payload.modelo) params.set('pre_modelo', payload.modelo)
+  if (payload.serie) params.set('pre_serie', payload.serie)
+  if (payload.orden_compra) params.set('pre_oc', payload.orden_compra)
+  if (payload.valor != null) params.set('pre_valor', String(payload.valor))
+  if (payload.id_trabajador != null) params.set('pre_trabajador', String(payload.id_trabajador))
+  if (payload.id_ubicacion != null) params.set('pre_ubicacion', String(payload.id_ubicacion))
+
+  return (
+    <div className="av2-panel warn">
+      <div className="av2-confirm-title">
+        <span>⚠ Registro propuesto</span>
+      </div>
+      <div className="av2-nombre">{payload.nombre}</div>
+      {detalles.map(([label, valor]) => (
+        <div key={label} className="av2-diff-row">
+          <span className="av2-diff-label">{label}</span>
+          <span className="av2-diff-after">{valor}</span>
+        </div>
+      ))}
+      {canEdit ? (
+        <div className="av2-confirm-actions">
+          <Link to={`/registro?${params.toString()}`} className="av2-btn av2-btn--confirm">
+            Abrir formulario prellenado
+          </Link>
+        </div>
+      ) : (
+        <p className="av2-confirm-note muted">Tu rol es de consulta: no puedes registrar bienes.</p>
+      )}
+    </div>
+  )
+}
+
 function Cards({ cards }: { cards: AgentCard[] }) {
   return (
     <>
@@ -165,6 +219,7 @@ function Cards({ cards }: { cards: AgentCard[] }) {
           )
         }
         if (card.tipo === 'confirmacion') return <ConfirmCard key={i} payload={card.payload} />
+        if (card.tipo === 'registro') return <RegistroPropuestoCard key={i} payload={card.payload} />
         return null
       })}
     </>
@@ -173,7 +228,8 @@ function Cards({ cards }: { cards: AgentCard[] }) {
 
 export function AgenteV2() {
   const navigate = useNavigate()
-  const { messages, loading, error, sendMessage, clearMessages } = useAIChat()
+  const { messages, loading, error, sendMessage, clearMessages, appendAssistantMessage } = useAIChat()
+  useRegistroRetorno(appendAssistantMessage)
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 

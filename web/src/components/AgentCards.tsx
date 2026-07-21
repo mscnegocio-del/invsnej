@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import {
   Hash,
   MapPin,
@@ -13,13 +13,14 @@ import {
   XCircle,
   Loader2,
   PencilLine,
+  PackagePlus,
 } from 'lucide-react'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import type { AgentCard, CambioPropuesto } from '../hooks/useAIChat'
+import type { AgentCard, CambioPropuesto, RegistroPropuesto } from '../hooks/useAIChat'
 
 const ESTADO_STYLES: Record<string, string> = {
   Nuevo: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
@@ -267,6 +268,78 @@ function ConfirmacionCard({
   )
 }
 
+function registroUrl(p: RegistroPropuesto, retorno: string): string {
+  const params = new URLSearchParams()
+  params.set('retorno', retorno)
+  if (p.codigo) params.set('codigo', p.codigo)
+  params.set('pre_nombre', p.nombre)
+  if (p.tipo) params.set('pre_tipo', p.tipo)
+  if (p.estado) params.set('pre_estado', p.estado)
+  if (p.marca) params.set('pre_marca', p.marca)
+  if (p.modelo) params.set('pre_modelo', p.modelo)
+  if (p.serie) params.set('pre_serie', p.serie)
+  if (p.orden_compra) params.set('pre_oc', p.orden_compra)
+  if (p.valor != null) params.set('pre_valor', String(p.valor))
+  if (p.id_trabajador != null) params.set('pre_trabajador', String(p.id_trabajador))
+  if (p.id_ubicacion != null) params.set('pre_ubicacion', String(p.id_ubicacion))
+  return `/registro?${params.toString()}`
+}
+
+function RegistroCard({ payload }: { payload: RegistroPropuesto }) {
+  const { canEdit } = useAuth()
+  const location = useLocation()
+  const detalles: [string, string][] = []
+  if (payload.codigo) detalles.push(['Código', payload.codigo])
+  if (payload.tipo) detalles.push(['Tipo', payload.tipo])
+  if (payload.estado) detalles.push(['Estado', payload.estado])
+  if (payload.marca) detalles.push(['Marca', payload.marca])
+  if (payload.modelo) detalles.push(['Modelo', payload.modelo])
+  if (payload.serie) detalles.push(['N° Serie', payload.serie])
+  if (payload.orden_compra) detalles.push(['Orden de compra', payload.orden_compra])
+  if (payload.valor != null) detalles.push(['Valor', `S/. ${payload.valor}`])
+  if (payload.nombre_responsable) detalles.push(['Responsable', payload.nombre_responsable])
+  if (payload.ubicacion_nombre) detalles.push(['Ubicación', payload.ubicacion_nombre])
+
+  return (
+    <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <PackagePlus className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+        <p className="text-xs font-semibold text-foreground flex-1 min-w-0 truncate">
+          Registro propuesto
+        </p>
+      </div>
+      <p className="text-sm font-medium text-foreground">{payload.nombre}</p>
+      {detalles.length > 0 && (
+        <ul className="space-y-0.5">
+          {detalles.map(([label, valor]) => (
+            <li key={label} className="flex items-center gap-1.5 text-xs">
+              <span className="font-medium text-foreground shrink-0">{label}:</span>
+              <span className="text-muted-foreground truncate">{valor}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {canEdit ? (
+        <div className="pt-1 space-y-1">
+          <Button asChild size="sm" className="h-8 w-full">
+            <Link to={registroUrl(payload, location.pathname)}>
+              <PackagePlus className="h-3.5 w-3.5 mr-1" />
+              Abrir formulario prellenado
+            </Link>
+          </Button>
+          <p className="text-[10px] text-muted-foreground text-center">
+            Revisa, completa lo que falte y guarda en el formulario
+          </p>
+        </div>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">
+          Tu rol es de consulta: no puedes registrar bienes.
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function AgentCards({ cards }: { cards: AgentCard[] }) {
   if (cards.length === 0) return null
   return (
@@ -276,6 +349,7 @@ export function AgentCards({ cards }: { cards: AgentCard[] }) {
         if (card.tipo === 'lista') return <ListaCard key={i} payload={card.payload} />
         if (card.tipo === 'conteo') return <ConteoCard key={i} payload={card.payload} />
         if (card.tipo === 'confirmacion') return <ConfirmacionCard key={i} payload={card.payload} />
+        if (card.tipo === 'registro') return <RegistroCard key={i} payload={card.payload} />
         return null
       })}
     </div>

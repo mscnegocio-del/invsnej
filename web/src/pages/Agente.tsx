@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button'
 import { Textarea } from '../components/ui/textarea'
 import { cn } from '../lib/utils'
 import { useAIChat } from '../hooks/useAIChat'
+import { useRegistroRetorno } from '../hooks/useRegistroRetorno'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
 import { AgentCards } from '../components/AgentCards'
 
@@ -33,7 +34,8 @@ function TypingIndicator() {
 }
 
 export function Agente() {
-  const { messages, loading, error, sendMessage, clearMessages } = useAIChat()
+  const { messages, loading, error, sendMessage, clearMessages, appendAssistantMessage } = useAIChat()
+  useRegistroRetorno(appendAssistantMessage)
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 

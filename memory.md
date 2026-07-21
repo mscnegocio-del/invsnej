@@ -1,5 +1,5 @@
 # Estado actual — invsnej
-> Última actualización: 2026-07-21 (sesión 2: Fase 1+2 en producción, /agente-v2 experimental, Home como hub único)
+> Última actualización: 2026-07-21 (sesión 3: /agente-v2 validado en campo, queda oculto como alterno)
 
 ## ✅ Completado
 - [x] Modo Agente Fase 1 EN PRODUCCIÓN (PR #5 mergeado): página `/agente` con voz y
@@ -36,12 +36,19 @@
       botón "Inicio" explícito, ⌘K con grupo "Secciones" (`web/src/lib/navSections.ts`)
 
 ## 🔄 En progreso
-- [ ] Decidir destino de `/agente-v2`: ¿reemplaza a `/agente`, queda como alterna
-      permanente, o se descarta tras feedback? Pendiente de uso real en campo.
-- [ ] Fase 2 restante: registro de bienes por voz/chat (quizá vía enlace a /registro
-      prellenado) — aún no implementado
+- [ ] Fase 2 restante — registro de bienes por chat: IMPLEMENTADO, PR #14 abierto
+      (rama `claude/lee-agents-docs-rd38um`). Edge Function `ai-chat` v36 ya
+      desplegada con tool `proponer_registro_bien` (valida código duplicado, resuelve
+      responsable/ubicación); frontend: tarjeta "Registro propuesto" (`RegistroCard`) con
+      botón que abre `/registro` prellenado vía params `pre_*` en `BienForm`. El agente
+      nunca inserta: el guardado pasa por el formulario real (validación + RLS).
+      Ciclo cerrado: al guardar vuelve al Agente (`?registrado=<id>`) y el chat confirma
+      "✅ registrado" con la ficha; historial del chat persiste en sessionStorage.
 
 ## ⚠️ Decisiones de esta sesión
+- `/agente-v2` PROBADO EN CAMPO y funciona correctamente, pero QUEDA OCULTO (sin enlace
+  en la UI; accesible solo por URL directa) como tema alterno. `/agente` sigue siendo la
+  principal; si a futuro se le agregan mejoras que lo justifiquen, v2 podría pasar a principal.
 - El Modo Agente usará la **API de Gemini ya existente** (Edge Function `ai-chat`), NO Anthropic
 - Se construye como evolución de `ai-chat`/`AIChatPanel`, no como sistema paralelo
 - Fases: 1) solo lectura + voz + tarjetas ricas, 2) acciones con confirmación, 3) exports/reportes
@@ -54,8 +61,5 @@
   (la usan solo las Edge Functions con service_role, pero queda expuesta a la anon key)
 
 ## 📌 Próximos pasos (próxima sesión)
-- Probar `/agente-v2` en campo (móvil real, luz de sol, con guantes, etc.)
-- Recoger feedback comparando `/agente` (shadcn) vs `/agente-v2` (HUD) y decidir si uno
-  reemplaza al otro o coexisten
 - Completar Fase 2: registro de bienes desde el chat
 - Luego Fase 3: exports/reportes desde el chat (Épica E3)

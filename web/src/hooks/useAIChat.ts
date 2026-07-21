@@ -1,5 +1,21 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
+
+// Historial persistido en sessionStorage para sobrevivir navegaciones
+// (p. ej. ir a /registro desde una tarjeta y volver al Agente)
+const STORAGE_KEY = 'inv:agente_chat'
+
+function loadStoredMessages(): ChatMessage[] {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as (Omit<ChatMessage, 'timestamp'> & { timestamp: string })[]
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }))
+  } catch {
+    return []
+  }
+}
 
 export type CambioPropuesto = {
   campo: 'estado' | 'ubicacion' | 'responsable'
@@ -8,11 +24,28 @@ export type CambioPropuesto = {
   update: Record<string, unknown>
 }
 
+export type RegistroPropuesto = {
+  nombre: string
+  codigo?: string
+  tipo?: string
+  estado?: string
+  marca?: string
+  modelo?: string
+  serie?: string
+  orden_compra?: string
+  valor?: number
+  id_trabajador?: number
+  nombre_responsable?: string
+  id_ubicacion?: number
+  ubicacion_nombre?: string
+}
+
 export type AgentCard =
   | { tipo: 'bien'; payload: Record<string, unknown> }
   | { tipo: 'lista'; payload: { resultados: Record<string, unknown>[]; total: number } }
   | { tipo: 'conteo'; payload: { total: number; filtros: Record<string, unknown> } }
   | { tipo: 'confirmacion'; payload: { bien: Record<string, unknown>; cambios: CambioPropuesto[] } }
+  | { tipo: 'registro'; payload: RegistroPropuesto }
 
 export type ChatMessage = {
   id: string
@@ -28,9 +61,16 @@ type ApiMessage = {
 }
 
 export function useAIChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(loadStoredMessages)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      if (messages.length === 0) sessionStorage.removeItem(STORAGE_KEY)
+      else sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+    } catch { /* noop */ }
+  }, [messages])
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return
@@ -84,10 +124,19 @@ export function useAIChat() {
     }
   }, [messages, loading])
 
+  // Inserta un mensaje del asistente sin llamar al modelo
+  // (p. ej. la confirmación al volver de /registro)
+  const appendAssistantMessage = useCallback((content: string, cards?: AgentCard[]) => {
+    setMessages((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), role: 'assistant', content, timestamp: new Date(), cards },
+    ])
+  }, [])
+
   const clearMessages = useCallback(() => {
     setMessages([])
     setError(null)
   }, [])
 
-  return { messages, loading, error, sendMessage, clearMessages }
+  return { messages, loading, error, sendMessage, clearMessages, appendAssistantMessage }
 }

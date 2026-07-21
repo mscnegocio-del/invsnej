@@ -74,6 +74,28 @@ const tools = [
         },
       },
       {
+        name: 'proponer_registro_bien',
+        description:
+          'Propone registrar un bien NUEVO en el inventario. NO lo crea: muestra una tarjeta con los datos propuestos y un botón que abre el formulario de registro prellenado, donde el usuario completa y guarda. Usar cuando el usuario pida registrar/agregar/dar de alta un bien nuevo.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            nombre: { type: 'STRING', description: 'Nombre o descripción del bien (ej. "Silla giratoria")' },
+            codigo: { type: 'STRING', description: 'Código patrimonial, si el usuario lo indica' },
+            tipo: { type: 'STRING', description: 'Tipo de bien' },
+            estado: { type: 'STRING', description: 'Nuevo|Bueno|Regular|Malo|Muy malo' },
+            ubicacion: { type: 'STRING', description: 'Ubicación (nombre parcial)' },
+            nombre_responsable: { type: 'STRING', description: 'Nombre del responsable' },
+            marca: { type: 'STRING', description: 'Marca' },
+            modelo: { type: 'STRING', description: 'Modelo' },
+            serie: { type: 'STRING', description: 'Número de serie' },
+            orden_compra: { type: 'STRING', description: 'Orden de compra' },
+            valor: { type: 'NUMBER', description: 'Valor en soles' },
+          },
+          required: ['nombre'],
+        },
+      },
+      {
         name: 'listar_bienes_por_responsable',
         description: 'Lista bienes asignados a un trabajador',
         parameters: {
@@ -92,7 +114,8 @@ const tools = [
 const SYSTEM_PROMPT = `Eres asistente de inventario patrimonial. Respondes en español, breve y directo.
 Para saludos o preguntas generales responde DIRECTAMENTE sin usar herramientas.
 Usa herramientas SOLO cuando el usuario pregunta sobre bienes, inventario, responsables o ubicaciones específicas.
-EDICIONES: si el usuario pide cambiar estado, ubicación o responsable de un bien, usa proponer_edicion_bien. Tú NUNCA editas directamente: la herramienta muestra una tarjeta de confirmación y el usuario decide en pantalla. Tras proponer, di que revise y confirme en la tarjeta; NUNCA afirmes que el cambio ya se aplicó. No puedes crear ni eliminar bienes.
+EDICIONES: si el usuario pide cambiar estado, ubicación o responsable de un bien, usa proponer_edicion_bien. Tú NUNCA editas directamente: la herramienta muestra una tarjeta de confirmación y el usuario decide en pantalla. Tras proponer, di que revise y confirme en la tarjeta; NUNCA afirmes que el cambio ya se aplicó.
+REGISTROS: si el usuario pide registrar/agregar/dar de alta un bien NUEVO, usa proponer_registro_bien con los datos que mencione (basta el nombre). Tú NUNCA creas el bien: la tarjeta abre el formulario de registro prellenado y el usuario completa (código, responsable) y guarda ahí. Tras proponer, di que abra el formulario desde la tarjeta; NUNCA afirmes que ya se registró. No puedes eliminar bienes.
 SINÓNIMOS: laptop/PC, impresora, proyector, escritorio, silla, televisor, teléfono, vehículo.`
 
 async function callGeminiWithRetry(body: any, geminiKey: string) {
@@ -140,6 +163,23 @@ type AgentCard =
   | { tipo: 'lista'; payload: { resultados: any[]; total: number } }
   | { tipo: 'conteo'; payload: { total: number; filtros: Record<string, unknown> } }
   | { tipo: 'confirmacion'; payload: { bien: any; cambios: any[] } }
+  | { tipo: 'registro'; payload: RegistroPropuesto }
+
+type RegistroPropuesto = {
+  nombre: string
+  codigo?: string
+  tipo?: string
+  estado?: string
+  marca?: string
+  modelo?: string
+  serie?: string
+  orden_compra?: string
+  valor?: number
+  id_trabajador?: number
+  nombre_responsable?: string
+  id_ubicacion?: number
+  ubicacion_nombre?: string
+}
 
 const ESTADOS_VALIDOS = ['Nuevo', 'Bueno', 'Regular', 'Malo', 'Muy malo']
 
@@ -297,6 +337,85 @@ async function ejecutarTool(
           nota: 'El usuario debe confirmar en la tarjeta en pantalla. No afirmes que ya se aplicó.',
         }),
         card: { tipo: 'confirmacion', payload: { bien, cambios } },
+      }
+    }
+    if (nombre === 'proponer_registro_bien') {
+      const propuesta: RegistroPropuesto = { nombre: String(args.nombre).trim() }
+      if (!propuesta.nombre) return { paraModelo: JSON.stringify({ error: 'Falta el nombre del bien' }) }
+
+      // Código: si viene, verificar que no exista ya (duplicado)
+      if (args.codigo) {
+        const codigo = String(args.codigo).trim()
+        const { data: existente } = await supabase
+          .from('bienes')
+          .select('id, codigo_patrimonial, nombre_mueble_equipo')
+          .eq('codigo_patrimonial', codigo)
+          .is('eliminado_at', null)
+          .maybeSingle()
+        if (existente) {
+          return {
+            paraModelo: JSON.stringify({
+              error: `Ya existe un bien con código ${codigo}: ${existente.nombre_mueble_equipo}. Sugiere al usuario editarlo en vez de registrarlo de nuevo.`,
+            }),
+            card: { tipo: 'bien', payload: existente },
+          }
+        }
+        propuesta.codigo = codigo
+      }
+
+      if (args.estado) {
+        const estadoNorm = ESTADOS_VALIDOS.find(
+          (e) => e.toLowerCase() === String(args.estado).trim().toLowerCase()
+        )
+        if (estadoNorm) propuesta.estado = estadoNorm
+      }
+
+      if (args.nombre_responsable) {
+        const tokens = String(args.nombre_responsable).trim().split(/\s+/).filter((t: string) => t.length > 1)
+        let trabQ = supabase.from('trabajadores').select('id, nombre')
+        for (const tk of tokens) trabQ = trabQ.ilike('nombre', `%${tk}%`)
+        const { data: trab } = await trabQ
+        if (trab && trab.length === 1) {
+          propuesta.id_trabajador = trab[0].id
+          propuesta.nombre_responsable = trab[0].nombre
+        } else if (trab && trab.length > 1) {
+          return {
+            paraModelo: JSON.stringify({
+              error: 'Coinciden varios trabajadores; pide al usuario precisar el nombre del responsable',
+              coincidencias: trab.slice(0, 5).map((t: any) => t.nombre),
+            }),
+          }
+        }
+        // 0 coincidencias: se omite; el usuario lo elegirá en el formulario
+      }
+
+      if (args.ubicacion) {
+        const { data: ubis } = await supabase
+          .from('ubicaciones')
+          .select('id, nombre')
+          .ilike('nombre', `%${String(args.ubicacion).trim()}%`)
+          .limit(5)
+        if (ubis && ubis.length === 1) {
+          propuesta.id_ubicacion = ubis[0].id
+          propuesta.ubicacion_nombre = ubis[0].nombre
+        }
+        // 0 o varias: se omite; el usuario la elegirá en el formulario
+      }
+
+      if (args.tipo) propuesta.tipo = String(args.tipo).trim()
+      if (args.marca) propuesta.marca = String(args.marca).trim()
+      if (args.modelo) propuesta.modelo = String(args.modelo).trim()
+      if (args.serie) propuesta.serie = String(args.serie).trim()
+      if (args.orden_compra) propuesta.orden_compra = String(args.orden_compra).trim()
+      if (typeof args.valor === 'number' && args.valor >= 0) propuesta.valor = args.valor
+
+      return {
+        paraModelo: JSON.stringify({
+          propuesta_mostrada: true,
+          datos: propuesta,
+          nota: 'El usuario debe abrir el formulario desde la tarjeta, completar lo que falte (código, responsable) y guardar. No afirmes que ya se registró.',
+        }),
+        card: { tipo: 'registro', payload: propuesta },
       }
     }
     return { paraModelo: JSON.stringify({ error: 'Tool no encontrada' }) }
