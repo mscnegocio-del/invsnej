@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Bot,
   Sparkles,
+  Orbit,
   Database,
   SearchIcon,
 } from 'lucide-react'
@@ -39,6 +40,7 @@ const navItemsAll: {
   { to: '/scan', label: 'Escanear', Icon: ScanLine, roles: ['admin', 'operador'] },
   { to: '/search', label: 'Buscar', Icon: Search, roles: ['admin', 'operador', 'consulta'] },
   { to: '/agente', label: 'Agente', Icon: Sparkles, roles: ['admin', 'operador', 'consulta'] },
+  { to: '/agente-v2', label: 'Agente v2', Icon: Orbit, roles: ['admin', 'operador', 'consulta'] },
   { to: '/siga-pj', label: 'SIGA PJ', Icon: Database, roles: ['admin', 'operador', 'consulta'] },
   { to: '/trabajadores', label: 'Trabajadores', Icon: Users, roles: ['admin'] },
   { to: '/admin', label: 'Administración', Icon: Shield, roles: ['admin'] },
