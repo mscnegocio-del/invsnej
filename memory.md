@@ -31,23 +31,15 @@
 - [x] Harness creado (AGENTS.md, memory.md, process/)
 - [x] Verificado acceso MCP a Supabase (`hegtvsuscaaifqqhbbxq`) y Vercel (`prj_NUeYWSxaqzw5GgGrWrP13cjTvLSx`)
 
+- [x] Rediseño de navegación (PR #12 MERGEADO Y VALIDADO EN CAMPO por el usuario — "todo
+      funciona bien"): sin sidebar/bottom-nav, Home como hub único, barra superior con
+      botón "Inicio" explícito, ⌘K con grupo "Secciones" (`web/src/lib/navSections.ts`)
+
 ## 🔄 En progreso
 - [ ] Decidir destino de `/agente-v2`: ¿reemplaza a `/agente`, queda como alterna
       permanente, o se descarta tras feedback? Pendiente de uso real en campo.
 - [ ] Fase 2 restante: registro de bienes por voz/chat (quizá vía enlace a /registro
       prellenado) — aún no implementado
-- [ ] Rediseño de navegación (en PR abierto): se eliminó el sidebar de escritorio y el
-      bottom-nav de móvil (`navItemsAll` en Layout.tsx). Home es ahora el único hub
-      (agregada tarjeta SIGA PJ que faltaba). Layout.tsx quedó con una sola barra superior
-      (móvil y escritorio) con: logo→Home, botón "Inicio" explícito (Link a "/", no
-      `navigate(-1)`) visible solo fuera de Home, ⌘K, chat IA, tema, sede, usuario, salir.
-      ⌘K (CommandPalette) ahora incluye grupo "Secciones" con TODAS las rutas
-      (`web/src/lib/navSections.ts`, filtrado por rol) — es el reemplazo del menú para
-      power users en desktop. Verificado: build+typecheck+lint limpios en archivos
-      tocados; app arranca contra Supabase real sin errores (login se ve bien; no se
-      pudo probar Home/CommandPalette post-login por falta de credenciales de sesión —
-      falta validar en campo). El flujo de "Seguir registrando" en /scan sigue intacto
-      (encadena registros sin volver a Home, confirmado por el usuario que ya lo usan).
 
 ## ⚠️ Decisiones de esta sesión
 - El Modo Agente usará la **API de Gemini ya existente** (Edge Function `ai-chat`), NO Anthropic
@@ -62,8 +54,6 @@
   (la usan solo las Edge Functions con service_role, pero queda expuesta a la anon key)
 
 ## 📌 Próximos pasos (próxima sesión)
-- Merge del rediseño de navegación y validar en campo: header sin sidebar/bottom-nav,
-  botón "Inicio", ⌘K con secciones, tarjetas de Home (incluida SIGA PJ nueva)
 - Probar `/agente-v2` en campo (móvil real, luz de sol, con guantes, etc.)
 - Recoger feedback comparando `/agente` (shadcn) vs `/agente-v2` (HUD) y decidir si uno
   reemplaza al otro o coexisten
