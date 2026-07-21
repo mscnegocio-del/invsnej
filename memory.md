@@ -1,6 +1,6 @@
 # Estado actual — invsnej
-> Última actualización: 2026-07-21 (sesión 3: Fase 2 completa y validada en campo — registro
-> de bienes desde el Agente con autorrelleno SIGA)
+> Última actualización: 2026-07-21 (sesión 3: Fase 2 completa y validada en campo; fix crítico
+> de RLS que bloqueaba eliminar bienes para todos)
 
 ## ✅ Completado
 - [x] Modo Agente Fase 1 EN PRODUCCIÓN (PR #5 mergeado): página `/agente` con voz y
@@ -52,6 +52,15 @@
       - Validado en campo por el usuario: registro real con autorrelleno SIGA correcto
         (marca/modelo/serie/OC/valor) + confirmación en el chat. También confirmado que
         el Agente rechaza correctamente pedidos de eliminar bienes (no tiene esa tool).
+- [x] Fix crítico: eliminar bienes fallaba SIEMPRE para todos (PR #17 mergeado). Causa
+      raíz: `bienes_select_activos` exige `eliminado_at IS NULL`, y Postgres exige que la
+      fila resultante de un UPDATE también pase la política SELECT — el soft-delete
+      (fijar eliminado_at) violaba RLS sin importar el rol. Fix: `sql/006_*` agrega una
+      política SELECT extra para admin que sí ve eliminados (ya aplicada en Supabase).
+      También se corrigió `BienDetail.tsx`: el registro en `bien_historial` ahora ocurre
+      SOLO si el borrado real tuvo éxito (antes se registraba primero, dejando "Baja"
+      fantasma en el historial cuando el borrado fallaba — quedaron 2 filas así para el
+      bien código 746437120002; el usuario decidió dejarlas, no limpiar).
 
 ## ⚠️ Decisiones de esta sesión
 - `/agente-v2` PROBADO EN CAMPO y funciona correctamente, pero QUEDA OCULTO (sin enlace
