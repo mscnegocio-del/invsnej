@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ScanLine, Search, Users, Settings, ShieldCheck, Fingerprint } from 'lucide-react'
+import { ScanLine, Search, Users, Settings, ShieldCheck, Fingerprint, Sparkles, ArrowRight } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { listPasskeys } from '../lib/passkeysApi'
@@ -7,6 +7,12 @@ import { useWebAuthn } from '../hooks/useWebAuthn'
 import { Card, CardContent } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { cn } from '../lib/utils'
+
+const SUGERENCIAS_HOME = [
+  '¿Dónde está el bien con código...?',
+  '¿Cuántas laptops hay en buen estado?',
+  'Cambia el estado de un bien',
+]
 
 type NavCard = {
   to: string
@@ -88,6 +94,39 @@ export function Home() {
       <p className="page-subtitle">
         Gestiona el inventario patrimonial escaneando códigos o buscando por filtros.
       </p>
+
+      <Link to="/agente" className="group block mt-6">
+        <Card className="overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card transition-all duration-200 hover:shadow-md hover:border-primary/50">
+          <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center gap-5">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+              <Sparkles className="h-7 w-7" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-foreground">Pregúntale al inventario</h2>
+                <span className="inline-flex items-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">Beta</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Habla o escribe y el Agente busca, cuenta y propone cambios por ti.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {SUGERENCIAS_HOME.map((s) => (
+                  <span
+                    key={s}
+                    className="text-xs px-2.5 py-1 rounded-full bg-muted/60 text-muted-foreground"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-sm font-medium text-primary shrink-0 self-start sm:self-center">
+              Abrir Agente
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((card) => (
