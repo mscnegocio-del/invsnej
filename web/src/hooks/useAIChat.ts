@@ -1,13 +1,16 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
-// Historial persistido en sessionStorage para sobrevivir navegaciones
-// (p. ej. ir a /registro desde una tarjeta y volver al Agente)
+// Historial persistido en localStorage para sobrevivir navegaciones (ir a /registro
+// desde una tarjeta y volver al Agente) y también reapertura de la app en móvil:
+// sessionStorage se pierde cuando el sistema operativo recicla la pestaña/PWA en
+// segundo plano (común en iOS/Android), ya que eso cuenta como un contexto de
+// navegación nuevo; localStorage persiste por origen, no por esa instancia.
 const STORAGE_KEY = 'inv:agente_chat'
 
 function loadStoredMessages(): ChatMessage[] {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw) as (Omit<ChatMessage, 'timestamp'> & { timestamp: string })[]
     if (!Array.isArray(parsed)) return []
@@ -68,8 +71,8 @@ export function useAIChat() {
 
   useEffect(() => {
     try {
-      if (messages.length === 0) sessionStorage.removeItem(STORAGE_KEY)
-      else sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+      if (messages.length === 0) localStorage.removeItem(STORAGE_KEY)
+      else localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
     } catch { /* noop */ }
   }, [messages])
 
