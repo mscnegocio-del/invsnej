@@ -1,6 +1,6 @@
 # Estado actual — invsnej
 > Última actualización: 2026-07-21 (sesión 3: Fase 2 completa y validada en campo; fix crítico
-> de RLS que bloqueaba eliminar bienes para todos)
+> de RLS que bloqueaba eliminar bienes para todos; fix de historial del Agente en móvil)
 
 ## ✅ Completado
 - [x] Modo Agente Fase 1 EN PRODUCCIÓN (PR #5 mergeado): página `/agente` con voz y
@@ -48,7 +48,7 @@
       - El agente NUNCA inserta directamente: el guardado pasa por el formulario real
         (validación + RLS). Ciclo cerrado: al guardar vuelve al Agente
         (`?registrado=<id>`) y el chat confirma "✅ registrado exitosamente" con la
-        ficha; historial del chat persiste en sessionStorage.
+        ficha; historial del chat persiste en localStorage (ver fix abajo).
       - Validado en campo por el usuario: registro real con autorrelleno SIGA correcto
         (marca/modelo/serie/OC/valor) + confirmación en el chat. También confirmado que
         el Agente rechaza correctamente pedidos de eliminar bienes (no tiene esa tool).
@@ -61,6 +61,12 @@
       SOLO si el borrado real tuvo éxito (antes se registraba primero, dejando "Baja"
       fantasma en el historial cuando el borrado fallaba — quedaron 2 filas así para el
       bien código 746437120002; el usuario decidió dejarlas, no limpiar).
+- [x] Fix: historial del Agente desaparecía en móvil tras navegar/usar la app un rato
+      (PR #19 mergeado). Causa: se guardaba en `sessionStorage`, que el SO puede borrar
+      al reciclar la pestaña/PWA en segundo plano (bloqueo de pantalla, cambio de app —
+      mismo motivo por el que ya existía la protección de "micrófono olvidado"). Fix:
+      `useAIChat.ts` ahora usa `localStorage` (atado al origen, sobrevive a eso).
+      "Nueva conversación" lo sigue limpiando igual.
 
 ## ⚠️ Decisiones de esta sesión
 - `/agente-v2` PROBADO EN CAMPO y funciona correctamente, pero QUEDA OCULTO (sin enlace
