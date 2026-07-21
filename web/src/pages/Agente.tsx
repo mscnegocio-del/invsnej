@@ -12,6 +12,7 @@ const SUGERENCIAS = [
   '¿Cuántas computadoras hay en buen estado?',
   '¿Qué bienes tiene asignados Oliver?',
   'Muéstrame los proyectores en mal estado',
+  'Cambia el estado del bien 7521487526 a Bueno',
 ]
 
 function TypingIndicator() {
@@ -226,7 +227,7 @@ export function Agente() {
           </Button>
         </div>
         <p className="text-[10px] text-muted-foreground mt-1.5 text-center">
-          Solo consultas en esta versión · Las acciones llegarán en la siguiente fase
+          Consultas y ediciones con confirmación · Ninguna edición se aplica sin tu OK
         </p>
       </div>
     </div>

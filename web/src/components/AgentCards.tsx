@@ -1,8 +1,25 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Hash, MapPin, User, Package, ListOrdered, Sigma, ChevronRight } from 'lucide-react'
+import {
+  Hash,
+  MapPin,
+  User,
+  Package,
+  ListOrdered,
+  Sigma,
+  ChevronRight,
+  ArrowRight,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  PencilLine,
+} from 'lucide-react'
 import { Badge } from './ui/badge'
+import { Button } from './ui/button'
 import { cn } from '../lib/utils'
-import type { AgentCard } from '../hooks/useAIChat'
+import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
+import type { AgentCard, CambioPropuesto } from '../hooks/useAIChat'
 
 const ESTADO_STYLES: Record<string, string> = {
   Nuevo: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
@@ -126,6 +143,130 @@ function ConteoCard({ payload }: { payload: { total: number; filtros: Record<str
   )
 }
 
+const CAMPO_LABEL: Record<string, string> = {
+  estado: 'Estado',
+  ubicacion: 'Ubicación',
+  responsable: 'Responsable',
+}
+
+type ConfirmEstado = 'pendiente' | 'ejecutando' | 'aplicado' | 'cancelado' | 'error'
+
+function ConfirmacionCard({
+  payload,
+}: {
+  payload: { bien: Record<string, unknown>; cambios: CambioPropuesto[] }
+}) {
+  const { user, canEdit } = useAuth()
+  const [estado, setEstado] = useState<ConfirmEstado>('pendiente')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const { bien, cambios } = payload
+
+  const ejecutar = async () => {
+    setEstado('ejecutando')
+    setErrorMsg(null)
+    try {
+      const updateData = cambios.reduce(
+        (acc, c) => ({ ...acc, ...c.update }),
+        {} as Record<string, unknown>
+      )
+      const { error } = await supabase.from('bienes').update(updateData).eq('id', bien.id)
+      if (error) throw new Error(error.message)
+
+      for (const c of cambios) {
+        await supabase.from('bien_historial').insert({
+          bien_id: bien.id,
+          campo: c.campo,
+          valor_antes: c.valor_antes,
+          valor_despues: c.valor_despues,
+          usuario_id: user?.id ?? null,
+          usuario_email: user?.email ?? null,
+          accion: 'edicion',
+        })
+      }
+      setEstado('aplicado')
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : 'Error inesperado')
+      setEstado('error')
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        'rounded-xl border p-3 space-y-2',
+        estado === 'aplicado'
+          ? 'border-emerald-500/40 bg-emerald-500/5'
+          : estado === 'cancelado'
+            ? 'border-border bg-muted/30 opacity-70'
+            : 'border-amber-500/40 bg-amber-500/5'
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <PencilLine className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+        <p className="text-xs font-semibold text-foreground flex-1 min-w-0 truncate">
+          Edición propuesta · {String(bien.codigo_patrimonial ?? '')}
+        </p>
+      </div>
+      <p className="text-xs text-muted-foreground truncate">
+        {String(bien.nombre_mueble_equipo ?? '')}
+      </p>
+      <ul className="space-y-1">
+        {cambios.map((c) => (
+          <li key={c.campo} className="flex items-center gap-1.5 text-xs">
+            <span className="font-medium text-foreground shrink-0">{CAMPO_LABEL[c.campo] ?? c.campo}:</span>
+            <span className="text-muted-foreground line-through truncate">{c.valor_antes ?? '—'}</span>
+            <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+            <span className="font-medium text-foreground truncate">{c.valor_despues ?? '—'}</span>
+          </li>
+        ))}
+      </ul>
+
+      {estado === 'pendiente' && !canEdit && (
+        <p className="text-[11px] text-muted-foreground">
+          Tu rol es de consulta: no puedes aplicar ediciones.
+        </p>
+      )}
+
+      {estado === 'pendiente' && canEdit && (
+        <div className="flex gap-2 pt-1">
+          <Button size="sm" className="h-8 flex-1" onClick={() => void ejecutar()}>
+            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+            Confirmar
+          </Button>
+          <Button size="sm" variant="outline" className="h-8 flex-1" onClick={() => setEstado('cancelado')}>
+            <XCircle className="h-3.5 w-3.5 mr-1" />
+            Cancelar
+          </Button>
+        </div>
+      )}
+
+      {estado === 'ejecutando' && (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Aplicando cambios…
+        </p>
+      )}
+      {estado === 'aplicado' && (
+        <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Cambios aplicados y registrados en el historial
+        </p>
+      )}
+      {estado === 'cancelado' && (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <XCircle className="h-3.5 w-3.5" /> Edición cancelada — no se cambió nada
+        </p>
+      )}
+      {estado === 'error' && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-destructive">No se pudo aplicar: {errorMsg}</p>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void ejecutar()}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function AgentCards({ cards }: { cards: AgentCard[] }) {
   if (cards.length === 0) return null
   return (
@@ -134,6 +275,7 @@ export function AgentCards({ cards }: { cards: AgentCard[] }) {
         if (card.tipo === 'bien') return <BienCard key={i} bien={card.payload} />
         if (card.tipo === 'lista') return <ListaCard key={i} payload={card.payload} />
         if (card.tipo === 'conteo') return <ConteoCard key={i} payload={card.payload} />
+        if (card.tipo === 'confirmacion') return <ConfirmacionCard key={i} payload={card.payload} />
         return null
       })}
     </div>

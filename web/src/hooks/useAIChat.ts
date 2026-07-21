@@ -1,10 +1,18 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
+export type CambioPropuesto = {
+  campo: 'estado' | 'ubicacion' | 'responsable'
+  valor_antes: string | null
+  valor_despues: string | null
+  update: Record<string, unknown>
+}
+
 export type AgentCard =
   | { tipo: 'bien'; payload: Record<string, unknown> }
   | { tipo: 'lista'; payload: { resultados: Record<string, unknown>[]; total: number } }
   | { tipo: 'conteo'; payload: { total: number; filtros: Record<string, unknown> } }
+  | { tipo: 'confirmacion'; payload: { bien: Record<string, unknown>; cambios: CambioPropuesto[] } }
 
 export type ChatMessage = {
   id: string

@@ -13,10 +13,14 @@
        apagado en segundo plano, con aviso en la UI
 10. [ ] Validar dictado corregido en móvil real y recoger más feedback de la Fase 1
 
-## Épica E2: Modo Agente — Fase 2 (acciones con confirmación) ⏳
-- Tools de escritura: editar estado/ubicación/responsable, registrar bien
-- Confirmación visual obligatoria antes de ejecutar; respetar rol del usuario (JWT en Edge)
-- Registrar cambios en `bien_historial`
+## Épica E2: Modo Agente — Fase 2 (acciones con confirmación) 🔄
+1. [x] Tool `proponer_edicion_bien` (estado/ubicación/responsable): NO escribe, valida y
+       devuelve card `confirmacion`; system prompt actualizado (el modelo nunca afirma haber editado)
+2. [x] `ConfirmacionCard`: diff antes→después, Confirmar/Cancelar, ejecución client-side con
+       la sesión del usuario (RLS respeta rol; `canEdit` oculta Confirmar a rol consulta) +
+       inserción en `bien_historial` por campo
+3. [ ] Desplegar `ai-chat` con la nueva tool y probar edición por chat/voz en producción
+4. [ ] Registro de bienes desde el chat (evaluar: proponer registro vs enlace a /registro prellenado)
 
 ## Épica E3: Modo Agente — Fase 3 (exports/reportes) ⏳
 - Generar CSV/JSON desde el chat ("mándame los bienes en mal estado de la sede 2")
