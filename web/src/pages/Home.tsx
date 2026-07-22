@@ -13,7 +13,7 @@ import iconMagnifyingGlass from '../assets/icons/menu/magnifying-glass.png'
 import iconCardFileBox from '../assets/icons/menu/card-file-box.png'
 import iconBustsInSilhouette from '../assets/icons/menu/busts-in-silhouette.png'
 import iconGear from '../assets/icons/menu/gear.png'
-import iconSparkles from '../assets/icons/menu/sparkles.png'
+import iconAgenteRobot from '../assets/icons/menu/agente-robot.webp'
 
 const SUGERENCIAS_HOME = [
   '¿Dónde está el bien con código...?',
@@ -107,7 +107,7 @@ export function Home() {
         <Card className="overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card transition-all duration-200 hover:shadow-md hover:border-primary/50">
           <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center gap-5">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center">
-              <img src={iconSparkles} alt="" className="h-14 w-14 object-contain drop-shadow-sm" />
+              <img src={iconAgenteRobot} alt="" className="h-14 w-14 object-contain drop-shadow-sm" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
