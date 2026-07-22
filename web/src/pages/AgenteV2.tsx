@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Mic, MicOff, Send, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { ThinkingOrb } from 'thinking-orbs'
 import { useAIChat, type AgentCard, type CambioPropuesto, type RegistroPropuesto } from '../hooks/useAIChat'
 import { useRegistroRetorno } from '../hooks/useRegistroRetorno'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
@@ -299,7 +300,15 @@ export function AgenteV2() {
             <div className="av2-ring av2-ring--1" />
             <div className="av2-ring av2-ring--2" />
             <div className="av2-ring av2-ring--3" />
-            <div className="av2-orb" />
+            <div className="av2-orb-canvas">
+              <ThinkingOrb
+                state={voz.listening ? 'listening' : 'working'}
+                size={64}
+                theme="dark"
+                paused={!voz.listening && !loading}
+                aria-label={voz.listening ? 'Escuchando' : loading ? 'Pensando' : 'En espera'}
+              />
+            </div>
             {voz.listening && (
               <div className="av2-wave">
                 <span /><span /><span /><span /><span /><span />
@@ -340,7 +349,9 @@ export function AgenteV2() {
             {loading && (
               <div className="av2-msg agent">
                 <div className="av2-avatar" />
-                <div className="av2-bubble av2-typing"><span /><span /><span /></div>
+                <div className="av2-bubble av2-typing">
+                  <ThinkingOrb state="working" size={20} theme="dark" aria-label="Pensando..." />
+                </div>
               </div>
             )}
           </div>

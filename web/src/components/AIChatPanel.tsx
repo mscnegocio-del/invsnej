@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Send, Trash2, Sparkles } from 'lucide-react'
+import { ThinkingOrb } from 'thinking-orbs'
 import iconAgenteRobot from '../assets/icons/menu/agente-robot.webp'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Button } from './ui/button'
@@ -30,11 +31,7 @@ function TypingIndicator() {
         <img src={iconAgenteRobot} alt="" className="h-7 w-7 object-contain" />
       </div>
       <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-3">
-        <div className="flex gap-1 items-center h-4">
-          <span className="block h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:0ms]" />
-          <span className="block h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:150ms]" />
-          <span className="block h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce [animation-delay:300ms]" />
-        </div>
+        <ThinkingOrb state="working" size={20} aria-label="Pensando..." />
       </div>
     </div>
   )
