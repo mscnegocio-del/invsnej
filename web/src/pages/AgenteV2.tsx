@@ -348,10 +348,8 @@ export function AgenteV2() {
             ))}
             {loading && (
               <div className="av2-msg agent">
-                <div className="av2-avatar" />
-                <div className="av2-bubble av2-typing">
-                  <ThinkingOrb state="working" size={20} theme="dark" aria-label="Pensando..." />
-                </div>
+                <ThinkingOrb state="working" size={20} theme="dark" aria-label="Pensando" />
+                <div className="av2-bubble av2-typing">Pensando…</div>
               </div>
             )}
           </div>
