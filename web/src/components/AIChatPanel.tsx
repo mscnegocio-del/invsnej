@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Bot, Send, Trash2, Sparkles } from 'lucide-react'
+import { Send, Trash2, Sparkles } from 'lucide-react'
+import iconAgenteRobot from '../assets/icons/menu/agente-robot.webp'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
@@ -25,8 +26,8 @@ interface AIChatPanelProps {
 function TypingIndicator() {
   return (
     <div className="flex items-end gap-2 justify-start">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-        <Bot className="h-4 w-4 text-primary" />
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center">
+        <img src={iconAgenteRobot} alt="" className="h-7 w-7 object-contain" />
       </div>
       <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-3">
         <div className="flex gap-1 items-center h-4">
@@ -116,8 +117,8 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
           <div className="py-4 space-y-4">
             {isEmpty && (
               <div className="flex flex-col items-center justify-center py-8 text-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                  <Bot className="h-7 w-7 text-primary" />
+                <div className="flex h-14 w-14 items-center justify-center">
+                  <img src={iconAgenteRobot} alt="" className="h-14 w-14 object-contain" />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground">¿En qué te ayudo?</p>
@@ -151,8 +152,8 @@ export function AIChatPanel({ open, onOpenChange }: AIChatPanelProps) {
                 )}
               >
                 {msg.role === 'assistant' && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <Bot className="h-4 w-4 text-primary" />
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center">
+                    <img src={iconAgenteRobot} alt="" className="h-7 w-7 object-contain" />
                   </div>
                 )}
                 <div

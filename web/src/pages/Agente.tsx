@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { Bot, Mic, MicOff, Send, Sparkles, Trash2 } from 'lucide-react'
+import { Mic, MicOff, Send, Sparkles, Trash2 } from 'lucide-react'
+import iconAgenteRobot from '../assets/icons/menu/agente-robot.webp'
 import { Button } from '../components/ui/button'
 import { Textarea } from '../components/ui/textarea'
 import { cn } from '../lib/utils'
@@ -19,8 +20,8 @@ const SUGERENCIAS = [
 function TypingIndicator() {
   return (
     <div className="flex items-end gap-2 justify-start">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-        <Bot className="h-4 w-4 text-primary" />
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center">
+        <img src={iconAgenteRobot} alt="" className="h-7 w-7 object-contain" />
       </div>
       <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-3">
         <div className="flex gap-1 items-center h-4">
@@ -95,8 +96,8 @@ export function Agente() {
       <div className="flex-1 overflow-y-auto py-4 space-y-4">
         {isEmpty && (
           <div className="flex flex-col items-center justify-center py-10 text-center gap-4 px-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-              <Bot className="h-8 w-8 text-primary" />
+            <div className="flex h-16 w-16 items-center justify-center">
+              <img src={iconAgenteRobot} alt="" className="h-16 w-16 object-contain" />
             </div>
             <div>
               <p className="text-base font-medium text-foreground">¿Qué necesitas del inventario?</p>
@@ -129,8 +130,8 @@ export function Agente() {
               )}
             >
               {msg.role === 'assistant' && (
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                  <Bot className="h-4 w-4 text-primary" />
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center">
+                  <img src={iconAgenteRobot} alt="" className="h-7 w-7 object-contain" />
                 </div>
               )}
               <div
