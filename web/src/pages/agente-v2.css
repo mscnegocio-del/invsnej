@@ -206,7 +206,7 @@
   background: radial-gradient(circle at 35% 30%, var(--av2-accent), var(--av2-accent-dim));
   box-shadow: 0 0 10px color-mix(in srgb, var(--av2-accent) 60%, transparent);
 }
-.av2-typing { display: flex; align-items: center; padding: 4px 0; }
+.av2-typing { color: var(--av2-ink-dim); animation: av2blink 1.4s ease-in-out infinite; }
 
 /* ---------- Panel HUD ---------- */
 .av2-panel {
