@@ -1,8 +1,19 @@
 # Estado actual — invsnej
 > Última actualización: 2026-08-03 (sesión 4: proyecto Supabase pausado → reanudado +
-> keep-alive; fix de exportación Excel/JSON en Buscar que solo traía la página actual)
+> keep-alive; fix de exportación Excel/JSON en Buscar; fix de PWA que servía JS viejo
+> tras un deploy)
 
 ## ✅ Completado
+- [x] Fix: la PWA (`vite-plugin-pwa`, `registerType: 'autoUpdate'`) nunca llamaba a
+      `registerSW()` en el código — solo el script auto-inyectado registraba el service
+      worker sin forzar actualización. Resultado: tras un deploy, usuarios con la app ya
+      abierta/instalada seguían ejecutando el bundle JS viejo (así se explicó que el fix
+      de exportación de abajo "no se notaba" pese a estar en producción: el navegador
+      corría el código de antes). Fix en `web/src/main.tsx`: `registerSW({ immediate: true,
+      onNeedRefresh: () => updateSW(true), onRegisteredSW: chequeo cada hora con
+      `registration.update()` })` — fuerza recarga automática (skipWaiting) en cuanto
+      detecta una versión nueva. Agregado `web/src/vite-env.d.ts` con la referencia a
+      `vite-plugin-pwa/client` para los tipos de `virtual:pwa-register`.
 - [x] Fix: en `/buscar`, los botones "Excel"/"JSON" de la cabecera de resultados exportaban
       solo `resultados` (la página en pantalla, `PAGE_SIZE=20`) en vez de todos los bienes
       que matchean los filtros (ej. 59 bienes en 3 páginas → exportaba 20). Causa: no
