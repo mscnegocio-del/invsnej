@@ -1,8 +1,18 @@
 # Estado actual — invsnej
-> Última actualización: 2026-08-03 (sesión 4: proyecto Supabase se pausó por inactividad;
-> reanudado y agregado workflow de keep-alive para que no vuelva a pasar)
+> Última actualización: 2026-08-03 (sesión 4: proyecto Supabase pausado → reanudado +
+> keep-alive; fix de exportación Excel/JSON en Buscar que solo traía la página actual)
 
 ## ✅ Completado
+- [x] Fix: en `/buscar`, los botones "Excel"/"JSON" de la cabecera de resultados exportaban
+      solo `resultados` (la página en pantalla, `PAGE_SIZE=20`) en vez de todos los bienes
+      que matchean los filtros (ej. 59 bienes en 3 páginas → exportaba 20). Causa: no
+      reutilizaban los filtros de búsqueda para traer todo, solo el estado ya paginado.
+      Fix en `web/src/pages/Search.tsx`: se extrajo `buildFilteredQuery()` (los mismos
+      filtros de `handleSearch`, sin paginar) y se agregó `fetchAllFiltered()` que pagina
+      en bloques de 1000 contra Supabase; `handleDownloadResultadosJson/Csv` ahora son
+      async y usan `fetchAllFiltered()`, con spinner (`exportingResultados`) mientras carga.
+      La tarjeta separada "Exportar todos los bienes" (ignora filtros, exporta el inventario
+      completo) no se tocó, es una función distinta e intencional.
 - [x] Proyecto Supabase `inventario` se había pausado (plan free, ~7 días sin consultas a la
       API). Reanudado (`restore_project`, quedó `ACTIVE`). Fix permanente: PR #30 mergeado a
       `main` — `.github/workflows/supabase-keep-alive.yml`, corre cada 4 días vía GitHub

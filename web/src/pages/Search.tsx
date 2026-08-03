@@ -142,6 +142,7 @@ export function Search() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exportingAll, setExportingAll] = useState(false)
+  const [exportingResultados, setExportingResultados] = useState<'json' | 'csv' | null>(null)
   const [copied, setCopied] = useState(false)
 
   type QuickEditTarget = {
@@ -308,11 +309,9 @@ export function Search() {
     document.body.removeChild(link); URL.revokeObjectURL(url)
   }
 
-  const handleSearch = async (event?: FormEvent) => {
-    if (event) event.preventDefault()
-    writeFiltersToUrl()
-    setError(null); setLoading(true)
-
+  // Construye el query de Supabase con los filtros vigentes (sin paginar) para que la
+  // búsqueda paginada y la exportación de resultados usen exactamente los mismos criterios.
+  const buildFilteredQuery = () => {
     let query = supabase.from('bienes')
       .select('id, codigo_patrimonial, nombre_mueble_equipo, estado, id_trabajador, ubicacion, sede_id, marca, modelo, serie, orden_compra, valor', { count: 'exact' })
       .is('eliminado_at', null)
@@ -338,9 +337,30 @@ export function Search() {
       const orStr = terminosNombre.map((t) => `nombre_mueble_equipo.ilike.%${escapeIlikeTerm(t)}%`).join(',')
       query = query.or(orStr)
     }
+    return query
+  }
+
+  // Trae TODAS las filas que matchean los filtros vigentes (paginando en bloques de 1000),
+  // para exportar la búsqueda completa y no solo la página visible en pantalla.
+  const fetchAllFiltered = async (): Promise<RowWithExtras[]> => {
+    const pageSize = 1000; let from = 0; const all: RowWithExtras[] = []; let hasMore = true
+    while (hasMore) {
+      const { data, error: supaError } = await buildFilteredQuery()
+        .order('fecha_registro', { ascending: false }).range(from, from + pageSize - 1)
+      if (supaError || !data) { hasMore = false; break }
+      all.push(...(data as RowWithExtras[]))
+      if (data.length < pageSize) hasMore = false; else from += pageSize
+    }
+    return all
+  }
+
+  const handleSearch = async (event?: FormEvent) => {
+    if (event) event.preventDefault()
+    writeFiltersToUrl()
+    setError(null); setLoading(true)
 
     const from = page * PAGE_SIZE
-    const { data, error: supaError, count } = await query
+    const { data, error: supaError, count } = await buildFilteredQuery()
       .order('fecha_registro', { ascending: false }).range(from, from + PAGE_SIZE - 1)
 
     setLoading(false)
@@ -812,11 +832,11 @@ export function Search() {
                       ? <><Check className="h-3.5 w-3.5" /> Copiado</>
                       : <><Copy className="h-3.5 w-3.5" /> Copiar</>}
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDownloadResultadosJson()} className="gap-1.5 h-8 text-xs">
-                    <FileJson className="h-3.5 w-3.5" /> JSON
+                  <Button variant="ghost" size="sm" onClick={() => handleDownloadResultadosJson()} disabled={exportingResultados !== null} className="gap-1.5 h-8 text-xs">
+                    {exportingResultados === 'json' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileJson className="h-3.5 w-3.5" />} JSON
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDownloadResultadosCsv()} className="gap-1.5 h-8 text-xs">
-                    <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+                  <Button variant="ghost" size="sm" onClick={() => handleDownloadResultadosCsv()} disabled={exportingResultados !== null} className="gap-1.5 h-8 text-xs">
+                    {exportingResultados === 'csv' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />} Excel
                   </Button>
                 </div>
               </div>
@@ -1136,14 +1156,26 @@ export function Search() {
     </div>
   )
 
-  function handleDownloadResultadosJson() {
-    if (!resultados.length) return
-    const normalized = (resultados as RowWithExtras[]).map((b) => ({ ...b, ubicacion: findUbicacionNombre(b.ubicacion), responsable: findResponsableNombre(b.id_trabajador), sede: findSedeNombre(b.sede_id) }))
-    downloadFile('bienes-busqueda.json', 'application/json', JSON.stringify(normalized, null, 2))
+  async function handleDownloadResultadosJson() {
+    if (!resultados.length || exportingResultados) return
+    setExportingResultados('json')
+    try {
+      const todos = await fetchAllFiltered()
+      const normalized = todos.map((b) => ({ ...b, ubicacion: findUbicacionNombre(b.ubicacion), responsable: findResponsableNombre(b.id_trabajador), sede: findSedeNombre(b.sede_id) }))
+      downloadFile('bienes-busqueda.json', 'application/json', JSON.stringify(normalized, null, 2))
+    } finally {
+      setExportingResultados(null)
+    }
   }
 
-  function handleDownloadResultadosCsv() {
-    if (!resultados.length) return
-    downloadFile('bienes-busqueda.csv', 'text/csv;charset=utf-8;', buildCsv((resultados as RowWithExtras[]).map((b) => ({ ...b, responsableNombre: findResponsableNombre(b.id_trabajador) }))))
+  async function handleDownloadResultadosCsv() {
+    if (!resultados.length || exportingResultados) return
+    setExportingResultados('csv')
+    try {
+      const todos = await fetchAllFiltered()
+      downloadFile('bienes-busqueda.csv', 'text/csv;charset=utf-8;', buildCsv(todos.map((b) => ({ ...b, responsableNombre: findResponsableNombre(b.id_trabajador) }))))
+    } finally {
+      setExportingResultados(null)
+    }
   }
 }
