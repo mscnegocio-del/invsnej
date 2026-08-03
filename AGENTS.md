@@ -24,7 +24,8 @@ validación de duplicados, multi-sede, exports y chat IA. ~1900+ bienes en produ
 
 ## Reglas de trabajo
 - Leer `memory.md` al inicio de cada sesión
-- Actualizar `memory.md` al terminar cada sesión
+- Actualizar `memory.md` después de cada acción relevante (no solo al final de la sesión):
+  cambios de infraestructura, PRs creados/mergeados, fixes desplegados, decisiones tomadas
 - Para contexto profundo → `process/` (rutas abajo)
 - Docs históricos en raíz (PRD.md, claude.md, architecture.md, design.md, PLAN_IMPLEMENTACION.md):
   son referencia; el estado vivo está en memory.md y process/
