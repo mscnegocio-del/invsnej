@@ -1,8 +1,14 @@
 # Estado actual — invsnej
-> Última actualización: 2026-07-21 (sesión 3: Fase 2 completa y validada en campo; fix crítico
-> de RLS que bloqueaba eliminar bienes para todos; fix de historial del Agente en móvil)
+> Última actualización: 2026-08-03 (sesión 4: proyecto Supabase se pausó por inactividad;
+> reanudado y agregado workflow de keep-alive para que no vuelva a pasar)
 
 ## ✅ Completado
+- [x] Proyecto Supabase `inventario` se había pausado (plan free, ~7 días sin consultas a la
+      API). Reanudado (`restore_project`, quedó `ACTIVE`). Fix permanente: PR #30 mergeado a
+      `main` — `.github/workflows/supabase-keep-alive.yml`, corre cada 4 días vía GitHub
+      Actions (cron, + `workflow_dispatch` manual), hace `GET /rest/v1/sedes?select=id&limit=1`
+      con la anon key (pública, protegida por RLS; no requiere secrets en el repo). No depende
+      de sesiones de Claude — corre siempre mientras el repo exista en GitHub.
 - [x] Modo Agente Fase 1 EN PRODUCCIÓN (PR #5 mergeado): página `/agente` con voz y
       tarjetas ricas; Edge Function `ai-chat` v34 desplegada devolviendo `{ reply, cards }`
 - [x] Fix de dictado (PR #6 mergeado): dictado continuo, texto acumulado editable, botón Detener
