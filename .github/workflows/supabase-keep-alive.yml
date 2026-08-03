@@ -1,0 +1,24 @@
+name: Supabase Keep-Alive
+
+# Los proyectos gratuitos de Supabase se pausan automáticamente tras ~7 días sin
+# actividad en la API. Este workflow hace una consulta de lectura muy liviana
+# cada 4 días para que el proyecto "inventario" nunca se pause por inactividad.
+on:
+  schedule:
+    - cron: "0 8 */4 * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar Supabase para mantener el proyecto activo
+        env:
+          SUPABASE_URL: https://hegtvsuscaaifqqhbbxq.supabase.co
+          # Anon key: es pública por diseño (ya viaja en el bundle del frontend),
+          # protegida por RLS. No requiere configurar secrets en el repo.
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlZ3R2c3VzY2FhaWZxcWhiYnhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzM5NTMsImV4cCI6MjA4NTc0OTk1M30.6WOx400PQSmCWNc7DUyJ-d_TcaPnP7FlYMTgd_9BkJY
+        run: |
+          curl -sS -f -X GET "$SUPABASE_URL/rest/v1/sedes?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY"
